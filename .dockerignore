@@ -1,0 +1,7 @@
+**/node_modules
+**/__pycache__
+collector/dist
+server/static/termometro.js
+data
+.git
+*.db

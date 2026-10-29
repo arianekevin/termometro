@@ -1,0 +1,27 @@
+# Termometro behind Caddy, with HTTPS from Let's Encrypt.
+#   1. Point your domain's DNS (an A record) at this server.
+#   2. cp .env.example .env and fill it in.
+#   3. docker compose up -d
+services:
+  termometro:
+    image: ghcr.io/arianekevin/termometro:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TERMOMETRO_PUBLIC_URL: https://${TERMOMETRO_DOMAIN}
+    volumes:
+      - termometro-data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${TERMOMETRO_DOMAIN} --to termometro:8080
+    volumes:
+      - caddy-data:/data
+
+volumes:
+  termometro-data:
+  caddy-data:

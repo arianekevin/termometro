@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termometro</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z' fill='%23e5484d'/%3E%3C/svg%3E">
+<style>
+/* No web fonts and no third-party requests: the dashboard of a privacy tool should not call anyone. */
+:root {
+  --canvas: #f6f6f8; --surface: #ffffff; --sunken: #f1f1f4; --line: #e7e7ec; --line-strong: #d6d6de;
+  --fg: #18181b; --fg2: #4b4b55; --faint: #6b6b76;
+  --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0ff; --on-accent: #ffffff; --brand: #e5484d;
+  --ok: #15803d; --ok-soft: #e8f7ee; --warn: #a16207; --warn-soft: #fdf4e3; --bad: #c2262e; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04); --ease: cubic-bezier(.16,1,.3,1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #111114; --surface: #1a1a1f; --sunken: #15151a; --line: #2a2a31; --line-strong: #3a3a43;
+    --fg: #f4f4f5; --fg2: #c9c9d1; --faint: #9b9ba6;
+    --accent: #a5b4fc; --accent-hover: #c7d2fe; --accent-soft: #23243d; --on-accent: #111114; --brand: #ff6b70;
+    --ok: #6ee7a0; --ok-soft: #12261b; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 400 14px/20px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--canvas); color: var(--fg);
+  -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+select, button, input { font: inherit; color: inherit; height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); }
+button, .button { cursor: pointer; font-weight: 500; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+button:hover { background: var(--sunken); }
+.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.primary:hover { background: var(--accent-hover); }
+:is(select, button, input, a):focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.mark svg { width: 20px; height: 20px; color: var(--brand); }
+header { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; }
+.top .mark { margin-right: auto; }
+.field { display: flex; align-items: center; gap: 6px; }
+.who { display: flex; align-items: center; gap: 8px; }
+nav.tabs { display: flex; gap: 4px; padding: 0 16px; overflow-x: auto; }
+nav.tabs a { display: flex; align-items: center; height: 40px; padding: 0 12px; color: var(--fg2); font-weight: 500; border-bottom: 2px solid transparent; text-decoration: none; white-space: nowrap; }
+nav.tabs a.on { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.chip button { height: 22px; width: 22px; padding: 0; border: 0; background: none; color: inherit; }
+main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; min-width: 0; }
+.label { font-size: 12px; line-height: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
+.meta { color: var(--faint); font-size: 12px; line-height: 16px; }
+.numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.big { font-size: 32px; line-height: 40px; font-weight: 700; margin-top: 4px; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); } .pill.warn { background: var(--warn-soft); } .pill.bad { background: var(--bad-soft); }
+.table { overflow-x: auto; margin: 8px -16px -16px; }
+table { width: 100%; border-collapse: collapse; }
+th { height: 40px; padding: 0 12px; text-align: left; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; color: var(--faint); border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tbody tr.row { cursor: pointer; transition: background .15s var(--ease); }
+tbody tr.row:hover { background: var(--sunken); }
+tbody tr.sel { background: var(--accent-soft); }
+code { font: 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg2); overflow-wrap: anywhere; }
+.route { font-weight: 500; overflow-wrap: break-word; min-width: 8em; }
+.bar { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; margin-top: 6px; min-width: 80px; }
+.bar i { display: block; height: 100%; border-radius: 3px; }
+.signals { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--fg2); min-width: 10em; }
+.detail td { background: var(--sunken); }
+.detail ul { margin: 4px 0 8px; padding-left: 18px; }
+.empty { padding: 32px 16px; text-align: center; color: var(--faint); }
+details summary { cursor: pointer; color: var(--fg2); }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; justify-content: space-between; }
+/* Sign-in */
+.signin { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.signin .card { width: 100%; max-width: 380px; padding: 28px; display: grid; gap: 16px; text-align: center; }
+.signin form { display: grid; gap: 10px; }
+.signin input { width: 100%; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12px; }
+.or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.setup { display: grid; gap: 16px; max-width: 760px; margin: 0 auto; width: 100%; }
+.setup pre { margin: 8px 0 0; padding: 12px 14px; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto;
+  font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); white-space: pre; }
+.snippet { position: relative; }
+.snippet button { position: absolute; top: 6px; right: 6px; height: 28px; font-size: 12px; }
+.waiting { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s var(--ease) infinite; }
+@keyframes pulse { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+.error { color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>'
+const PT = /^pt\b/i.test(navigator.language)
+document.documentElement.lang = PT ? 'pt-BR' : 'en'
+const L = PT ? {
+  signinTitle: 'Entre para ver seus projetos', google: 'Entrar com Google', password: 'Senha', enter: 'Entrar', or: 'ou',
+  errors: { not_allowed: 'Este e-mail não tem acesso. Peça a quem cuida desta instalação.', google: 'O Google não confirmou o login. Tente de novo.',
+    state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
+  signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
+  day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
+  tabs: { frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações' },
+  names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora' },
+  noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
+  overall: 'Nota geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'tranquilo', attention: 'atenção', much: 'muita frustração',
+  sessions: (n) => `${n} ${n === 1 ? 'sessão' : 'sessões'}`, visitsN: (n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`, scoreIn: (s, v) => `nota ${s} em ${v}`,
+  screensByFrustration: 'Telas, da mais frustrante para a menos', openRow: 'Clique numa tela para ver onde irrita e o que falhou.',
+  screen: 'Tela', score: 'Nota', signals: 'Sinais', none: 'nenhum sinal', where: 'Onde irrita', whatFailed: 'O que falhou', after: 'depois de clicar em',
+  noDetail: 'Os sinais desta tela não têm elemento nem falha (voltas, abandonos).', byVersion: 'Por versão', versionHint: 'Um deploy que sobe a nota piorou a experiência.',
+  how: 'Como a nota é calculada', howText: (w, f) => `Cada sinal vale pontos: ${w}. A nota é a soma dos pontos dividida pelas visitas, vezes ${f}, com teto 100. Até 19 está tranquilo, de 20 a 49 pede atenção, de 50 para cima é muita frustração.`,
+  privacy: 'Nada do que o usuário digita ou vê é coletado: só o tipo do sinal, a tela, o seletor do elemento e ids de conta, usuário e papel.',
+  screensByUse: 'Telas, da mais usada para a menos', pickScreen: 'Clique numa tela para ver os elementos dela.', clicks: 'Cliques', users: 'Usuários',
+  elementsOf: (r) => `Elementos de ${r}`, openMap: 'Abrir mapa de calor', mapNoUrl: 'Defina "url" no projeto para abrir o mapa.', element: 'Elemento', problems: 'Problemas',
+  noClicks: 'Nenhum clique nesta tela.', neverIn: (r) => `Nunca clicados em ${r}`, neverHint: 'Apareceram na tela e ninguém clicou no período: candidatos a sair ou a mudar de lugar.',
+  allClicked: 'Tudo o que aparece nesta tela foi clicado ao menos uma vez.', problemTip: (e) => `rage ${e.rage} · sem resposta ${e.dead} · erros depois ${e.errors}`,
+  noPeople: 'Nenhum usuário identificado neste período.', byRole: 'Por papel', roleHint: 'O que cada tipo de usuário usa.', byAccount: 'Por conta', accountHint: 'Contas do seu produto (id).',
+  byUser: 'Por usuário', userHint: 'Só ids. Clique para filtrar todas as abas por esse usuário.', topScreens: 'Telas mais usadas',
+  noActions: 'Nenhuma ação concluída neste período.', effort: 'Esforço por ação', effortHint: 'Uma ação é uma gravação que o backend aceitou. Conta os cliques e o tempo desde a anterior (ou desde 2 minutos parado). Mediana é o caso típico; p90, os 10% piores. De 8 cliques para cima pede atenção; de 15, é trabalhoso.',
+  action: 'Ação', times: 'Vezes', clicksMed: 'Cliques (mediana)', clicksP90: 'Cliques (p90)', timeMed: 'Tempo (mediana)', timeP90: 'Tempo (p90)',
+  setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
+  withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
+  originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
+  waiting: 'Esperando o primeiro evento…', copy: 'Copiar', copied: 'Copiado',
+} : {
+  signinTitle: 'Sign in to see your projects', google: 'Sign in with Google', password: 'Password', enter: 'Sign in', or: 'or',
+  errors: { not_allowed: 'This e-mail has no access. Ask whoever runs this instance.', google: 'Google did not confirm the sign-in. Try again.',
+    state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
+  signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
+  day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
+  tabs: { frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions' },
+  names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back' },
+  noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
+  overall: 'Overall score', visits: 'Visits', worst: 'Most frustrating screen', calm: 'calm', attention: 'attention', much: 'very frustrating',
+  sessions: (n) => `${n} ${n === 1 ? 'session' : 'sessions'}`, visitsN: (n) => `${n} ${n === 1 ? 'visit' : 'visits'}`, scoreIn: (s, v) => `score ${s} over ${v}`,
+  screensByFrustration: 'Screens, most frustrating first', openRow: 'Click a screen to see where it irritates and what failed.',
+  screen: 'Screen', score: 'Score', signals: 'Signals', none: 'no signals', where: 'Where it irritates', whatFailed: 'What failed', after: 'after clicking',
+  noDetail: 'This screen\'s signals have no element or failure (bounces, abandoned forms).', byVersion: 'By version', versionHint: 'A deploy that raises the score made things worse.',
+  how: 'How the score works', howText: (w, f) => `Each signal is worth points: ${w}. The score is the points divided by the visits, times ${f}, capped at 100. Up to 19 is calm, 20 to 49 needs attention, 50 and up is very frustrating.`,
+  privacy: 'Nothing the user types or sees is collected: only the signal, the screen, the element\'s selector and account, user and role ids.',
+  screensByUse: 'Screens, most used first', pickScreen: 'Click a screen to see its elements.', clicks: 'Clicks', users: 'Users',
+  elementsOf: (r) => `Elements of ${r}`, openMap: 'Open heat map', mapNoUrl: 'Set the project\'s "url" to open the map.', element: 'Element', problems: 'Problems',
+  noClicks: 'No clicks on this screen.', neverIn: (r) => `Never clicked on ${r}`, neverHint: 'They were on screen and nobody clicked them in the period: candidates to remove or move.',
+  allClicked: 'Everything on this screen was clicked at least once.', problemTip: (e) => `rage ${e.rage} · dead ${e.dead} · errors after ${e.errors}`,
+  noPeople: 'No identified users in this period.', byRole: 'By role', roleHint: 'What each kind of user uses.', byAccount: 'By account', accountHint: 'Your product\'s accounts (id).',
+  byUser: 'By user', userHint: 'Ids only. Click to filter every tab by that user.', topScreens: 'Most used screens',
+  noActions: 'No completed actions in this period.', effort: 'Effort per action', effortHint: 'An action is a write the backend accepted. It counts the clicks and time since the previous one (or since 2 idle minutes). The median is the typical case; p90, the worst 10%. 8 clicks and up needs attention; 15 is laborious.',
+  action: 'Action', times: 'Times', clicksMed: 'Clicks (median)', clicksP90: 'Clicks (p90)', timeMed: 'Time (median)', timeP90: 'Time (p90)',
+  setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
+  withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
+  originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
+  waiting: 'Waiting for the first event…', copy: 'Copy', copied: 'Copied',
+}
+
+const $ = (s) => document.querySelector(s)
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const band = (n) => (n >= 50 ? 'bad' : n >= 20 ? 'warn' : 'ok')
+const say = (n) => (n >= 50 ? L.much : n >= 20 ? L.attention : L.calm)
+const scoreHtml = (n) => `<b class="${band(n)}">${n}</b>`
+const keep = (k, v) => { try { localStorage.setItem('termometro.' + k, v) } catch {} }
+const recall = (k) => { try { return localStorage.getItem('termometro.' + k) } catch { return null } }
+const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
+const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+const empty = (msg) => `<div class="card empty">${msg}</div>`
+const signals = (s) => {
+  const items = Object.entries(s).sort((a, b) => b[1] - a[1])
+  return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
+}
+
+const state = { me: null, tab: 'frustration', user: '', usageRoute: '' }
+
+// Sign-in --------------------------------------------------------------------------------------------------
+function signin(error) {
+  const m = state.me.methods
+  $('#app').innerHTML = `<div class="signin"><div class="card">
+    <div class="mark" style="justify-content:center">${MARK}Termometro</div>
+    <div class="meta">${L.signinTitle}</div>
+    ${error ? `<div class="error" role="alert">${esc(L.errors[error] ?? error)}</div>` : ''}
+    ${m.google ? `<a class="button primary" href="/auth/google" style="height:40px">${L.google}</a>` : ''}
+    ${m.google && m.password ? `<div class="or">${L.or}</div>` : ''}
+    ${m.password ? `<form id="pw"><input type="password" name="password" placeholder="${L.password}" aria-label="${L.password}" autocomplete="current-password" required>
+      <button class="${m.google ? '' : 'primary'}" type="submit">${L.enter}</button></form>` : ''}
+  </div></div>`
+  $('#pw')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const res = await fetch('/api/login', { method: 'POST', body: JSON.stringify({ password: e.target.password.value }) })
+    if (res.ok) return boot()
+    signin(res.status === 429 ? 'limit' : 'wrong')
+  })
+}
+
+// Shell ----------------------------------------------------------------------------------------------------
+function shell() {
+  const projects = state.me.projects
+  $('#app').innerHTML = `
+    <header>
+      <div class="top">
+        <div class="mark">${MARK}Termometro</div>
+        <label class="field"><span class="meta">${L.project}</span><select id="project">${projects.map((p) => `<option>${esc(p.name)}</option>`).join('')}</select></label>
+        <label class="field"><span class="meta">${L.period}</span><select id="days">
+          <option value="1">${L.day}</option>${[7, 30, 90].map((n) => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${L.days(n)}</option>`).join('')}</select></label>
+        <label class="field"><span class="meta">${L.version}</span><select id="version"></select></label>
+        <label class="field"><span class="meta">${L.account}</span><select id="account"></select></label>
+        <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
+        <span id="user-chip"></span>
+        ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
+      </div>
+      <nav class="tabs">${Object.entries(L.tabs).map(([k, v]) => `<a href="#${k}" data-tab="${k}">${v}</a>`).join('')}</nav>
+    </header>
+    <main id="content"></main>`
+  const project = recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
+  const days = recall('days'); if (days) $('#days').value = days
+  $('#project').addEventListener('change', async () => { keep('project', $('#project').value); state.user = ''; state.usageRoute = ''; await loadFilters(); render() })
+  for (const id of ['days', 'version', 'account', 'role']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
+  $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
+  $('#content').addEventListener('click', onContentClick)
+  $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
+  document.addEventListener('click', (e) => { if (e.target.closest('#remove-user')) { state.user = ''; render() } })
+}
+
+async function loadFilters() {
+  const f = await (await fetch('/api/filters?project=' + encodeURIComponent($('#project').value))).json()
+  const fill = (id, values, all) => {
+    const current = $('#' + id).value || recall(id) || ''
+    $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option>${esc(v)}</option>`).join('')
+    $('#' + id).value = values.includes(current) ? current : ''
+  }
+  fill('version', f.versions, L.allf); fill('account', f.accounts, L.all); fill('role', f.roles, L.all)
+}
+
+function query(extra = {}) {
+  const q = new URLSearchParams({ project: $('#project').value, days: $('#days').value })
+  for (const k of ['version', 'account', 'role']) if ($('#' + k).value) q.set(k, $('#' + k).value)
+  if (state.user) q.set('user', state.user)
+  for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v)
+  return q
+}
+async function read(path, extra) {
+  const res = await fetch(`${path}?${query(extra)}`)
+  if (res.status === 401) { boot(); throw new Error('signed out') }
+  return res.json()
+}
+
+// Frustration ----------------------------------------------------------------------------------------------
+async function frustration() {
+  const r = await read('/api/summary')
+  const o = r.overall
+  if (!o.visits && !r.routes.length) return empty(L.noVisits)
+  const worst = r.routes.find((x) => x.visits)
+  const detail = (x) => {
+    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — <code>${esc(a.target)}</code> ${a.n}×</li>`).join('')}</ul>` : ''
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li>${esc(L.names[f.type])}: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×</li>`).join('')}</ul>` : ''
+    return where + failed || `<span class="meta">${L.noDetail}</span>`
+  }
+  return `
+    <section class="numbers">
+      <div class="card"><div class="label">${L.overall}</div><div class="big ${band(o.score)}">${o.score}</div><span class="pill ${band(o.score)}">${say(o.score)}</span></div>
+      <div class="card"><div class="label">${L.visits}</div><div class="big">${o.visits}</div><div class="meta">${L.sessions(o.sessions)}</div></div>
+      <div class="card"><div class="label">${L.worst}</div><div class="route" style="margin-top:8px">${worst ? esc(worst.key) : '—'}</div>
+        <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}</div></div>
+    </section>
+    <section class="card">
+      <div class="label">${L.screensByFrustration}</div><div class="meta">${L.openRow}</div>
+      ${table(`<th>${L.screen}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.routes.map((x, i) => `
+        <tr class="row" data-open="${i}" tabindex="0" aria-expanded="false">
+          <td><div class="route">${esc(x.key)}</div></td>
+          <td class="n">${scoreHtml(x.score)}<div class="bar"><i style="width:${x.score}%;background:var(--${band(x.score)})"></i></div></td>
+          <td class="n">${x.visits}</td><td>${signals(x.signals)}</td></tr>
+        <tr class="detail" data-of="${i}" hidden><td colspan="4">${detail(x)}</td></tr>`).join(''))}
+    </section>
+    ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}</div><div class="meta">${L.versionHint}</div>
+      ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
+        <td class="n">${scoreHtml(v.score)}</td><td class="n">${v.visits}</td><td>${signals(v.signals)}</td></tr>`).join(''))}</section>` : ''}
+    <details class="card"><summary>${L.how}</summary>
+      <p>${L.howText(Object.entries(r.weights).map(([k, w]) => `${esc(L.names[k] ?? k)} ${w}`).join(', '), r.factor)}</p>
+      <p class="meta">${L.privacy}</p></details>`
+}
+
+// Usage ----------------------------------------------------------------------------------------------------
+async function usage() {
+  const { screens } = await read('/api/usage')
+  if (!screens.length) return empty(L.noVisits)
+  if (!screens.some((s) => s.route === state.usageRoute)) state.usageRoute = screens[0].route
+  const d = await read('/api/usage', { route: state.usageRoute })
+  const maxV = Math.max(...screens.map((s) => s.visits))
+  const maxC = Math.max(1, ...d.elements.map((e) => e.clicks))
+  const heat = (f) => `hsl(${Math.round(220 - f * 220)} 75% 50%)`
+  const project = state.me.projects.find((p) => p.name === $('#project').value)
+  return `
+    <section class="two">
+      <div class="card">
+        <div class="label">${L.screensByUse}</div><div class="meta">${L.pickScreen}</div>
+        ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
+          <tr class="row ${s.route === state.usageRoute ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
+            <td><div class="route">${esc(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
+            <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
+      </div>
+      <div class="card">
+        <div class="head"><div><div class="label">${esc(L.elementsOf(d.route))}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
+          ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
+        ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
+          <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><code>${esc(e.target)}</code></td>
+            <td class="n">${e.clicks}</td><td class="n">${e.users}</td>
+            <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${e.rage + e.dead + e.errors}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
+          : `<p class="meta">${L.noClicks}</p>`}
+      </div>
+    </section>
+    <section class="card"><div class="label">${esc(L.neverIn(d.route))}</div><div class="meta">${L.neverHint}</div>
+      ${d.never_clicked.length ? `<ul>${d.never_clicked.map((a) => `<li><code>${esc(a)}</code></li>`).join('')}</ul>` : `<p class="meta">${L.allClicked}</p>`}</section>`
+}
+
+async function openMap() {
+  const res = await fetch('/api/map-token?project=' + encodeURIComponent($('#project').value), { method: 'POST' })
+  if (!res.ok) return
+  const { token, url } = await res.json()
+  const target = new URL(url)
+  target.searchParams.set('termometro_map', token)
+  window.open(target.href, '_blank', 'noopener')
+}
+
+// People ---------------------------------------------------------------------------------------------------
+async function people() {
+  const p = await read('/api/people')
+  if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
+  const top = (ss) => ss.map((s) => `${esc(s.route)} <span class="meta">${s.visits}</span>`).join('<br>')
+  const group = (title, hint, list, col) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
+    ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
+      list.map((g) => `<tr><td><b>${esc(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+  return `
+    <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account)}</section>
+    <section class="card"><div class="label">${L.byUser}</div><div class="meta">${L.userHint}</div>
+      ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
+        p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
+          <td><code title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(u.account)}</td>
+          <td class="n">${u.visits}</td><td class="n">${u.clicks}</td><td class="n">${scoreHtml(u.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
+}
+
+// Actions --------------------------------------------------------------------------------------------------
+async function actions() {
+  const { actions } = await read('/api/actions')
+  if (!actions.length) return empty(L.noActions)
+  const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
+  return `<section class="card"><div class="label">${L.effort}</div><div class="meta">${L.effortHint}</div>
+    ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
+      actions.map((a) => `<tr><td><code>${esc(a.action)}</code></td><td class="n">${a.times}</td><td class="n">${a.users}</td>
+        <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td><td class="n">${a.clicks_p90}</td>
+        <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
+}
+
+// First run ------------------------------------------------------------------------------------------------
+function setup(project) {
+  const server = location.origin
+  const npm = `npm install termometro\n\nimport { start } from 'termometro'\n\nstart({\n  key: '${project.key}',\n  url: '${server}',\n})`
+  const tag = `<script src="${server}/termometro.js" data-key="${project.key}" async><\/script>` // escaped: a literal closing tag would end this very <script>
+  const snippet = (code) => `<div class="snippet"><pre>${esc(code)}</pre><button data-copy="${esc(code)}">${L.copy}</button></div>`
+  return `<section class="setup">
+    <div class="card"><div class="label">${esc(L.setupTitle(project.name))}</div><p>${L.setupIntro}</p>
+      <div class="waiting" role="status"><span class="pulse"></span>${L.waiting}</div></div>
+    <div class="card"><div class="label">${L.withBundler}</div>${snippet(npm)}<p class="meta">${L.routerHint}</p></div>
+    <div class="card"><div class="label">${L.withoutBundler}</div>${snippet(tag)}</div>
+    <p class="meta">${project.origins?.length ? esc(L.originsHint(project.origins.join(', '))) : L.anyOrigin}</p>
+  </section>`
+}
+
+let waitTimer = 0
+async function hasEvents() {
+  const status = await read('/api/status')
+  return status.events > 0
+}
+
+// Render ---------------------------------------------------------------------------------------------------
+const TABS = { frustration, usage, people, actions }
+
+async function render() {
+  clearTimeout(waitTimer)
+  const project = state.me.projects.find((p) => p.name === $('#project').value)
+  try {
+    if (!(await hasEvents())) {
+      $('#content').innerHTML = setup(project)
+      // Poll until the first event lands, then show the dashboard and its filters.
+      const wait = async () => {
+        if (await hasEvents().catch(() => false)) { await loadFilters(); return render() }
+        waitTimer = setTimeout(wait, 3000)
+      }
+      waitTimer = setTimeout(wait, 3000)
+      return
+    }
+  } catch (error) {
+    if (error.message === 'signed out') return
+  }
+  document.querySelectorAll('nav.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === state.tab))
+  $('#user-chip').innerHTML = state.user
+    ? `<span class="chip">${L.user} <code>${esc(short(state.user))}</code><button id="remove-user" aria-label="${L.removeUser}">×</button></span>` : ''
+  try {
+    $('#content').innerHTML = await TABS[state.tab]()
+    $('#open-map')?.addEventListener('click', openMap)
+  } catch (error) {
+    if (error.message !== 'signed out') $('#content').innerHTML = empty(L.failed + esc(error.message))
+  }
+}
+
+function onContentClick(e) {
+  const copy = e.target.closest('[data-copy]')
+  if (copy) {
+    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = L.copy }, 1500) })
+    return
+  }
+  const tr = e.target.closest('tr.row'); if (!tr) return
+  if (tr.dataset.open !== undefined) {
+    const d = document.querySelector(`tr[data-of="${tr.dataset.open}"]`)
+    d.hidden = !d.hidden; tr.setAttribute('aria-expanded', String(!d.hidden))
+  } else if (tr.dataset.route !== undefined) { state.usageRoute = tr.dataset.route; render() }
+  else if (tr.dataset.user !== undefined) { state.user = state.user === tr.dataset.user ? '' : tr.dataset.user; render() }
+}
+
+addEventListener('hashchange', () => { state.tab = TABS[location.hash.slice(1)] ? location.hash.slice(1) : 'frustration'; if ($('#content')) render() })
+
+async function boot() {
+  state.tab = TABS[location.hash.slice(1)] ? location.hash.slice(1) : 'frustration'
+  state.me = await (await fetch('/api/me')).json()
+  const params = new URLSearchParams(location.search)
+  if (!state.me.signed_in) return signin(params.get('error'))
+  if (params.has('error')) history.replaceState(null, '', location.pathname + location.hash)
+  if (!state.me.projects.length) { $('#app').innerHTML = `<main>${empty(L.noProjects)}</main>`; return }
+  shell()
+  await loadFilters()
+  render()
+}
+boot()
+</script>
+</body>
+</html>

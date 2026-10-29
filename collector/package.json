@@ -1,0 +1,46 @@
+{
+  "name": "termometro",
+  "version": "0.1.0",
+  "description": "See where your users struggle — rage clicks, dead clicks, errors, effort per action and a heat map — without recording anyone.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "ux",
+    "frustration",
+    "rage-click",
+    "dead-click",
+    "heatmap",
+    "privacy",
+    "analytics",
+    "self-hosted"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arianekevin/termometro.git",
+    "directory": "collector"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && esbuild src/auto.ts --bundle --minify --format=iife --target=es2019 --outfile=dist/termometro.js && cp dist/termometro.js ../server/static/termometro.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "happy-dom": "20.10.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
