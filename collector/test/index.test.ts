@@ -141,6 +141,44 @@ describe('termometro', () => {
     ])
   })
 
+  it('reports a slow request once per visit, and not a quick or failed one', async () => {
+    window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body instanceof Blob) {
+        sent.push(JSON.parse(await init.body.text()))
+        return new Response(null, { status: 204 })
+      }
+      await new Promise((r) => setTimeout(r, String(input).includes('quick') ? 200 : 3500))
+      return new Response(null, { status: String(input).includes('broken') ? 500 : 200 })
+    }) as typeof fetch
+    const t = start()
+    t.page('/reports')
+    const wait = async (url: string) => { const p = fetch(url); await vi.advanceTimersByTimeAsync(3500); await p }
+    await wait('/api/reports/2024')
+    await wait('/api/reports/2025')
+    await wait('/api/quick')
+    await wait('/api/broken')
+    t.page('/reports')
+    await wait('/api/reports/2026')
+    const slow = (await events()).filter((e) => e.type === 'slow')
+    expect(slow.map((e) => [e.route, e.detail])).toEqual([['/reports', 'GET /api/reports/:id'], ['/reports', 'GET /api/reports/:id']])
+    expect(slow[0]!.duration_ms).toBeGreaterThanOrEqual(3000)
+  })
+
+  it('does not report slow requests with slowMs: 0', async () => {
+    window.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body instanceof Blob) {
+        sent.push(JSON.parse(await init.body.text()))
+        return new Response(null, { status: 204 })
+      }
+      await new Promise((r) => setTimeout(r, 5000))
+      return new Response(null, { status: 200 })
+    }) as typeof fetch
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000, slowMs: 0 })
+    termometro.page('/poll')
+    const p = fetch('/api/long-poll'); await vi.advanceTimersByTimeAsync(5000); await p
+    expect((await events()).some((e) => e.type === 'slow')).toBe(false)
+  })
+
   it('reports errors scrubbed and caps repeats of the same one', async () => {
     const t = start()
     t.page('/x')

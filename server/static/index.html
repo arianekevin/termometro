@@ -106,8 +106,8 @@ const L = PT ? {
     state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
   signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
   day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
-  tabs: { frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações' },
-  names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora' },
+  tabs: { frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
   noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
   overall: 'Nota geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'tranquilo', attention: 'atenção', much: 'muita frustração',
   sessions: (n) => `${n} ${n === 1 ? 'sessão' : 'sessões'}`, visitsN: (n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`, scoreIn: (s, v) => `nota ${s} em ${v}`,
@@ -124,6 +124,12 @@ const L = PT ? {
   byUser: 'Por usuário', userHint: 'Só ids. Clique para filtrar todas as abas por esse usuário.', topScreens: 'Telas mais usadas',
   noActions: 'Nenhuma ação concluída neste período.', effort: 'Esforço por ação', effortHint: 'Uma ação é uma gravação que o backend aceitou. Conta os cliques e o tempo desde a anterior (ou desde 2 minutos parado). Mediana é o caso típico; p90, os 10% piores. De 8 cliques para cima pede atenção; de 15, é trabalhoso.',
   action: 'Ação', times: 'Vezes', clicksMed: 'Cliques (mediana)', clicksP90: 'Cliques (p90)', timeMed: 'Tempo (mediana)', timeP90: 'Tempo (p90)',
+  seen: (first, last, ago) => `desde a ${first} · última vez na ${last}, ${ago}`, average: (s) => `${s} s em média`,
+  ago: (n, unit) => `há ${n} ${{ m: n === 1 ? 'minuto' : 'minutos', h: n === 1 ? 'hora' : 'horas', d: n === 1 ? 'dia' : 'dias' }[unit]}`, now: 'agora',
+  oneVersion: 'Só uma versão neste período. Quando a próxima chegar, a comparação aparece aqui.', compareWith: 'comparada com',
+  compareHint: 'Mesmo período e filtros, separados por versão. Nota maior na versão nova é piora.', change: 'Variação',
+  screensCompared: 'Telas, da que mais piorou para a que mais melhorou', actionsCompared: 'Ações: cliques e tempo (medianas)',
+  newFailures: 'Falhas que só a versão nova tem', noNewFailures: 'Nenhuma falha nova.', onlyIn: (v) => `só na ${v}`, worse: 'piorou', better: 'melhorou', same: 'igual',
   setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
   originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
@@ -134,8 +140,8 @@ const L = PT ? {
     state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
   signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
   day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
-  tabs: { frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions' },
-  names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back' },
+  tabs: { frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
+  names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
   noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
   overall: 'Overall score', visits: 'Visits', worst: 'Most frustrating screen', calm: 'calm', attention: 'attention', much: 'very frustrating',
   sessions: (n) => `${n} ${n === 1 ? 'session' : 'sessions'}`, visitsN: (n) => `${n} ${n === 1 ? 'visit' : 'visits'}`, scoreIn: (s, v) => `score ${s} over ${v}`,
@@ -152,6 +158,12 @@ const L = PT ? {
   byUser: 'By user', userHint: 'Ids only. Click to filter every tab by that user.', topScreens: 'Most used screens',
   noActions: 'No completed actions in this period.', effort: 'Effort per action', effortHint: 'An action is a write the backend accepted. It counts the clicks and time since the previous one (or since 2 idle minutes). The median is the typical case; p90, the worst 10%. 8 clicks and up needs attention; 15 is laborious.',
   action: 'Action', times: 'Times', clicksMed: 'Clicks (median)', clicksP90: 'Clicks (p90)', timeMed: 'Time (median)', timeP90: 'Time (p90)',
+  seen: (first, last, ago) => `since ${first} · last in ${last}, ${ago}`, average: (s) => `${s} s on average`,
+  ago: (n, unit) => `${n} ${{ m: 'min', h: n === 1 ? 'hour' : 'hours', d: n === 1 ? 'day' : 'days' }[unit]} ago`, now: 'just now',
+  oneVersion: 'Only one version in this period. When the next one arrives, the comparison shows up here.', compareWith: 'compared with',
+  compareHint: 'Same period and filters, split by version. A higher score on the new version is worse.', change: 'Change',
+  screensCompared: 'Screens, most worsened first', actionsCompared: 'Actions: clicks and time (medians)',
+  newFailures: 'Failures only the new version has', noNewFailures: 'No new failures.', onlyIn: (v) => `only in ${v}`, worse: 'worse', better: 'better', same: 'same',
   setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
   originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
@@ -165,6 +177,10 @@ const say = (n) => (n >= 50 ? L.much : n >= 20 ? L.attention : L.calm)
 const scoreHtml = (n) => `<b class="${band(n)}">${n}</b>`
 const keep = (k, v) => { try { localStorage.setItem('termometro.' + k, v) } catch {} }
 const recall = (k) => { try { return localStorage.getItem('termometro.' + k) } catch { return null } }
+const ago = (at) => {
+  const m = Math.floor((Date.now() - at) / 60000)
+  return m < 1 ? L.now : m < 60 ? L.ago(m, 'm') : m < 1440 ? L.ago(Math.floor(m / 60), 'h') : L.ago(Math.floor(m / 1440), 'd')
+}
 const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
 const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
 const empty = (msg) => `<div class="card empty">${msg}</div>`
@@ -173,7 +189,7 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'frustration', user: '', usageRoute: '' }
+const state = { me: null, tab: 'frustration', user: '', usageRoute: '', a: '', b: '' }
 
 // Sign-in --------------------------------------------------------------------------------------------------
 function signin(error) {
@@ -216,10 +232,13 @@ function shell() {
     <main id="content"></main>`
   const project = recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
   const days = recall('days'); if (days) $('#days').value = days
-  $('#project').addEventListener('change', async () => { keep('project', $('#project').value); state.user = ''; state.usageRoute = ''; await loadFilters(); render() })
+  $('#project').addEventListener('change', async () => { keep('project', $('#project').value); state.user = ''; state.usageRoute = ''; state.a = ''; state.b = ''; await loadFilters(); render() })
   for (const id of ['days', 'version', 'account', 'role']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
+  $('#content').addEventListener('change', (e) => {
+    if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
+  })
   $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
   document.addEventListener('click', (e) => { if (e.target.closest('#remove-user')) { state.user = ''; render() } })
 }
@@ -255,7 +274,8 @@ async function frustration() {
   const worst = r.routes.find((x) => x.visits)
   const detail = (x) => {
     const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — <code>${esc(a.target)}</code> ${a.n}×</li>`).join('')}</ul>` : ''
-    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li>${esc(L.names[f.type])}: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×</li>`).join('')}</ul>` : ''
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
+      <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`
   }
   return `
@@ -353,6 +373,40 @@ async function actions() {
         <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
 }
 
+// Versions -------------------------------------------------------------------------------------------------
+async function versions() {
+  const c = await read('/api/compare', { a: state.a, b: state.b }) // the header's version filter does not apply here
+  if (c.versions.length < 2) return empty(L.oneVersion)
+  const pick = (id, value) => `<select id="${id}" aria-label="${L.version}">${c.versions.map((v) => `<option ${v === value ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`
+  const delta = (d) => d === null ? '<span class="meta">—</span>'
+    : `<span class="pill ${d >= 10 ? 'bad' : d <= -10 ? 'ok' : d > 0 ? 'warn' : 'ok'}">${d > 0 ? '+' : ''}${d}</span>`
+  const pair = (x, y, unit = '') => `${x ?? '—'}${x !== undefined && x !== null ? unit : ''} → <b>${y ?? '—'}${y !== undefined && y !== null ? unit : ''}</b>`
+  const o = c.overall
+  const d = o.b.score - o.a.score
+  return `
+    <section class="card"><div class="head"><div class="field" style="flex-wrap:wrap">${pick('cmp-b', c.b)}<span class="meta">${L.compareWith}</span>${pick('cmp-a', c.a)}</div></div>
+      <div class="meta" style="margin-top:8px">${L.compareHint}</div></section>
+    <section class="numbers">
+      <div class="card"><div class="label">${L.overall}</div><div class="big">${scoreHtml(o.a.score)} → ${scoreHtml(o.b.score)}</div>
+        <span class="pill ${d >= 10 ? 'bad' : d > 0 ? 'warn' : 'ok'}">${d > 0 ? L.worse : d < 0 ? L.better : L.same}</span></div>
+      <div class="card"><div class="label">${L.visits}</div><div class="big">${o.a.visits} → ${o.b.visits}</div></div>
+      <div class="card"><div class="label">${L.newFailures}</div><div class="big ${c.new_failures.length ? 'bad' : 'ok'}">${c.new_failures.length}</div></div>
+    </section>
+    <section class="card"><div class="label">${L.screensCompared}</div>
+      ${table(`<th>${L.screen}</th><th class="n">${esc(c.a)}</th><th class="n">${esc(c.b)}</th><th class="n">${L.change}</th><th class="n">${L.visits} ${esc(c.b)}</th><th>${L.signals} ${esc(c.b)}</th>`,
+        c.routes.map((r) => `<tr><td><div class="route">${esc(r.route)}</div></td>
+          <td class="n">${r.a ? scoreHtml(r.a.score) : '<span class="meta">—</span>'}</td><td class="n">${r.b ? scoreHtml(r.b.score) : '<span class="meta">—</span>'}</td>
+          <td class="n">${r.delta === null ? `<span class="meta">${esc(L.onlyIn(r.b ? c.b : c.a))}</span>` : delta(r.delta)}</td>
+          <td class="n">${r.b?.visits ?? 0}</td><td>${r.b ? signals(r.b.signals) : ''}</td></tr>`).join(''))}</section>
+    ${c.actions.length ? `<section class="card"><div class="label">${L.actionsCompared}</div>
+      ${table(`<th>${L.action}</th><th class="n">${L.clicks}</th><th class="n">${L.timeMed}</th><th class="n">${L.times} ${esc(c.b)}</th>`,
+        c.actions.map((x) => `<tr><td><code>${esc(x.action)}</code></td><td class="n">${pair(x.a?.clicks_median, x.b?.clicks_median)}</td>
+          <td class="n">${pair(x.a?.seconds_median, x.b?.seconds_median, ' s')}</td><td class="n">${x.b?.times ?? 0}</td></tr>`).join(''))}</section>` : ''}
+    <section class="card"><div class="label">${L.newFailures}</div>
+      ${c.new_failures.length ? `<ul>${c.new_failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code> <span class="meta">${esc(f.route)}</span> — ${f.n}×</li>`).join('')}</ul>`
+        : `<p class="meta">${L.noNewFailures}</p>`}</section>`
+}
+
 // First run ------------------------------------------------------------------------------------------------
 function setup(project) {
   const server = location.origin
@@ -375,7 +429,7 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
-const TABS = { frustration, usage, people, actions }
+const TABS = { frustration, usage, people, actions, versions }
 
 async function render() {
   clearTimeout(waitTimer)

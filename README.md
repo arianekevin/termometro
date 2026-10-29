@@ -3,7 +3,7 @@
 **See where your users struggle — without recording anyone.**
 
 Termometro measures frustration and effort on every screen of your web app: rage clicks, dead clicks, errors,
-abandoned forms, how many clicks each save takes, and what nobody ever clicks. It never records sessions or
+slow responses, abandoned forms, how many clicks each save takes, and what nobody ever clicks. It never records sessions or
 collects what users type or see, and it runs on your own server.
 
 [Português](README.pt-BR.md)
@@ -14,7 +14,9 @@ collects what users type or see, and it runs on your own server.
 - **Usage:** most and least used screens, and the elements nobody clicks.
 - **People:** usage by role, account and user — ids only.
 - **Heat map** over your own app, opened from the dashboard.
-- **By version:** did the last deploy make things better or worse?
+- **By version:** did the last deploy make things better or worse? Screen by screen, action by action, and the
+  failures only the new version has — and a Slack or Google Chat message when it got worse.
+- **Each failure dated:** in which version it started and when it was last seen, so you know whether the fix worked.
 
 ## Why
 
@@ -66,9 +68,17 @@ Then open http://localhost:8080 (password `try`). For a real project, make a key
 | `TERMOMETRO_ALLOWED_EMAILS`, `TERMOMETRO_ALLOWED_DOMAINS` | who may sign in with Google, comma separated |
 | `TERMOMETRO_PUBLIC_URL` | where the server is reached, e.g. `https://termometro.example.com` (needed for Google) |
 | `TERMOMETRO_RETENTION_DAYS` | how long events with user ids are kept (default 90); after that they become id-less daily totals |
+| `TERMOMETRO_WEBHOOK_URL` | a Slack or Google Chat incoming webhook; a project can have its own `webhook` in `TERMOMETRO_PROJECTS` |
+| `TERMOMETRO_LANGUAGE` | language of the webhook messages: `en` (default) or `pt-BR` |
 | `TERMOMETRO_NO_AUTH=1` | no sign-in, for a dashboard already behind your own VPN or proxy auth |
 
 At least one way in — Google or a password — is required unless `TERMOMETRO_NO_AUTH=1`.
+
+**Warnings after a deploy:** with a webhook, the server checks every hour whether the latest version (the one that
+started sending last) is worse than the one before, and posts once about each of these:
+
+- a screen whose score went up by 15 or more, with at least 30 visits in each version;
+- a screen error or server error the previous version never had, that already happened 5 times.
 
 **Google sign-in:** in Google Cloud Console, create an OAuth client of type *Web application* with the
 redirect URI `https://YOUR-SERVER/auth/google/callback`, then set the client id and secret above.
@@ -90,6 +100,7 @@ const termometro = start({
   version: import.meta.env.VITE_APP_VERSION,          // compare deploys
   identity: () => user ? { account: user.accountId, user: user.id, role: user.role } : null,
   pagesFromRouter: true,
+  // slowMs: 3000,                                   // a request slower than this is a "slow" signal; 0 turns it off
 })
 
 // Vue Router — one row per screen, not per id
@@ -110,7 +121,8 @@ Without a bundler:
 ## How the score works
 
 Each signal weighs points: rage click 3, dead click 2, screen error 5, server error 5, refused request 2,
-abandoned form 2, quick back 1. A screen's score is its points divided by its visits, times 20, capped at 100.
+abandoned form 2, quick back 1, slow response 1 (a request that took 3 s or more while the page was in front of the
+user, counted once per endpoint per visit). A screen's score is its points divided by its visits, times 20, capped at 100.
 Up to 19 is calm, 20–49 needs attention, 50+ is very frustrating.
 
 An **action** is a write your backend accepted (POST, PUT, PATCH, DELETE answered 2xx/3xx), with the clicks and

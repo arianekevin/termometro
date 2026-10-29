@@ -13,6 +13,7 @@ and the API:
   GET  /api/usage      usage per screen, or per element of one      │ session cookie (or a heat-map token,
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
   GET  /api/actions    effort (clicks and time) per accepted write  │
+  GET  /api/compare    one version against another (default: latest) │
   GET  /api/filters    accounts, roles and versions seen             │
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        ┘
@@ -30,6 +31,9 @@ Configuration (environment) — at least one way in, Google or a password, unles
   TERMOMETRO_DB         SQLite file (default ./data/termometro.db)
   TERMOMETRO_HOST, TERMOMETRO_PORT          (default 0.0.0.0:8080)
   TERMOMETRO_RETENTION_DAYS                 events with user ids live this long (default 90), then become id-less totals
+  TERMOMETRO_WEBHOOK_URL   Slack or Google Chat incoming webhook for every project without its own "webhook": warns when
+                           the latest version made a screen worse or brought a new failure
+  TERMOMETRO_LANGUAGE      language of those warnings: en (default) or pt-BR
 
 `python termometro.py new-key` prints a fresh project key.
 """
@@ -52,11 +56,12 @@ from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
 STATIC = HERE / "static"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 # Weight of each frustration signal in the score. "page" is a visit (the denominator); "click" and "action"
 # measure usage and effort and weigh nothing; "inventory" lists what can be clicked on a screen.
-WEIGHTS = {"rage": 3, "dead": 2, "js_error": 5, "http_5xx": 5, "http_4xx": 2, "abandon": 2, "bounce": 1}
+WEIGHTS = {"rage": 3, "dead": 2, "js_error": 5, "http_5xx": 5, "http_4xx": 2, "abandon": 2, "bounce": 1, "slow": 1}
+FAILURES = "('js_error', 'http_5xx', 'http_4xx', 'slow')"
 TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory"}
 FACTOR, CAP = 20, 100
 
@@ -69,6 +74,10 @@ SESSION_SECONDS = 7 * 86400
 MAP_TOKEN_SECONDS = 3600
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+ALERT_EVERY = 3600
+ALERT_MIN_VISITS = 30   # visits to a screen in each of the two versions before its scores are compared
+ALERT_RISE = 15         # score points a screen has to get worse by
+ALERT_MIN_NEW = 5       # times a failure the previous version never had must happen
 SIZES = {"version": 40, "session": 40, "account": 64, "user": 64, "role": 32,
          "route": 200, "target": 200, "detail": 200}
 
@@ -86,6 +95,8 @@ class Config:
         self.host = env.get("TERMOMETRO_HOST", "0.0.0.0")
         self.port = int(env.get("TERMOMETRO_PORT", "8080"))
         self.retention_days = int(env.get("TERMOMETRO_RETENTION_DAYS", "90"))
+        self.webhook = env.get("TERMOMETRO_WEBHOOK_URL", "")
+        self.language = "pt" if env.get("TERMOMETRO_LANGUAGE", "").lower().startswith("pt") else "en"
         raw = env.get("TERMOMETRO_PROJECTS")
         if not raw and env.get("TERMOMETRO_CONFIG"):
             raw = Path(env["TERMOMETRO_CONFIG"]).read_text()
@@ -96,7 +107,8 @@ class Config:
         for p in projects:
             if not p.get("name") or not p.get("key"):
                 raise ValueError("every project needs a name and a key")
-            self.projects[p["key"]] = {"name": str(p["name"]), "origins": list(p.get("origins", [])), "url": p.get("url", "")}
+            self.projects[p["key"]] = {"name": str(p["name"]), "origins": list(p.get("origins", [])), "url": p.get("url", ""),
+                                       "webhook": p.get("webhook", "") or self.webhook}
         self.by_name = {p["name"]: p for p in self.projects.values()}
 
     @property
@@ -142,6 +154,9 @@ def connect() -> sqlite3.Connection:
             day TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL, route TEXT NOT NULL, type TEXT NOT NULL,
             n INTEGER NOT NULL, PRIMARY KEY (day, project, version, route, type));
         CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS alerts (
+            project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
+            PRIMARY KEY (project, version, key));
     """)
     return con
 
@@ -281,19 +296,26 @@ def summary(con, f: Filter) -> dict:
     targets = con.execute(f"""
         SELECT route, target, type, COUNT(*) n FROM events WHERE {f.sql} AND type IN {SIGNALS} AND target != ''
         GROUP BY route, target, type ORDER BY n DESC""", f.args).fetchall()
+    # SQLite hands back the bare `version` from the row that holds the MIN or the MAX: where it started and ended.
+    first = {k[:4]: k[4:] for k in con.execute(f"""
+        SELECT route, type, detail, target, MIN(at), version FROM events
+        WHERE {f.sql} AND type IN {FAILURES} GROUP BY route, type, detail, target""", f.args)}
     failures = con.execute(f"""
-        SELECT route, type, detail, target, COUNT(*) n FROM events
-        WHERE {f.sql} AND type IN ('js_error', 'http_5xx', 'http_4xx')
+        SELECT route, type, detail, target, COUNT(*) n, MAX(at), version, AVG(duration_ms) FROM events
+        WHERE {f.sql} AND type IN {FAILURES}
         GROUP BY route, type, detail, target ORDER BY n DESC""", f.args).fetchall()
     per_route: dict[str, dict] = {}
     for route, target, kind, n in targets:
         lst = per_route.setdefault(route, {"targets": [], "failures": []})["targets"]
         if len(lst) < 5:
             lst.append({"target": target, "type": kind, "n": n})
-    for route, kind, detail, target, n in failures:
+    for route, kind, detail, target, n, last_at, last_version, ms in failures:
         lst = per_route.setdefault(route, {"targets": [], "failures": []})["failures"]
         if len(lst) < 5:
-            lst.append({"type": kind, "detail": detail, "after": target, "n": n})
+            first_at, first_version = first[(route, kind, detail, target)]
+            lst.append({"type": kind, "detail": detail, "after": target, "n": n,
+                        "first_at": first_at, "first_version": first_version, "last_at": last_at,
+                        "last_version": last_version, "seconds": round(ms / 1000, 1) if kind == "slow" and ms else None})
     for r in routes:
         r.update(per_route.get(r["key"], {"targets": [], "failures": []}))
     visits, points = con.execute(f"""
@@ -372,6 +394,50 @@ def actions(con, f: Filter) -> dict:
     return {"actions": sorted(out, key=lambda a: (-a["clicks_median"], -a["times"]))}
 
 
+def versions_in_order(con, f: Filter) -> list[str]:
+    """The versions seen in the period, oldest deploy first (by when each one first sent something)."""
+    return [v for (v,) in con.execute(f"""
+        SELECT version FROM events WHERE {f.sql} AND version != '?' GROUP BY version ORDER BY MIN(id)""", f.args)]
+
+
+def compare(con, f: Filter) -> dict:
+    """One version against another (default: the latest against the one before): per screen, per action, and the
+    failures only the newer one has."""
+    base = {k: v for k, v in f.q.items() if k != "version"}
+    versions = versions_in_order(con, Filter(base))
+    b = f.q.get("b") if f.q.get("b") in versions else (versions[-1] if versions else "")
+    older = versions[:versions.index(b)] if b else []
+    a = f.q.get("a") if f.q.get("a") in versions and f.q.get("a") != b else (older[-1] if older else "")
+    if not a or not b:
+        return {"versions": versions, "a": a, "b": b, "overall": {}, "routes": [], "actions": [], "new_failures": []}
+    fa, fb = Filter({**base, "version": a}), Filter({**base, "version": b})
+
+    def overall(fv):
+        rows = frustration_by(con, fv, "version")
+        return {k: rows[0][k] for k in ("visits", "score", "signals")} if rows else {"visits": 0, "score": 0, "signals": {}}
+
+    def side(g):
+        return {"visits": g["visits"], "score": g["score"], "signals": g["signals"]} if g else None
+
+    ra = {g["key"]: g for g in frustration_by(con, fa, "route")}
+    rb = {g["key"]: g for g in frustration_by(con, fb, "route")}
+    routes = [{"route": r, "a": side(ra.get(r)), "b": side(rb.get(r)),
+               "delta": rb[r]["score"] - ra[r]["score"] if ra.get(r, {}).get("visits") and rb.get(r, {}).get("visits") else None}
+              for r in set(ra) | set(rb)]
+    routes.sort(key=lambda x: (x["delta"] is None, -(x["delta"] or 0), -((x["b"] or {}).get("visits", 0))))
+    aa = {x["action"]: x for x in actions(con, fa)["actions"]}
+    ab = {x["action"]: x for x in actions(con, fb)["actions"]}
+    acts = [{"action": k, "a": aa.get(k), "b": ab.get(k)} for k in set(aa) | set(ab)]
+    acts.sort(key=lambda x: -((x["b"] or {}).get("clicks_median", 0) - (x["a"] or {}).get("clicks_median", 0)))
+    seen = {(k, d) for k, d in con.execute(
+        f"SELECT DISTINCT type, detail FROM events WHERE {fa.sql} AND type IN {FAILURES}", fa.args)}
+    new = [{"type": k, "detail": d, "route": r, "n": n} for k, d, r, n in con.execute(f"""
+        SELECT type, detail, MIN(route), COUNT(*) n FROM events WHERE {fb.sql} AND type IN {FAILURES}
+        GROUP BY type, detail ORDER BY n DESC""", fb.args) if (k, d) not in seen]
+    return {"versions": versions, "a": a, "b": b, "overall": {"a": overall(fa), "b": overall(fb)},
+            "routes": routes, "actions": acts, "new_failures": new[:20]}
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -404,6 +470,75 @@ def daily_retention():
         time.sleep(86400)
 
 
+ALERT_TEXT = {
+    "en": {"title": "Termometro · {project} {b} got worse than {a}", "screen": "• {route}: score {sa} → {sb} ({visits} visits)",
+           "failure": "• New failure on {route}: {detail} ({n}×)"},
+    "pt": {"title": "Termometro · {project} {b} piorou em relação à {a}", "screen": "• {route}: nota {sa} → {sb} ({visits} visitas)",
+           "failure": "• Falha nova em {route}: {detail} ({n}×)"},
+}
+
+
+def regressions(con, project: str) -> tuple[str, str, list[tuple[str, str]]]:
+    """What the latest version made worse than the one before: (a, b, [(key, line)]). Only screens with enough
+    visits in both, and only failures the previous version never had that already repeated."""
+    c = compare(con, Filter({"project": project, "days": str(CONFIG.retention_days)}))
+    text = ALERT_TEXT[CONFIG.language]
+    found = []
+    for r in c["routes"]:
+        if (r["delta"] or 0) >= ALERT_RISE and r["a"]["visits"] >= ALERT_MIN_VISITS and r["b"]["visits"] >= ALERT_MIN_VISITS:
+            found.append(("screen " + r["route"], text["screen"].format(
+                route=r["route"], sa=r["a"]["score"], sb=r["b"]["score"], visits=r["b"]["visits"])))
+    for x in c["new_failures"]:
+        if x["type"] in ("js_error", "http_5xx") and x["n"] >= ALERT_MIN_NEW:
+            found.append((f"failure {x['type']} {x['detail']}", text["failure"].format(**x)))
+    return c["a"], c["b"], found
+
+
+def post_webhook(url: str, message: str) -> bool:
+    """Slack and Google Chat incoming webhooks both take {"text": ...}."""
+    req = urllib.request.Request(url, data=json.dumps({"text": message}).encode(),
+                                 headers={"Content-Type": "application/json; charset=utf-8"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return 200 <= r.status < 300
+    except OSError as error:
+        print(f"webhook failed: {error}", flush=True)
+        return False
+
+
+def check_alerts(con, send=post_webhook) -> int:
+    """Warns each project's webhook once about each regression of its latest version. Returns how many went out;
+    a warning that failed to go out is tried again on the next check."""
+    sent = 0
+    for project in CONFIG.projects.values():
+        if not project["webhook"]:
+            continue
+        a, b, found = regressions(con, project["name"])
+        fresh = [(k, line) for k, line in found if not con.execute(
+            "SELECT 1 FROM alerts WHERE project = ? AND version = ? AND key = ?", (project["name"], b, k)).fetchone()]
+        if not fresh:
+            continue
+        lines = [ALERT_TEXT[CONFIG.language]["title"].format(project=project["name"], a=a, b=b)] + [line for _, line in fresh]
+        if CONFIG.public_url:
+            lines.append(CONFIG.public_url + "/#versions")
+        if send(project["webhook"], "\n".join(lines)):
+            now = int(time.time() * 1000)
+            con.executemany("INSERT OR IGNORE INTO alerts (project, version, key, at) VALUES (?, ?, ?, ?)",
+                            [(project["name"], b, k, now) for k, _ in fresh])
+            sent += len(fresh)
+    return sent
+
+
+def hourly_alerts():
+    while True:
+        time.sleep(ALERT_EVERY)
+        try:
+            with connect() as con:
+                check_alerts(con)
+        except sqlite3.Error as error:
+            print(f"alerts failed: {error}", flush=True)
+
+
 def google_email(code: str) -> str:
     """Trades the code for an ID token and returns its verified e-mail. The token comes straight from Google's
     token endpoint over TLS, so its signature does not need checking here — the claims still do."""
@@ -420,7 +555,8 @@ def google_email(code: str) -> str:
     return str(claims["email"])
 
 
-READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions}
+READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
+         "/api/compare": compare}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8")}
@@ -644,6 +780,8 @@ def main(argv: list[str]) -> None:
     CONFIG.check()
     connect().close()
     threading.Thread(target=daily_retention, daemon=True).start()
+    if any(p["webhook"] for p in CONFIG.projects.values()):
+        threading.Thread(target=hourly_alerts, daemon=True).start()
     server = ThreadingHTTPServer((CONFIG.host, CONFIG.port), Handler)
     names = ", ".join(p["name"] for p in CONFIG.projects.values()) or "none"
     print(f"termometro {VERSION} on http://{CONFIG.host}:{CONFIG.port} — db {CONFIG.db} — projects: {names}", flush=True)

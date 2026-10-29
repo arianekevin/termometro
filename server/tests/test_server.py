@@ -87,8 +87,54 @@ class Server(unittest.TestCase):
         cart = s["routes"][0]
         self.assertEqual((cart["key"], cart["score"]), ("/cart", 80))  # (3 + 5) / 2 visits * 20
         self.assertEqual(sorted(x["type"] for x in cart["targets"]), ["http_5xx", "rage"])
-        self.assertEqual(cart["failures"], [{"type": "http_5xx", "detail": "POST /api/pay 500", "after": "button#pay", "n": 1}])
+        failure = cart["failures"][0]
+        self.assertEqual({k: failure[k] for k in ("type", "detail", "after", "n", "first_version", "last_version")},
+                         {"type": "http_5xx", "detail": "POST /api/pay 500", "after": "button#pay", "n": 1,
+                          "first_version": "1.0", "last_version": "1.0"})
         self.assertEqual(s["overall"]["visits"], 3)
+
+    def test_a_failure_says_when_and_in_which_version_it_started_and_was_last_seen(self):
+        error = {"type": "js_error", "route": "/cart", "detail": "TypeError: x is undefined"}
+        self.send([{"type": "page", "route": "/cart"}, error], version="1.0")
+        time.sleep(0.01)
+        self.send([{"type": "page", "route": "/cart"}, error, error], version="1.1")
+        time.sleep(0.01)
+        self.send([{"type": "page", "route": "/cart"}], version="1.2")
+        [failure] = self.read("/api/summary?project=shop&days=1")["routes"][0]["failures"]
+        self.assertEqual((failure["n"], failure["first_version"], failure["last_version"]), (3, "1.0", "1.1"))
+        self.assertLess(failure["first_at"], failure["last_at"])
+
+    def test_a_slow_request_weighs_one_and_shows_its_average_time(self):
+        self.send([{"type": "page", "route": "/reports"},
+                   {"type": "slow", "route": "/reports", "detail": "GET /api/reports/:id", "duration_ms": 4000},
+                   {"type": "slow", "route": "/reports", "detail": "GET /api/reports/:id", "duration_ms": 5000}])
+        r = self.read("/api/summary?project=shop&days=1")["routes"][0]
+        self.assertEqual((r["score"], r["signals"]), (40, {"slow": 2}))  # 2 x 1 point / 1 visit * 20
+        self.assertEqual((r["failures"][0]["type"], r["failures"][0]["seconds"]), ("slow", 4.5))
+
+    def test_compare_puts_the_latest_version_against_the_one_before(self):
+        page = lambda r: {"type": "page", "route": r}
+        self.send([page("/cart"), page("/cart"), page("/home"),
+                   {"type": "action", "route": "/cart", "detail": "POST /api/orders", "clicks": 3, "duration_ms": 4000},
+                   {"type": "js_error", "route": "/cart", "detail": "TypeError: old"}], version="2.0")
+        time.sleep(0.01)
+        self.send([page("/cart"), page("/cart"), page("/home"),
+                   {"type": "rage", "route": "/cart", "target": "button#pay"},
+                   {"type": "action", "route": "/cart", "detail": "POST /api/orders", "clicks": 9, "duration_ms": 20000},
+                   {"type": "js_error", "route": "/cart", "detail": "TypeError: old"},
+                   {"type": "http_5xx", "route": "/cart", "detail": "POST /api/pay 500"}], version="10.0")
+        c = self.read("/api/compare?project=shop&days=1")
+        self.assertEqual((c["versions"], c["a"], c["b"]), (["2.0", "10.0"], "2.0", "10.0"))  # deploy order, not text order
+        cart = c["routes"][0]
+        self.assertEqual((cart["route"], cart["a"]["score"], cart["b"]["score"], cart["delta"]), ("/cart", 50, 100, 50))  # (3 + 5 + 5) / 2 * 20, capped
+        self.assertEqual(c["routes"][1]["delta"], 0)
+        [orders] = c["actions"]
+        self.assertEqual((orders["a"]["clicks_median"], orders["b"]["clicks_median"]), (3, 9))
+        self.assertEqual(c["new_failures"], [{"type": "http_5xx", "detail": "POST /api/pay 500", "route": "/cart", "n": 1}])
+        self.assertEqual(c["overall"]["b"]["visits"], 3)
+        back = self.read("/api/compare?project=shop&days=1&a=10.0&b=2.0")
+        self.assertEqual((back["a"], back["b"]), ("10.0", "2.0"))
+        self.assertEqual(self.read("/api/compare?project=blog&days=1")["routes"], [])
 
     def test_unknown_key_and_foreign_origin_are_refused(self):
         self.assertEqual(self.send([{"type": "page"}], key="tk_nope")[0], 403)
@@ -222,6 +268,67 @@ class Server(unittest.TestCase):
         self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
         status, headers, _ = call(self.base, "/map.js")
         self.assertEqual((status, headers["Access-Control-Allow-Origin"]), (200, "*"))
+
+
+class Alerts(unittest.TestCase):
+    def setUp(self):
+        setup_config(TERMOMETRO_WEBHOOK_URL="https://hooks.example/x", TERMOMETRO_PUBLIC_URL="https://t.example")
+        self.messages = []
+
+    def store(self, version, events):
+        _, rows, _ = t.parse_batch({"key": KEY, "version": version, "session": "s", "events": events}, ORIGIN)
+        with t.connect() as con:
+            con.executemany("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, "
+                            "detail, clicks, duration_ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+
+    def deploy(self, version, rage, errors=0, visits=40):
+        self.store(version, [{"type": "page", "route": "/cart"}] * visits +
+                   [{"type": "rage", "route": "/cart", "target": "button#pay"}] * rage +
+                   [{"type": "js_error", "route": "/cart", "detail": f"TypeError: new in {version}"}] * errors)
+
+    def check(self, ok=True):
+        def send(url, message):
+            self.messages.append((url, message))
+            return ok
+        with t.connect() as con:
+            return t.check_alerts(con, send)
+
+    def test_warns_once_when_the_latest_version_makes_a_screen_worse_or_brings_a_new_failure(self):
+        self.deploy("1.0", rage=4)
+        self.assertEqual(self.check(), 0)  # nothing to compare with yet
+        self.deploy("1.1", rage=20, errors=6)
+        self.assertEqual(self.check(), 2)
+        [(url, message)] = self.messages
+        self.assertEqual(url, "https://hooks.example/x")
+        self.assertEqual(message.splitlines(), [
+            "Termometro · shop 1.1 got worse than 1.0",
+            "• /cart: score 6 → 45 (40 visits)",  # 4 x 3 / 40 * 20 = 6; (20 x 3 + 6 x 5) / 40 * 20 = 45
+            "• New failure on /cart: TypeError: new in 1.1 (6×)",
+            "https://t.example/#versions"])
+        self.assertEqual(self.check(), 0)  # already warned
+
+    def test_small_samples_small_rises_and_rare_failures_do_not_warn(self):
+        self.deploy("1.0", rage=4)
+        self.deploy("1.1", rage=10, errors=4)  # 6 -> 15: a rise of 9; the new error happened 4 times
+        self.deploy("1.2", rage=40, visits=10)  # worse, but 10 visits are too few
+        self.assertEqual(self.check(), 0)
+
+    def test_a_warning_that_did_not_go_out_is_tried_again(self):
+        self.deploy("1.0", rage=4)
+        self.deploy("1.1", rage=20)
+        self.assertEqual(self.check(ok=False), 0)
+        self.assertEqual(self.check(), 1)
+        self.assertEqual(len(self.messages), 2)
+
+    def test_portuguese_and_projects_without_a_webhook(self):
+        setup_config(TERMOMETRO_LANGUAGE="pt-BR", TERMOMETRO_PROJECTS=json.dumps([
+            {"name": "shop", "key": KEY, "origins": [ORIGIN], "webhook": "https://chat.example/y"},
+            {"name": "blog", "key": "tk_blog"}]))
+        self.deploy("1.0", rage=4)
+        self.deploy("1.1", rage=20)
+        self.assertEqual(self.check(), 1)
+        self.assertEqual(self.messages[0][0], "https://chat.example/y")
+        self.assertEqual(self.messages[0][1].splitlines()[:2], ["Termometro · shop 1.1 piorou em relação à 1.0", "• /cart: nota 6 → 30 (40 visitas)"])
 
 
 class FakeGoogle(BaseHTTPRequestHandler):

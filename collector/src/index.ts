@@ -7,7 +7,8 @@
  *
  * Signals: rage (3 clicks on the same spot within 1 s), dead (a click on a button or link that changed nothing
  * within 1 s), js_error, http_4xx / http_5xx (401 is left out: an expired session is not frustration), abandon
- * (started filling a form or dialog and left the screen without saving) and bounce (went back within 4 s).
+ * (started filling a form or dialog and left the screen without saving), bounce (went back within 4 s) and slow
+ * (a request that answered after 3 s while the page was in front of the user).
  * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen per
  * session) and action (a write the backend accepted, with the clicks and time it took since the previous one).
  *
@@ -39,6 +40,8 @@ export interface Options {
   flushIntervalMs?: number
   /** Your router calls `page()` for the first screen too (Vue Router's `afterEach` does); otherwise it is counted here. */
   pagesFromRouter?: boolean
+  /** A request slower than this is a "slow" signal. Default: 3000 ms; 0 turns it off (long polling, big exports). */
+  slowMs?: number
 }
 
 export interface Termometro {
@@ -52,7 +55,7 @@ export interface Termometro {
   stop(): void
 }
 
-type EventType = 'page' | 'rage' | 'dead' | 'js_error' | 'http_4xx' | 'http_5xx' | 'abandon' | 'bounce' |
+type EventType = 'page' | 'rage' | 'dead' | 'js_error' | 'http_4xx' | 'http_5xx' | 'abandon' | 'bounce' | 'slow' |
   'click' | 'action' | 'inventory'
 interface TrackedEvent {
   type: EventType
@@ -78,6 +81,7 @@ const MAX_INVENTORY = 300
 const MAX_QUEUE = 500
 const MAX_BATCH = 100
 const MAX_SAME_ERROR = 3
+const SLOW_MS = 3000
 const OVERLAY = '[data-termometro]'
 
 const CLICKABLE = 'a[href],button,[role="button"],[role="menuitem"],[role="tab"],summary,' +
@@ -160,6 +164,9 @@ export function start(options: Options): Termometro {
   const queue: Queued[] = []
   const undo: Array<() => void> = []
   const errorsSeen = new Map<string, number>()
+  // Per visit: a slow endpoint polled every few seconds is one complaint about the screen, not dozens.
+  const slowSeen = new Set<string>()
+  const slowMs = options.slowMs ?? SLOW_MS
   const inventoried = new Set<string>()
 
   let identified: Identity | null = null
@@ -225,21 +232,26 @@ export function start(options: Options): Termometro {
     if (times <= MAX_SAME_ERROR) record({ type: 'js_error', route: currentRoute, target: recentClick(), detail })
   }
 
-  function network(method: string, url: string, status: number) {
+  function network(method: string, url: string, status: number, ms: number) {
     if (url.startsWith(base)) return
     networkCount++
     const verb = method.toUpperCase()
+    const where = `${verb} ${pathOf(url)}`
+    if (slowMs > 0 && ms >= slowMs && status > 0 && status < 400 && document.visibilityState === 'visible' && !slowSeen.has(where)) {
+      slowSeen.add(where)
+      record({ type: 'slow', route: currentRoute, target: recentClick(), detail: where, duration_ms: Math.round(ms) })
+    }
     if (/^(POST|PUT|PATCH|DELETE)$/.test(verb) && status > 0 && status < 400) {
       filling = null
       // A write nobody clicked for (a heartbeat, a background save) is not an action.
       if (actionClicks > 0) {
-        record({ type: 'action', route: currentRoute, detail: `${verb} ${pathOf(url)}`, clicks: actionClicks, duration_ms: Date.now() - actionStart })
+        record({ type: 'action', route: currentRoute, detail: where, clicks: actionClicks, duration_ms: Date.now() - actionStart })
         actionClicks = 0
       }
     }
     if (status === 401 || (status > 0 && status < 400)) return
     const type = status >= 400 && status < 500 ? 'http_4xx' : 'http_5xx'
-    record({ type, route: currentRoute, target: recentClick(), detail: `${verb} ${pathOf(url)} ${status || 'network failure'}` })
+    record({ type, route: currentRoute, target: recentClick(), detail: `${where} ${status || 'network failure'}` })
   }
 
   function leaveForm() {
@@ -269,6 +281,7 @@ export function start(options: Options): Termometro {
     leaveForm()
     currentRoute = route ?? options.route?.() ?? routeFromPath(location.pathname)
     arrivedAt = Date.now()
+    slowSeen.clear()
     record({ type: 'page', route: currentRoute })
     scheduleInventory()
   }
@@ -335,12 +348,13 @@ export function start(options: Options): Termometro {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+    const sent = performance.now()
     try {
       const response = await nativeFetch.call(window, input, init)
-      network(method, url, response.status)
+      network(method, url, response.status, performance.now() - sent)
       return response
     } catch (failure) {
-      if (!(failure instanceof DOMException && failure.name === 'AbortError')) network(method, url, 0)
+      if (!(failure instanceof DOMException && failure.name === 'AbortError')) network(method, url, 0, performance.now() - sent)
       throw failure
     }
   }
@@ -358,8 +372,9 @@ export function start(options: Options): Termometro {
     const req = requests.get(this)
     if (req) {
       let aborted = false
+      const sent = performance.now()
       this.addEventListener('abort', () => { aborted = true })
-      this.addEventListener('loadend', () => { if (!aborted) network(req.method, req.url, this.status) })
+      this.addEventListener('loadend', () => { if (!aborted) network(req.method, req.url, this.status, performance.now() - sent) })
     }
     return sendOriginal.call(this, body)
   }
