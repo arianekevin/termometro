@@ -52,7 +52,9 @@ docker run --rm -p 8080:8080 -e TERMOMETRO_PASSWORD=try \
   ghcr.io/arianekevin/termometro:latest
 ```
 
-Then open http://localhost:8080 (password `try`).
+Then open http://localhost:8080 (password `try`). For a real project, make a key with
+`docker run --rm ghcr.io/arianekevin/termometro python termometro.py new-key`, and list your app's address
+(e.g. `http://localhost:5173` while developing) in the project's `origins`: events from anywhere else are refused.
 
 ### Configuration
 
@@ -91,7 +93,7 @@ const termometro = start({
 })
 
 // Vue Router — one row per screen, not per id
-router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matched.at(-1)?.path ?? to.path) })
+router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matched[to.matched.length - 1]?.path ?? to.path) })
 app.config.errorHandler = (err) => { termometro.error(err); console.error(err) }
 ```
 

@@ -52,7 +52,9 @@ docker run --rm -p 8080:8080 -e TERMOMETRO_PASSWORD=teste \
   ghcr.io/arianekevin/termometro:latest
 ```
 
-Depois abra http://localhost:8080 (senha `teste`).
+Depois abra http://localhost:8080 (senha `teste`). Para um projeto de verdade, gere a chave com
+`docker run --rm ghcr.io/arianekevin/termometro python termometro.py new-key` e ponha o endereço do seu app
+(por exemplo `http://localhost:5173` em desenvolvimento) nas `origins` do projeto: eventos de outro lugar são recusados.
 
 A configuração completa (login com Google, quem pode entrar, retenção) está no [README em inglês](README.md#configuration).
 Para entrar com Google: no Google Cloud Console, crie um cliente OAuth do tipo *Aplicativo da Web* com o URI de
@@ -76,7 +78,7 @@ const termometro = start({
   pagesFromRouter: true,
 })
 
-router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matched.at(-1)?.path ?? to.path) })
+router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matched[to.matched.length - 1]?.path ?? to.path) })
 app.config.errorHandler = (err) => { termometro.error(err); console.error(err) }
 ```
 

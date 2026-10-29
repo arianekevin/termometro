@@ -22,7 +22,7 @@ const termometro = start({
   pagesFromRouter: true,                      // if you call page() on route changes
 })
 
-router.afterEach((to) => termometro.page(to.matched.at(-1)?.path ?? to.path)) // one row per screen, not per id
+router.afterEach((to) => termometro.page(to.matched[to.matched.length - 1]?.path ?? to.path)) // one row per screen, not per id
 app.config.errorHandler = (err) => { termometro.error(err); console.error(err) }
 ```
 
