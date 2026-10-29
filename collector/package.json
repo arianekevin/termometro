@@ -29,18 +29,24 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/arianekevin/termometro.git",
+    "url": "git+https://github.com/arianekevin/termometro.git",
     "directory": "collector"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && esbuild src/auto.ts --bundle --minify --format=iife --target=es2019 --outfile=dist/termometro.js && cp dist/termometro.js ../server/static/termometro.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build && cp ../LICENSE LICENSE",
+    "postpack": "rm -f LICENSE"
   },
   "devDependencies": {
     "esbuild": "0.28.1",
     "happy-dom": "20.10.6",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
+  },
+  "homepage": "https://github.com/arianekevin/termometro#readme",
+  "bugs": {
+    "url": "https://github.com/arianekevin/termometro/issues"
   }
 }
