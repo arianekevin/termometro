@@ -105,6 +105,33 @@ class Server(unittest.TestCase):
         self.assertEqual((failure["n"], failure["first_version"], failure["last_version"]), (3, "1.0", "1.1"))
         self.assertLess(failure["first_at"], failure["last_at"])
 
+    def test_a_fresh_start_hides_what_came_before_until_undone_and_deletes_nothing(self):
+        error = {"type": "js_error", "route": "/cart", "detail": "TypeError: old"}
+        self.send([{"type": "page", "route": "/cart"}, error])
+        time.sleep(0.01)
+        status, _, body = call(self.base, "/api/mark?project=shop", {}, cookie=self.cookie)
+        self.assertEqual(status, 200)
+        mark = json.loads(body)["mark"]
+        self.assertEqual(self.read("/api/me")["projects"][0]["mark"], mark)
+        self.assertIsNone(self.read("/api/me")["projects"][1]["mark"])  # only the project asked for
+        time.sleep(0.01)
+        self.send([{"type": "page", "route": "/home"}, {**error, "route": "/home"}])
+        s = self.read("/api/summary?project=shop&days=1")
+        self.assertEqual(([r["key"] for r in s["routes"]], s["overall"]["visits"]), (["/home"], 1))
+        [f] = self.read("/api/failures?project=shop&days=1")["failures"]
+        self.assertTrue(f["new"])  # before the mark does not count: it started again
+        self.assertGreaterEqual(f["first_at"], mark)
+        self.assertEqual(self.read("/api/summary?project=shop&days=1&all=1")["overall"]["visits"], 2)
+        self.assertEqual(self.read("/api/summary?project=blog&days=1")["overall"]["visits"], 0)
+        status, _, _ = call(self.base, "/api/mark?project=shop&clear=1", {}, cookie=self.cookie)
+        self.assertEqual(status, 200)
+        self.assertIsNone(self.read("/api/me")["projects"][0]["mark"])
+        self.assertEqual(self.read("/api/summary?project=shop&days=1")["overall"]["visits"], 2)
+
+    def test_a_fresh_start_needs_a_signed_in_user_and_a_known_project(self):
+        self.assertEqual(call(self.base, "/api/mark?project=shop", {})[0], 401)
+        self.assertEqual(call(self.base, "/api/mark?project=nope", {}, cookie=self.cookie)[0], 404)
+
     def test_a_slow_request_weighs_one_and_shows_its_average_time(self):
         self.send([{"type": "page", "route": "/reports"},
                    {"type": "slow", "route": "/reports", "detail": "GET /api/reports/:id", "duration_ms": 4000},
@@ -399,8 +426,8 @@ class Server(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(self.read("/api/me", cookie=None), {"signed_in": False, "email": "", "no_auth": False,
                                                              "methods": {"google": False, "password": True}, "projects": []})
-        self.assertEqual(self.read("/api/me")["projects"], [{"name": "shop", "url": ORIGIN, "key": KEY, "origins": [ORIGIN]},
-                                                            {"name": "blog", "url": "", "key": "tk_blog", "origins": []}])
+        self.assertEqual(self.read("/api/me")["projects"], [{"name": "shop", "url": ORIGIN, "key": KEY, "origins": [ORIGIN], "mark": None},
+                                                            {"name": "blog", "url": "", "key": "tk_blog", "origins": [], "mark": None}])
         forged = "termometro_session=s.9999999999.AAAA"
         self.assertEqual(call(self.base, "/api/summary?project=shop", cookie=forged)[0], 401)
 

@@ -40,6 +40,8 @@ header { position: sticky; top: 0; z-index: 5; background: var(--surface); borde
 .top .mark { margin-right: auto; }
 .field { display: flex; align-items: center; gap: 6px; }
 .who { display: flex; align-items: center; gap: 8px; }
+#mark-chip { display: inline-flex; align-items: center; gap: 6px; }
+#mark-chip:empty { display: none; }
 nav.tabs { display: flex; gap: 4px; padding: 0 16px; overflow-x: auto; }
 nav.tabs a { display: flex; align-items: center; height: 40px; padding: 0 12px; color: var(--fg2); font-weight: 500; border-bottom: 2px solid transparent; text-decoration: none; white-space: nowrap; }
 nav.tabs a.on { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
@@ -151,6 +153,9 @@ const L = PT ? {
     state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
   signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
   day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
+  mark: { start: 'Recomeçar daqui', startTip: 'Daqui para frente, o painel, os alertas e o relatório só olham o que vier depois. Nada é apagado.',
+    confirm: (p) => `Recomeçar ${p} a partir de agora? O que veio antes some do painel, mas não é apagado: dá para ver tudo ou desfazer.`,
+    since: (w) => `Contando desde ${w}`, showAll: 'Ver tudo', undo: 'Desfazer', allSince: (w) => `Vendo tudo, inclusive antes de ${w}`, back: 'Só desde o marco' },
   failureTab: {
     list: 'Falhas, das que atingem mais sessões para as que atingem menos', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
     none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
@@ -230,6 +235,9 @@ const L = PT ? {
     state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
   signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
   day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
+  mark: { start: 'Start afresh', startTip: 'From now on, the dashboard, alerts and report only look at what comes after. Nothing is deleted.',
+    confirm: (p) => `Start ${p} afresh from now? What came before leaves the dashboard but is not deleted: you can see it all or undo.`,
+    since: (w) => `Counting since ${w}`, showAll: 'See everything', undo: 'Undo', allSince: (w) => `Seeing everything, including before ${w}`, back: 'Only since the mark' },
   failureTab: {
     list: 'Failures, the ones hitting the most sessions first', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
     none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
@@ -324,11 +332,11 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
+const state = { me: null, tab: 'overview', user: '', all: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
 
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
 const FILTERS = ['project', 'days', 'version', 'account', 'role']
-const PARAMS = ['user', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
+const PARAMS = ['user', 'all', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
   state.tab = TABS[tab] ? tab : 'overview'
@@ -338,7 +346,7 @@ function readHash() {
 function hashFor(tab, params = {}) {
   const p = new URLSearchParams()
   for (const k of FILTERS) { const v = k in params ? params[k] : $('#' + k)?.value; if (v && !(k === 'days' && v === '7')) p.set(k, v) }
-  for (const k of PARAMS) { const v = k in params ? params[k] : k === 'user' ? state.user : ''; if (v) p.set(k, v) }
+  for (const k of PARAMS) { const v = k in params ? params[k] : k === 'user' || k === 'all' ? state[k] : ''; if (v) p.set(k, v) }
   return '#' + tab + (p.toString() ? '?' + p : '')
 }
 function writeHash() {
@@ -384,6 +392,7 @@ function shell() {
         <label class="field"><span class="meta">${L.version}</span><select id="version"></select></label>
         <label class="field"><span class="meta">${L.account}</span><select id="account"></select></label>
         <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
+        <span id="mark-chip"></span>
         <span id="user-chip"></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
       </div>
@@ -411,6 +420,28 @@ function shell() {
   })
   $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
   document.addEventListener('click', (e) => { if (e.target.closest('#remove-user')) { state.user = ''; render() } })
+  $('#mark-chip').addEventListener('click', (e) => { const b = e.target.closest('[data-mark]'); if (b) onMark(b.dataset.mark) })
+}
+
+// Fresh start: a mark per project; reads see only what came after it, unless "see everything" (all=1).
+const projectNow = () => state.me.projects.find((p) => p.name === $('#project').value)
+function markChip() {
+  const mark = projectNow()?.mark, M = L.mark
+  $('#mark-chip').innerHTML = !mark
+    ? `<button class="small" data-mark="start" title="${esc(M.startTip)}">${M.start}</button>`
+    : state.all
+      ? `<span class="meta">${esc(M.allSince(when(mark)))}</span> <button class="small" data-mark="back">${M.back}</button>`
+      : `<span class="meta">${esc(M.since(when(mark)))}</span> <button class="small" data-mark="all">${M.showAll}</button> <button class="small" data-mark="undo">${M.undo}</button>`
+}
+async function onMark(action) {
+  const project = projectNow()
+  if (action === 'all' || action === 'back') { state.all = action === 'all' ? '1' : ''; return render() }
+  if (action === 'start' && !confirm(L.mark.confirm(project.name))) return
+  const res = await fetch(`/api/mark?project=${encodeURIComponent(project.name)}${action === 'undo' ? '&clear=1' : ''}`, { method: 'POST' })
+  if (res.status === 401) return boot()
+  project.mark = (await res.json()).mark
+  state.all = ''
+  render()
 }
 
 async function loadFilters() {
@@ -427,6 +458,7 @@ function query(extra = {}) {
   const q = new URLSearchParams({ project: $('#project').value, days: $('#days').value })
   for (const k of ['version', 'account', 'role']) if ($('#' + k).value) q.set(k, $('#' + k).value)
   if (state.user) q.set('user', state.user)
+  if (state.all) q.set('all', '1')
   for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v)
   return q
 }
@@ -852,6 +884,7 @@ async function render() {
   document.querySelectorAll('nav.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === state.tab))
   $('#user-chip').innerHTML = state.user
     ? `<span class="chip">${L.user} <code>${esc(short(state.user))}</code><button id="remove-user" aria-label="${L.removeUser}">×</button></span>` : ''
+  markChip()
   try {
     $('#content').innerHTML = await TABS[state.tab]()
     $('#open-map')?.addEventListener('click', openMap)

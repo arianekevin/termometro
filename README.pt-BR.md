@@ -136,6 +136,13 @@ formulário abandonado 2, voltou na hora 1, resposta lenta 1 (requisição de 3 
 usuário, uma vez por endereço por visita). A nota da tela é a soma dos pontos dividida pelas visitas, vezes 20,
 com teto 100. Até 19 está tranquilo, de 20 a 49 pede atenção, de 50 para cima é muita frustração.
 
+## Recomeçar
+
+Depois de um redesenho ou de uma correção grande, **Recomeçar daqui** (ao lado dos filtros) põe um marco no
+projeto: dali em diante o painel, os alertas, o relatório e "falha nova" só contam o que veio depois. Nada é
+apagado: **Ver tudo** mostra o que veio antes (`all=1` em qualquer leitura), **Desfazer** tira o marco, e o
+dado antigo continua saindo pela retenção.
+
 ## Licença
 
 [AGPL-3.0](LICENSE). Você pode usar, alterar e hospedar o Termometro livremente; se oferecer uma versão alterada

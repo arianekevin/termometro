@@ -162,6 +162,13 @@ Up to 19 is calm, 20–49 needs attention, 50+ is very frustrating.
 An **action** is a write your backend accepted (POST, PUT, PATCH, DELETE answered 2xx/3xx), with the clicks and
 time since the previous one; two idle minutes start the count again, and a write nobody clicked for is ignored.
 
+## Start afresh
+
+After a redesign or a big fix, **Start afresh** (next to the filters) puts a mark on the project: from then on the
+dashboard, the alerts, the report and "new failure" only count what came after it. Nothing is deleted: **See
+everything** shows what came before (`all=1` on any read), **Undo** removes the mark, and old data still leaves
+with the retention.
+
 ## Known limits
 
 - A dead click is "nothing in the page changed within 1 s". On a screen that updates by itself (toasts, clocks,

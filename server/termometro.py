@@ -24,7 +24,9 @@ and the API:
   GET  /api/compare    one version against another (default: latest) │
   GET  /api/filters    accounts, roles and versions seen             │
   GET  /api/status     has this project received anything yet        │
-  POST /api/map-token  a one-hour token to open the heat map        ┘
+  POST /api/map-token  a one-hour token to open the heat map        │
+  POST /api/mark       start the project afresh from now (?project=), or ?clear=1 to undo ┘
+                       every read above sees only what came after the mark, unless ?all=1
   GET  /  /map.js  /termometro.js
 
 A screen's frustration score is the weighted signals divided by its visits, times 20, capped at 100. One rage
@@ -182,7 +184,27 @@ def connect() -> sqlite3.Connection:
             except sqlite3.OperationalError:  # another thread added it first
                 pass
     con.execute("CREATE INDEX IF NOT EXISTS events_session ON events (project, session, at)")
+    MARKS.clear()
+    MARKS.update({k[5:]: int(v) for k, v in con.execute("SELECT k, v FROM meta WHERE k LIKE 'mark:%'")})
     return con
+
+
+# A project's fresh start: reads see only what came after it (unless they ask for all=1); nothing is deleted, and
+# what came before still leaves with the retention. Read from the meta table on every connect().
+MARKS: dict[str, int] = {}
+
+
+def mark_of(q: dict) -> int:
+    return 0 if q.get("all") == "1" else MARKS.get(q.get("project", ""), 0)
+
+
+def set_mark(con, project: str, at: int | None) -> None:
+    if at is None:
+        con.execute("DELETE FROM meta WHERE k = ?", ("mark:" + project,))
+        MARKS.pop(project, None)
+    else:
+        con.execute("INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", ("mark:" + project, str(at)))
+        MARKS[project] = at
 
 
 _secret: dict[str, bytes] = {}
@@ -316,12 +338,14 @@ class Filter:
             self.days = max(1, min(CONFIG.retention_days, int(q.get("days", "7"))))
         except ValueError:
             self.days = 7
-        self.since = int((time.time() - self.days * 86400) * 1000)
+        self.mark = mark_of(q)
+        self.since = max(self.mark, int((time.time() - self.days * 86400) * 1000))
         self.sql, self.args = "project = ? AND at >= ?", [q.get("project", ""), self.since]
-        if before:  # the same length of time just before: what "now" is compared with
-            self.since -= self.days * 86400 * 1000
+        if before:  # the same length of time just before: what "now" is compared with, never before the mark
+            end = int((time.time() - self.days * 86400) * 1000)
+            self.since = max(self.mark, end - self.days * 86400 * 1000)
             self.sql += " AND at < ?"
-            self.args = [q.get("project", ""), self.since, self.since + self.days * 86400 * 1000]
+            self.args = [q.get("project", ""), self.since, end]
         for field, column in (("version", "version"), ("account", "account"), ("role", "role"),
                               ("user", "user_id"), ("route", "route")):
             if q.get(field):
@@ -540,10 +564,10 @@ def overview(con, f: Filter) -> dict:
         elif old and old["visits"] >= INSIGHT_MIN_VISITS and old["score"] - g["score"] >= INSIGHT_RISE:
             add("screen_better", "ok", old["score"] - g["score"], link, route=route, before=old["score"], now=g["score"],
                 visits=g["visits"])
-    # A failure is new when the retained history has nothing of it before this period.
+    # A failure is new when the retained history (since the mark) has nothing of it before this period.
     first = {(k, d): at for k, d, at in con.execute(
-        f"SELECT type, detail, MIN(at) FROM events WHERE project = ? AND type IN {FAILURES} GROUP BY type, detail",
-        (f.q.get("project", ""),))}
+        f"SELECT type, detail, MIN(at) FROM events WHERE project = ? AND at >= ? AND type IN {FAILURES} GROUP BY type, detail",
+        (f.q.get("project", ""), f.mark))}
     failures = con.execute(f"""
         SELECT type, detail, MIN(route), COUNT(*) n, COUNT(DISTINCT session), MAX(at) FROM events
         WHERE {f.sql} AND type IN {FAILURES} GROUP BY type, detail ORDER BY n DESC""", f.args).fetchall()
@@ -613,16 +637,16 @@ def search(con, f: Filter) -> dict:
 FAILURE_WEIGHT = {"js_error": 5, "http_5xx": 5, "http_4xx": 2, "slow": 1}
 
 
-def first_seen(con, project: str) -> dict:
-    """(type, detail) -> (first time, its version), over everything still kept: when a failure started."""
+def first_seen(con, f: Filter) -> dict:
+    """(type, detail) -> (first time, its version), over everything still kept since the mark: when a failure started."""
     return {(k, d): (at, v) for k, d, at, v in con.execute(
-        f"SELECT type, detail, MIN(at), version FROM events WHERE project = ? AND type IN {FAILURES} GROUP BY type, detail",
-        (project,))}
+        f"""SELECT type, detail, MIN(at), version FROM events WHERE project = ? AND at >= ? AND type IN {FAILURES}
+            GROUP BY type, detail""", (f.q.get("project", ""), f.mark))}
 
 
 def failures(con, f: Filter) -> dict:
     """Every failure of the period, grouped by kind and message, the ones that hit the most people first."""
-    first = first_seen(con, f.q.get("project", ""))
+    first = first_seen(con, f)
     rows = con.execute(f"""
         SELECT type, detail, COUNT(*), COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')), MAX(at), version,
                COUNT(DISTINCT route), MIN(route)
@@ -660,7 +684,7 @@ def failure(con, f: Filter) -> dict:
                MAX(at) FROM events WHERE {where}""", args).fetchone()
     if not n:
         return {"type": kind, "detail": detail, "n": 0}
-    first_at, first_version = first_seen(con, f.q.get("project", "")).get((kind, detail), (None, ""))
+    first_at, first_version = first_seen(con, f).get((kind, detail), (None, ""))
     # The latest occurrence of each session (SQLite gives the bare columns of the MAX row), newest sessions first.
     samples = con.execute(f"""SELECT id, session, MAX(at), version, user_id, account, role, agent, device FROM events
         WHERE {where} GROUP BY session ORDER BY MAX(at) DESC LIMIT {TRAIL_SAMPLES}""", args).fetchall()
@@ -1207,6 +1231,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.login()
         if path == "/api/logout":
             return self.json(200, {"ok": True}, {"Set-Cookie": "termometro_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"})
+        if path == "/api/mark":
+            if not self.signed_in():
+                return self.json(401, {"error": "sign in"})
+            q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+            if q.get("project") not in CONFIG.by_name:
+                return self.json(404, {"error": "project"})
+            at = None if q.get("clear") == "1" else int(time.time() * 1000)
+            with connect() as con:
+                set_mark(con, q["project"], at)
+            return self.json(200, {"mark": at})
         if path == "/api/map-token":
             if not self.signed_in():
                 return self.json(401, {"error": "sign in"})
@@ -1266,12 +1300,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.google_callback(q)
         if url.path == "/api/me":
             who = self.session()
+            with connect():
+                marks = dict(MARKS)
             return self.json(200, {"signed_in": who is not None, "email": who["email"] if who else "",
                                    "methods": {"google": CONFIG.google, "password": bool(CONFIG.password)},
                                    "no_auth": CONFIG.no_auth,
                                    # The key is public by design (it ships in the app's bundle); the dashboard shows it
                                    # to whoever signed in, for the setup snippet.
-                                   "projects": [{"name": p["name"], "url": p["url"], "key": k, "origins": p["origins"]}
+                                   "projects": [{"name": p["name"], "url": p["url"], "key": k, "origins": p["origins"],
+                                                 "mark": marks.get(p["name"])}
                                                 for k, p in CONFIG.projects.items()]
                                    if who else []})
         if url.path not in READS and url.path not in ("/api/filters", "/api/status"):
