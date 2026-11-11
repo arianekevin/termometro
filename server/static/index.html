@@ -54,7 +54,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; display: grid
 .big { font-size: 32px; line-height: 40px; font-weight: 700; margin-top: 4px; }
 .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
 .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.pill.ok { background: var(--ok-soft); } .pill.warn { background: var(--warn-soft); } .pill.bad { background: var(--bad-soft); }
+.pill.ok { background: var(--ok-soft); } .pill.idea { background: var(--accent-soft); color: var(--accent); } .pill.warn { background: var(--warn-soft); } .pill.bad { background: var(--bad-soft); }
 .table { overflow-x: auto; margin: 8px -16px -16px; }
 table { width: 100%; border-collapse: collapse; }
 th { height: 40px; padding: 0 12px; text-align: left; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; color: var(--faint); border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -115,6 +115,14 @@ pre.stack { margin: 8px 0 0; padding: 10px 12px; background: var(--sunken); bord
 .steps .t { flex: 0 0 76px; text-align: right; color: var(--faint); font-size: 12px; }
 .steps li.sig { color: var(--warn); } .steps li.here { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
 button.small { height: 28px; font-size: 12px; }
+/* Journeys */
+.flow { display: grid; grid-template-columns: 1fr minmax(160px, auto) 1fr; gap: 16px; align-items: start; margin-top: 12px; }
+.flow .here { text-align: center; padding: 12px; border-radius: 10px; background: var(--accent-soft); align-self: center; }
+@media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+.counts a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; } .counts a:hover { text-decoration: underline; }
+.funnel { display: grid; gap: 12px; margin-top: 12px; max-width: 720px; }
+.fhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 500; overflow-wrap: anywhere; }
+.bar.big { height: 12px; border-radius: 4px; }
 /* Overview */
 .delta { font-size: 12px; font-weight: 600; margin-left: 4px; }
 .insights { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
@@ -155,13 +163,25 @@ const L = PT ? {
       action: (s) => `Gravou ${s.detail}${s.clicks ? ` (${s.clicks} cliques)` : ''}`, abandon: (s) => `Abandonou ${s.target}`, bounce: () => 'Voltou na hora' },
     issue: { occurrences: 'Ocorrências', period: (d) => `nos últimos ${d} dias`, first: 'Desde', last: 'Última vez', steps: 'Passos até a falha', link: 'No Termometro' },
   },
-  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  journey: {
+    reach: 'Longe demais?', reachHint: 'Quantos cliques e telas a pessoa passa desde a última ação salva (ou do começo da sessão) até usar cada botão ou ação. Muito usado e longe: candidato a atalho ou a um lugar mais à mão.',
+    item: 'Botão ou ação', uses: 'Usos', clicksTo: 'Cliques até chegar', screensTo: 'Telas no caminho', far: 'longe', noneFar: 'Nada muito usado e longe neste período.', allReach: (n) => `Todos os botões e ações (${Math.min(n, 50)} mais usados)`, element: 'botão', action: 'ação',
+    pairs: 'Andam juntas', pairsHint: 'Ações que costumam vir uma logo depois da outra. Quando a segunda vem quase sempre, e com caminho longo entre elas, vale aproximar ou virar um passo só.',
+    pair: (p) => `Depois de <code>${p.a}</code>, <b>${Math.round(p.share * 100)}%</b> das vezes vem <code>${p.b}</code>`,
+    pairMeta: (p) => `${p.n} vezes · ${p.clicks} cliques e ${p.screens} ${p.screens === 1 ? 'tela' : 'telas'} entre elas (mediana)`, linked: 'juntas', noPairs: 'Nenhuma sequência de ações se repete o bastante neste período.',
+    flow: 'De onde vêm e para onde vão', flowHint: 'Escolha uma tela. Clique numa origem ou destino para seguir o caminho.', from: 'Chegam de', to: 'Vão para', exit: 'saíram do app', start: 'começaram aqui',
+    timeOn: (s) => `tempo típico na tela: ${s} s`,
+    funnel: 'Funil', funnelHint: 'Monte uma sequência de passos e veja quantas sessões chegam a cada um, nessa ordem (pode haver outras coisas no meio).',
+    addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
+    reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
+  },
+  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
   search: 'Buscar tela, botão, erro, ação, usuário…', noResults: 'Nada com esse nome neste período.',
   kinds: { screen: 'Telas', element: 'Elementos', failure: 'Falhas', action: 'Ações', user: 'Usuários', account: 'Contas' },
   vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
   scoreByDay: 'Nota por dia', peak: (n) => `pior dia: nota ${n}`, dayTip: (d, s, v) => `${d}: nota ${s} em ${v} visitas`,
   whatToSee: 'O que merece atenção', insightsHint: 'Do mais grave para o menos. Cada item leva aonde dá para ver mais.', nothing: 'Nada fora do normal neste período.',
-  sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou' }, see: 'Ver',
+  sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' }, see: 'Ver',
   insight: {
     screen_worse: (i, s) => `<b>${i.route}</b> piorou: nota ${i.before} → ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> está frustrante: nota ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
@@ -169,6 +189,8 @@ const L = PT ? {
     failure_new: (i, s) => `Falha nova em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
     failure_recurring: (i, s) => `Falha recorrente em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
     action_laborious: (i) => `<code>${i.action}</code> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
+    reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> em <b>' + i.route + '</b>'} é muito usado (${i.uses}×) e fica longe: ${i.clicks} cliques e ${i.screens} ${i.screens === 1 ? 'tela' : 'telas'} até chegar.`,
+    pair_linked: (i) => `Depois de <code>${i.a}</code>, ${Math.round(i.share * 100)}% das vezes vem <code>${i.b}</code> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
     element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${i.rage} rage clicks e ${i.dead} cliques sem resposta.`,
   },
   names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
@@ -217,13 +239,25 @@ const L = PT ? {
       action: (s) => `Saved ${s.detail}${s.clicks ? ` (${s.clicks} clicks)` : ''}`, abandon: (s) => `Abandoned ${s.target}`, bounce: () => 'Went right back' },
     issue: { occurrences: 'Occurrences', period: (d) => `in the last ${d} days`, first: 'Since', last: 'Last seen', steps: 'Steps up to the failure', link: 'On Termometro' },
   },
-  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
+  journey: {
+    reach: 'Too far?', reachHint: 'How many clicks and screens people go through since the last saved action (or the start of the session) to use each button or action. Used a lot and far away: a candidate for a shortcut or a handier place.',
+    item: 'Button or action', uses: 'Uses', clicksTo: 'Clicks to get there', screensTo: 'Screens on the way', far: 'far', noneFar: 'Nothing used a lot and far away in this period.', allReach: (n) => `Every button and action (top ${Math.min(n, 50)})`, element: 'button', action: 'action',
+    pairs: 'Go together', pairsHint: 'Actions that tend to come one right after the other. When the second almost always follows, with a long way between them, bring them closer or make them one step.',
+    pair: (p) => `After <code>${p.a}</code>, <b>${Math.round(p.share * 100)}%</b> of the time comes <code>${p.b}</code>`,
+    pairMeta: (p) => `${p.n} times · ${p.clicks} clicks and ${p.screens} ${p.screens === 1 ? 'screen' : 'screens'} between them (median)`, linked: 'together', noPairs: 'No sequence of actions repeats enough in this period.',
+    flow: 'Where they come from and go to', flowHint: 'Pick a screen. Click an origin or a destination to follow the path.', from: 'Come from', to: 'Go to', exit: 'left the app', start: 'started here',
+    timeOn: (s) => `typical time on screen: ${s} s`,
+    funnel: 'Funnel', funnelHint: 'Build a sequence of steps and see how many sessions reach each one, in that order (other things in between are fine).',
+    addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
+    reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
+  },
+  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions' },
   search: 'Search screen, button, error, action, user…', noResults: 'Nothing by that name in this period.',
   kinds: { screen: 'Screens', element: 'Elements', failure: 'Failures', action: 'Actions', user: 'Users', account: 'Accounts' },
   vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
   scoreByDay: 'Score per day', peak: (n) => `worst day: score ${n}`, dayTip: (d, s, v) => `${d}: score ${s} over ${v} visits`,
   whatToSee: 'What deserves a look', insightsHint: 'Most serious first. Each item leads where you can see more.', nothing: 'Nothing out of the ordinary in this period.',
-  sev: { bad: 'serious', warn: 'attention', ok: 'improved' }, see: 'See',
+  sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' }, see: 'See',
   insight: {
     screen_worse: (i, s) => `<b>${i.route}</b> got worse: score ${i.before} → ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> is frustrating: score ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
@@ -231,6 +265,8 @@ const L = PT ? {
     failure_new: (i, s) => `New failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
     failure_recurring: (i, s) => `Recurring failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
     action_laborious: (i) => `<code>${i.action}</code> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
+    reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> on <b>' + i.route + '</b>'} is used a lot (${i.uses}×) and sits far away: ${i.clicks} clicks and ${i.screens} ${i.screens === 1 ? 'screen' : 'screens'} to get there.`,
+    pair_linked: (i) => `After <code>${i.a}</code>, ${Math.round(i.share * 100)}% of the time comes <code>${i.b}</code> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
     element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${i.rage} rage clicks and ${i.dead} dead clicks.`,
   },
   names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
@@ -281,11 +317,11 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', signal: '', detail: '', hash: new URLSearchParams(), focus: false }
+const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
 
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
 const FILTERS = ['project', 'days', 'version', 'account', 'role']
-const PARAMS = ['user', 'route', 'action', 'a', 'b', 'signal', 'detail']
+const PARAMS = ['user', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
   state.tab = TABS[tab] ? tab : 'overview'
@@ -356,13 +392,15 @@ function shell() {
   for (const id of ['days', 'version', 'account', 'role']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
   $('nav.tabs').addEventListener('click', (e) => {
     const a = e.target.closest('a[data-tab]'); if (!a) return
-    e.preventDefault(); go(a.dataset.tab, { route: state.route, a: state.a, b: state.b })
+    e.preventDefault(); go(a.dataset.tab, { route: state.route, a: state.a, b: state.b, funnel: state.funnel })
   })
   wireSearch()
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
   $('#content').addEventListener('change', (e) => {
     if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
+    if (e.target.id === 'flow-screen') { state.route = e.target.value; render() }
+    if (e.target.id === 'funnel-add' && e.target.value) { state.funnel = JSON.stringify([...funnelSteps(), e.target.value]); render() }
   })
   $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
   document.addEventListener('click', (e) => { if (e.target.closest('#remove-user')) { state.user = ''; render() } })
@@ -578,6 +616,63 @@ async function showSession(button) {
   button.replaceWith(Object.assign(document.createElement('div'), { className: 'meta', textContent: s.truncated ? F().truncated : '' }))
 }
 
+// Journeys -------------------------------------------------------------------------------------------------
+const J = () => L.journey
+const funnelSteps = () => { try { const v = JSON.parse(state.funnel || '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
+const stepLabel = (step) => { const [kind, ...rest] = step.split(':'); return `${J().stepKind[kind] ?? kind}: ${rest.join(':')}` }
+
+async function journeys() {
+  const j = await read('/api/journeys')
+  if (!j.screens.length) return empty(L.noVisits)
+  const steps = funnelSteps()
+  const fu = steps.length ? await read('/api/funnel', { steps: JSON.stringify(steps) }) : { steps: [] }
+  if (!j.screens.some((x) => x.route === state.route)) state.route = j.screens[0].route
+  const sc = j.screens.find((x) => x.route === state.route)
+  const pct = (x) => Math.round(x * 100)
+  const flowList = (list, empty) => list.length ? `<ul class="counts">${list.map((x) => `<li>${x.route === '(exit)' ? `<span class="meta">${J().exit}</span>`
+    : `<a href="#" data-flow="${esc(x.route)}">${esc(x.route)}</a>`}<b>${pct(x.share)}%</b></li>`).join('')}</ul>` : `<p class="meta">${empty}</p>`
+  const reach = [...j.reach].sort((a, b) => b.uses - a.uses).slice(0, 50)
+  const options = (kind, values) => values.map((v) => `<option value="${esc(kind + ':' + v)}">${esc(v)}</option>`).join('')
+  const actionsSeen = [...new Set(j.reach.filter((r) => r.kind === 'action').map((r) => r.key))]
+  const elementsSeen = [...new Set(j.reach.filter((r) => r.kind === 'element').map((r) => r.key))].slice(0, 60)
+  const far = j.reach.filter((r) => r.far).slice(0, 10)
+  const reachCard = () => `
+    <section class="card"><div class="label">${J().reach}</div><div class="meta">${J().reachHint}</div>
+      ${far.length ? reachTable(far) : `<p class="meta">${J().noneFar}</p>`}
+      <details style="margin-top:12px"><summary>${J().allReach(j.reach.length)}</summary>${reachTable(reach)}</details>
+    </section>`
+  const reachTable = (rows) => table(`<th>${J().item}</th><th>${L.screen}</th><th class="n">${J().uses}</th><th class="n">${L.users}</th><th class="n">${J().clicksTo}</th><th class="n">${J().screensTo}</th>`,
+        rows.map((r) => `<tr><td><span class="meta">${J()[r.kind]}</span> ${r.far ? `<span class="pill idea">${J().far}</span>` : ''}<br><code>${esc(r.key)}</code></td>
+          <td>${esc(r.route)}</td><td class="n">${r.uses}</td><td class="n">${r.users}</td>
+          <td class="n"><b class="${r.clicks_median >= 5 ? 'warn' : ''}">${r.clicks_median}</b></td><td class="n"><b class="${r.screens_median >= 2 ? 'warn' : ''}">${r.screens_median}</b></td></tr>`).join(''))
+  return reachCard() + `
+    <section class="card"><div class="label">${J().pairs}</div><div class="meta">${J().pairsHint}</div>
+      ${j.pairs.length ? `<ul class="insights">${j.pairs.slice(0, 15).map((p) => { const e = { ...p, a: esc(p.a), b: esc(p.b), clicks: p.clicks_median, screens: p.screens_median }
+        return `<li>${p.linked ? `<span class="pill idea">${J().linked}</span>` : ''}<div class="text">${J().pair(e)}<div class="meta">${J().pairMeta(e)}</div></div></li>` }).join('')}</ul>`
+        : `<p class="meta">${J().noPairs}</p>`}
+    </section>
+    <section class="card"><div class="head"><div><div class="label">${J().flow}</div><div class="meta">${J().flowHint}</div></div>
+        <select id="flow-screen" aria-label="${L.screen}">${j.screens.map((x) => `<option ${x.route === state.route ? 'selected' : ''}>${esc(x.route)}</option>`).join('')}</select></div>
+      <div class="flow">
+        <div><div class="label">${J().from}</div>${flowList(sc.from, J().start)}</div>
+        <div class="here"><div class="route">${esc(sc.route)}</div><div class="meta">${L.visitsN(sc.visits)} · ${J().timeOn(sc.seconds_median)}</div></div>
+        <div><div class="label">${J().to}</div>${flowList(sc.to, '—')}</div>
+      </div>
+    </section>
+    <section class="card"><div class="label">${J().funnel}</div><div class="meta">${J().funnelHint}</div>
+      <div class="funnel">${fu.steps.map((x, i) => `<div class="fstep">
+          <div class="fhead"><span>${i + 1}. ${esc(stepLabel(x.step))}</span><button class="small" data-funnel-remove="${i}" aria-label="${J().removeStep}">×</button></div>
+          <div class="bar big"><i style="width:${pct(x.share)}%;background:var(--accent)"></i></div>
+          <div class="meta">${J().reached(x.sessions, pct(x.share))}${i && fu.steps[i - 1].sessions ? ` · <span class="${x.sessions < fu.steps[i - 1].sessions * 0.7 ? 'bad' : ''}">${J().lost(Math.round((1 - x.sessions / fu.steps[i - 1].sessions) * 100))}</span>` : ''}</div>
+        </div>`).join('')}
+        ${steps.length < 8 ? `<select id="funnel-add" aria-label="${J().addStep}"><option value="">${J().addStep}</option>
+          <optgroup label="${J().screensG}">${options('page', j.screens.map((x) => x.route))}</optgroup>
+          <optgroup label="${J().actionsG}">${options('action', actionsSeen)}</optgroup>
+          <optgroup label="${J().elementsG}">${options('click', elementsSeen)}</optgroup></select>` : ''}
+      </div>
+    </section>`
+}
+
 // Usage ----------------------------------------------------------------------------------------------------
 async function usage() {
   const { screens } = await read('/api/usage')
@@ -705,7 +800,7 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
-const TABS = { overview, frustration, failures, usage, people, actions, versions }
+const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions }
 
 async function render() {
   clearTimeout(waitTimer)
@@ -744,6 +839,10 @@ function onContentClick(e) {
     navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = L.copy }, 1500) })
     return
   }
+  const flow = e.target.closest('[data-flow]')
+  if (flow) { e.preventDefault(); state.route = flow.dataset.flow; return render() }
+  const drop = e.target.closest('[data-funnel-remove]')
+  if (drop) { const s = funnelSteps(); s.splice(Number(drop.dataset.funnelRemove), 1); state.funnel = s.length ? JSON.stringify(s) : ''; return render() }
   const more = e.target.closest('[data-session]')
   if (more) return showSession(more)
   const tr = e.target.closest('tr.row'); if (!tr) return

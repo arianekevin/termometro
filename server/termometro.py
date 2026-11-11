@@ -14,6 +14,8 @@ and the API:
   GET  /api/failures   every failure, grouped by kind and message       │
   GET  /api/failure    one failure in depth (?signal=&detail=): stack, browsers, trails │
   GET  /api/session    everything one session did, in order (?session=) │
+  GET  /api/journeys   time on screen, screen to screen, how far things are, actions that follow │
+  GET  /api/funnel     sessions through ?steps=["page:/a","action:POST /b"] in order │
   GET  /api/summary    frustration per screen and per version      │
   GET  /api/usage      usage per screen, or per element of one      │ session cookie (or a heat-map token,
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
@@ -559,6 +561,13 @@ def overview(con, f: Filter) -> dict:
             HAVING COUNT(*) >= {INSIGHT_IRRITATION} ORDER BY COUNT(*) DESC LIMIT 5""", f.args):
         add("element_irritating", "warn", 80 + min(rage + dead, 99), {"tab": "usage", "params": {"route": route}},
             route=route, target=target, rage=rage, dead=dead)
+    j = journeys(con, f)
+    for r in [r for r in j["reach"] if r["far"]][:3]:
+        add("reach_far", "idea", 70 + min(r["uses"], 99) / 10, {"tab": "journeys", "params": {}}, kind_of=r["kind"],
+            key=r["key"], route=r["route"], uses=r["uses"], clicks=r["clicks_median"], screens=r["screens_median"])
+    for p in [p for p in j["pairs"] if p["linked"]][:2]:
+        add("pair_linked", "idea", 60 + p["share"] * 10, {"tab": "journeys", "params": {}}, a=p["a"], b=p["b"],
+            share=p["share"], n=p["n"], clicks=p["clicks_median"], screens=p["screens_median"])
     insights.sort(key=lambda i: -i["weight"])
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
             "insights": insights[:15]}
@@ -683,6 +692,130 @@ def session_trail(con, f: Filter) -> dict:
             "steps": steps(rows), "truncated": len(rows) == SESSION_MAX}
 
 
+MAX_JOURNEY_ROWS = 500_000
+SCREEN_CAP_MS = 30 * 60 * 1000  # longer than this on one screen is a tab left open, not reading
+FAR_CLICKS, FAR_SCREENS, FAR_USES = 5, 2, 10
+PAIR_MIN, PAIR_SHARE = 5, 0.3
+EXIT = "(exit)"
+
+
+def session_rows(con, f: Filter, types=("page", "click", "action")):
+    """The period's events of these types, session by session, in the order they happened."""
+    marks = ",".join("?" * len(types))
+    rows = con.execute(f"""SELECT session, type, route, target, detail, at, clicks, user_id FROM events
+        WHERE {f.sql} AND type IN ({marks}) ORDER BY session, at, id LIMIT {MAX_JOURNEY_ROWS}""", f.args + list(types))
+    current, steps = None, []
+    for row in rows:
+        if row[0] != current:
+            if steps:
+                yield current, steps
+            current, steps = row[0], []
+        steps.append(row[1:])
+    if steps:
+        yield current, steps
+
+
+def median(values):
+    return statistics.median(values) if values else 0
+
+
+def journeys(con, f: Filter) -> dict:
+    """How people move: time on each screen and where they come from and go to; how far (clicks and screens since
+    the last saved action, or the start of the session) each element and action is, against how much it is used;
+    and which actions tend to follow one another."""
+    screens: dict[str, dict] = {}
+    reach: dict[tuple, dict] = {}
+    pairs: dict[tuple, dict] = {}
+    action_count: dict[str, int] = {}
+    for _, steps in session_rows(con, f):
+        clicks = screens_passed = 0
+        last_page = None
+        last_action = None  # (detail, screens passed since it)
+        for kind, route, target, detail, at, n_clicks, user in steps:
+            if kind == "page":
+                here = screens.setdefault(route, {"ms": [], "from": {}, "to": {}})
+                if last_page:
+                    s = screens[last_page[0]]
+                    s["ms"].append(min(at - last_page[1], SCREEN_CAP_MS))
+                    s["to"][route] = s["to"].get(route, 0) + 1
+                    here["from"][last_page[0]] = here["from"].get(last_page[0], 0) + 1
+                last_page = (route, at)
+                screens_passed += 1
+                continue
+            key = ("element", route, target) if kind == "click" else ("action", route, detail)
+            r = reach.setdefault(key, {"clicks": [], "screens": [], "users": set()})
+            # For a click, the clicks before it; for an action, the collector already counted its clicks.
+            r["clicks"].append(clicks if kind == "click" else (n_clicks or 0))
+            r["screens"].append(max(screens_passed - 1, 0))
+            if user:
+                r["users"].add(user)
+            if kind == "click":
+                clicks += 1
+                continue
+            action_count[detail] = action_count.get(detail, 0) + 1
+            if last_action:
+                p = pairs.setdefault((last_action[0], detail), {"clicks": [], "screens": []})
+                p["clicks"].append(n_clicks or 0)
+                p["screens"].append(max(screens_passed - 1, 0))
+            last_action = (detail,)
+            clicks, screens_passed = 0, 1
+        if last_page:
+            s = screens[last_page[0]]
+            s["to"][EXIT] = s["to"].get(EXIT, 0) + 1
+
+    def top(d, total):
+        return [{"route": k, "n": n, "share": round(n / total, 2) if total else 0}
+                for k, n in sorted(d.items(), key=lambda kv: -kv[1])[:8]]
+
+    out_screens = []
+    for route, s in screens.items():
+        arrivals, leaves = sum(s["from"].values()), sum(s["to"].values())
+        out_screens.append({"route": route, "visits": leaves, "seconds_median": round(median(s["ms"]) / 1000, 1),
+                            "from": top(s["from"], arrivals), "to": top(s["to"], leaves)})
+    out_screens.sort(key=lambda s: -s["visits"])
+    out_reach = []
+    for (kind, route, key), r in reach.items():
+        uses = len(r["clicks"])
+        c, sc = median(r["clicks"]), median(r["screens"])
+        out_reach.append({"kind": kind, "key": key, "route": route, "uses": uses, "users": len(r["users"]),
+                          "clicks_median": c, "screens_median": sc,
+                          "far": uses >= FAR_USES and (c >= FAR_CLICKS or sc >= FAR_SCREENS)})
+    out_reach.sort(key=lambda r: -r["uses"] * (r["clicks_median"] + 2 * r["screens_median"]))
+    out_pairs = []
+    for (a, b), p in pairs.items():
+        n = len(p["clicks"])
+        share = n / action_count[a] if action_count.get(a) else 0
+        if n >= PAIR_MIN:
+            out_pairs.append({"a": a, "b": b, "n": n, "share": round(share, 2), "clicks_median": median(p["clicks"]),
+                              "screens_median": median(p["screens"]), "linked": share >= PAIR_SHARE})
+    out_pairs.sort(key=lambda p: (-p["share"], -p["n"]))
+    return {"screens": out_screens, "reach": out_reach[:100], "pairs": out_pairs[:50]}
+
+
+def funnel(con, f: Filter) -> dict:
+    """Sessions that went through the steps in order (other things in between are fine). A step is
+    `page:<route>`, `action:<detail>` or `click:<target>`."""
+    try:
+        wanted = [s for s in json.loads(f.q.get("steps", "[]")) if isinstance(s, str) and ":" in s][:8]
+    except ValueError:
+        wanted = []
+    if not wanted:
+        return {"steps": []}
+    reached = [0] * len(wanted)
+    for _, steps in session_rows(con, f):
+        i = 0
+        for kind, route, target, detail, *_ in steps:
+            want_kind, _, want = wanted[i].partition(":")
+            value = {"page": route, "action": detail, "click": target}[kind]
+            if kind == want_kind and value == want:
+                reached[i] += 1
+                i += 1
+                if i == len(wanted):
+                    break
+    return {"steps": [{"step": s, "sessions": n, "share": round(n / reached[0], 2) if reached[0] else 0}
+                      for s, n in zip(wanted, reached)]}
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -802,7 +935,7 @@ def google_email(code: str) -> str:
 
 READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
-         "/api/failure": failure, "/api/session": session_trail}
+         "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8")}

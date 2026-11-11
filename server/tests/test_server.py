@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -232,6 +233,41 @@ class Server(unittest.TestCase):
         whole = self.read("/api/session?project=shop&days=1&session=s1")
         self.assertEqual(([s["type"] for s in whole["steps"]], whole["user"]), (["page", "click", "js_error", "click"], "u-s1"))
         self.assertEqual(self.read("/api/failure?project=shop&days=1&signal=js_error&detail=nope")["n"], 0)
+
+    def test_journeys_show_how_far_things_are_what_follows_what_and_where_people_go(self):
+        sent = int(time.time() * 1000)
+        path = [{"type": "page", "route": "/home"}, {"type": "click", "route": "/home", "target": "a.menu"},
+                {"type": "page", "route": "/tickets"}, {"type": "click", "route": "/tickets", "target": "a.row"},
+                {"type": "page", "route": "/tickets/:id"}, {"type": "click", "route": "/tickets/:id", "target": "button.more"},
+                {"type": "click", "route": "/tickets/:id", "target": "button.bulk"},
+                {"type": "action", "route": "/tickets/:id", "detail": "POST /api/bulk", "clicks": 4, "duration_ms": 9000},
+                {"type": "click", "route": "/tickets/:id", "target": "button#export"},
+                {"type": "action", "route": "/tickets/:id", "detail": "POST /api/export", "clicks": 1, "duration_ms": 1000},
+                {"type": "page", "route": "/home"}]
+        for i in range(10):
+            events = [{**e, "t": sent - (len(path) - n) * 1000} for n, e in enumerate(path)]
+            call(self.base, "/api/events", {"key": KEY, "version": "1", "session": f"j{i}", "user": f"u{i}", "sent": sent,
+                                            "events": events}, origin=ORIGIN)
+        self.send([{"type": "page", "route": "/home"}], session="lonely")
+        j = self.read("/api/journeys?project=shop&days=1")
+        bulk = next(r for r in j["reach"] if r["key"] == "button.bulk")
+        self.assertEqual((bulk["uses"], bulk["users"], bulk["clicks_median"], bulk["screens_median"], bulk["far"]), (10, 10, 3, 2, True))
+        action = next(r for r in j["reach"] if r["key"] == "POST /api/bulk")
+        self.assertEqual((action["clicks_median"], action["screens_median"], action["far"]), (4, 2, True))
+        export = next(r for r in j["reach"] if r["key"] == "button#export")
+        self.assertEqual((export["clicks_median"], export["screens_median"], export["far"]), (0, 0, False))  # right after the bulk save
+        [pair] = j["pairs"]
+        self.assertEqual((pair["a"], pair["b"], pair["n"], pair["share"], pair["linked"]), ("POST /api/bulk", "POST /api/export", 10, 1.0, True))
+        home = next(x for x in j["screens"] if x["route"] == "/home")
+        self.assertEqual({x["route"]: x["n"] for x in home["to"]}, {"/tickets": 10, "(exit)": 11})
+        self.assertEqual(home["seconds_median"], 2.0)
+        tickets = next(x for x in j["screens"] if x["route"] == "/tickets")
+        self.assertEqual(tickets["from"], [{"route": "/home", "n": 10, "share": 1.0}])
+        steps = urllib.parse.quote(json.dumps(["page:/home", "action:POST /api/bulk", "action:POST /api/export", "page:/nowhere"]))
+        f = self.read(f"/api/funnel?project=shop&days=1&steps={steps}")["steps"]
+        self.assertEqual([x["sessions"] for x in f], [11, 10, 10, 0])
+        o = self.read("/api/overview?project=shop&days=1")
+        self.assertTrue({"reach_far", "pair_linked"} <= {i["kind"] for i in o["insights"]})
 
     def test_unknown_key_and_foreign_origin_are_refused(self):
         self.assertEqual(self.send([{"type": "page"}], key="tk_nope")[0], 403)
