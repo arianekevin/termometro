@@ -269,6 +269,50 @@ class Server(unittest.TestCase):
         o = self.read("/api/overview?project=shop&days=1")
         self.assertTrue({"reach_far", "pair_linked"} <= {i["kind"] for i in o["insights"]})
 
+    def test_report_has_everything_with_definitions_in_json_and_markdown(self):
+        self.send([{"type": "page", "route": "/cart"}, {"type": "rage", "route": "/cart", "target": "button#pay"},
+                   {"type": "js_error", "route": "/cart", "detail": "TypeError: x", "stack": "f @ /a.js:1:2"},
+                   {"type": "action", "route": "/cart", "detail": "POST /api/orders", "clicks": 3, "duration_ms": 1000}])
+        r = self.read("/api/report?project=shop&days=1")
+        self.assertIn("rage", r["glossary"]["signals"])
+        self.assertEqual(r["failures_in_depth"][0]["stacks"], [{"key": "f @ /a.js:1:2", "n": 1}])
+        self.assertEqual(r["screens_by_frustration"][0]["key"], "/cart")
+        status, headers, body = call(self.base, "/api/report?project=shop&days=1&format=md", cookie=self.cookie)
+        md = body.decode()
+        self.assertEqual((status, headers["Content-Type"]), (200, "text/markdown; charset=utf-8"))
+        for part in ("# Termometro report — shop", "## How to read this", "TypeError: x", "f @ /a.js:1:2", "POST /api/orders"):
+            self.assertIn(part, md)
+
+    def test_an_api_token_reads_and_a_wrong_one_does_not(self):
+        t.CONFIG.api_tokens = ["tt_good"]
+        self.send([{"type": "page", "route": "/cart"}])
+        status, _, body = call(self.base, "/api/overview?project=shop&days=1", token="tt_good")
+        self.assertEqual((status, json.loads(body)["now"]["visits"]), (200, 1))
+        self.assertEqual(call(self.base, "/api/overview?project=shop&days=1", token="tt_bad")[0], 401)
+        self.assertEqual(json.loads(call(self.base, "/api/me", token="tt_good")[2])["projects"][0]["name"], "shop")
+
+    def test_mcp_server_lists_tools_and_answers_through_the_api(self):
+        import subprocess
+        t.CONFIG.api_tokens = ["tt_mcp"]
+        self.send([{"type": "page", "route": "/cart"}, {"type": "js_error", "route": "/cart", "detail": "TypeError: x"}])
+        script = Path(t.STATIC) / "termometro_mcp.py"
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+                {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "failures", "arguments": {"days": 1}}},
+                {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "report", "arguments": {"days": 1}}},
+                {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "list_projects", "arguments": {}}}]
+        run = subprocess.run([sys.executable, str(script)], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, timeout=30,
+                             env={"TERMOMETRO_URL": self.base, "TERMOMETRO_TOKEN": "tt_mcp", "TERMOMETRO_PROJECT": "shop"})
+        out = {m["id"]: m for m in map(json.loads, run.stdout.splitlines())}
+        self.assertEqual(sorted(out), [1, 2, 3, 4, 5], run.stderr)
+        self.assertIn("report", [x["name"] for x in out[2]["result"]["tools"]])
+        failures = json.loads(out[3]["result"]["content"][0]["text"])["failures"]
+        self.assertEqual(failures[0]["detail"], "TypeError: x")
+        self.assertIn("# Termometro report — shop", out[4]["result"]["content"][0]["text"])
+        self.assertEqual(json.loads(out[5]["result"]["content"][0]["text"])[0]["name"], "shop")
+
     def test_unknown_key_and_foreign_origin_are_refused(self):
         self.assertEqual(self.send([{"type": "page"}], key="tk_nope")[0], 403)
         self.assertEqual(self.send([{"type": "page"}], origin="https://evil.example")[0], 403)

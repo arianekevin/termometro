@@ -16,6 +16,7 @@ and the API:
   GET  /api/session    everything one session did, in order (?session=) │
   GET  /api/journeys   time on screen, screen to screen, how far things are, actions that follow │
   GET  /api/funnel     sessions through ?steps=["page:/a","action:POST /b"] in order │
+  GET  /api/report     everything above for the period in one document, with definitions; ?format=md for text │
   GET  /api/summary    frustration per screen and per version      │
   GET  /api/usage      usage per screen, or per element of one      │ session cookie (or a heat-map token,
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
@@ -41,6 +42,8 @@ Configuration (environment) — at least one way in, Google or a password, unles
   TERMOMETRO_WEBHOOK_URL   Slack or Google Chat incoming webhook for every project without its own "webhook": warns when
                            the latest version made a screen worse or brought a new failure
   TERMOMETRO_LANGUAGE      language of those warnings: en (default) or pt-BR
+  TERMOMETRO_API_TOKENS    comma-separated tokens that read everything with `Authorization: Bearer <token>` — for the
+                           MCP server (termometro_mcp.py) or your own scripts; `python termometro.py new-token` makes one
 
 `python termometro.py new-key` prints a fresh project key.
 """
@@ -108,6 +111,7 @@ class Config:
         self.port = int(env.get("TERMOMETRO_PORT", "8080"))
         self.retention_days = int(env.get("TERMOMETRO_RETENTION_DAYS", "90"))
         self.webhook = env.get("TERMOMETRO_WEBHOOK_URL", "")
+        self.api_tokens = [x.strip() for x in env.get("TERMOMETRO_API_TOKENS", "").split(",") if x.strip()]
         self.language = "pt" if env.get("TERMOMETRO_LANGUAGE", "").lower().startswith("pt") else "en"
         raw = env.get("TERMOMETRO_PROJECTS")
         if not raw and env.get("TERMOMETRO_CONFIG"):
@@ -816,6 +820,143 @@ def funnel(con, f: Filter) -> dict:
                       for s, n in zip(wanted, reached)]}
 
 
+GLOSSARY = {
+    "signals": {
+        "rage": "3 clicks on the same spot within 1 s",
+        "dead": "a click on a button or link that changed nothing (no DOM change, request or navigation) within 1 s",
+        "js_error": "an uncaught JavaScript error or rejected promise",
+        "http_5xx": "a request answered with 5xx, or a network failure",
+        "http_4xx": "a request refused with 4xx (401 is left out)",
+        "abandon": "started filling a form or dialog and left the screen without saving",
+        "bounce": "went back within 4 s of arriving",
+        "slow": "a request that took 3 s or more while the page was in front of the user",
+    },
+    "usage": {
+        "page": "a visit to a screen (route pattern, ids as :id)",
+        "click": "any click, with the element's CSS selector",
+        "action": "a write (POST/PUT/PATCH/DELETE) the backend accepted after at least one click, with the clicks and time "
+                  "since the previous one (or since 2 idle minutes)",
+    },
+    "score": f"per screen: sum of signal weights / visits x {FACTOR}, capped at {CAP}. 0-19 calm, 20-49 attention, 50+ very "
+             "frustrating. Weights: " + ", ".join(f"{k} {w}" for k, w in WEIGHTS.items()),
+    "reach": "clicks and screens since the last saved action (or the start of the session) until a button or action is "
+             f"used. 'far' = used {FAR_USES}+ times and a median of {FAR_CLICKS}+ clicks or {FAR_SCREENS}+ screens.",
+    "pairs": f"action B right after action A in the same session; share = how often A is followed by B. 'linked' = {PAIR_SHARE:.0%}+.",
+    "privacy": "No text the user typed or saw is collected: only signal kinds, route patterns, element selectors, request "
+               "method and path with ids replaced, error messages scrubbed of numbers, e-mails and quoted text, and opaque "
+               "ids for account, user and role.",
+}
+
+
+def report(con, f: Filter) -> dict:
+    """Everything worth knowing about the period in one document, with the definitions needed to read it: what an
+    AI (or a person) needs to find the problems and suggest improvements without opening the dashboard."""
+    project = f.q.get("project", "")
+    o = overview(con, f)
+    s = summary(con, f)
+    fl = failures(con, f)["failures"]
+    j = journeys(con, f)
+    deep = []
+    for x in fl[:5]:
+        d = failure(con, Filter({**f.q, "signal": x["type"], "detail": x["detail"]}))
+        d["trails"] = d["trails"][:2]
+        deep.append(d)
+    screens = usage(con, f)["screens"]
+    never = {}
+    for sc in screens[:10]:
+        u = usage(con, Filter({**f.q, "route": sc["route"]}))
+        never[sc["route"]] = {"elements": u["elements"][:15], "never_clicked": u["never_clicked"][:30]}
+    p = people(con, f)
+    c = compare(con, Filter({k: v for k, v in f.q.items() if k != "version"}))
+    return {
+        "termometro": VERSION, "project": project, "days": f.days,
+        "filters": {k: f.q[k] for k in ("version", "account", "role", "user") if f.q.get(k)},
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "glossary": GLOSSARY,
+        "overview": o, "screens_by_frustration": s["routes"][:30], "versions": s["versions"],
+        "failures": fl[:30], "failures_in_depth": deep,
+        "usage": {"screens": screens[:40], "elements_per_screen": never},
+        "effort_per_action": actions(con, f)["actions"][:40],
+        "journeys": {"far": [r for r in j["reach"] if r["far"]][:20], "pairs": j["pairs"][:20], "screens": j["screens"][:25]},
+        "people": {"roles": p["roles"][:20], "accounts": p["accounts"][:20], "identified_users": len(p["users"])},
+        "latest_version_vs_previous": {k: c[k] for k in ("a", "b", "overall", "new_failures")} | {"routes": c["routes"][:20]},
+    }
+
+
+def report_markdown(r: dict) -> str:
+    """The report as text a person can read and an AI can take in one paste."""
+    r = json.loads(json.dumps(r).replace("|", "\\\\|"))  # a pipe in a selector or a message would break the tables
+    out = [f"# Termometro report — {r['project']}, last {r['days']} days",
+           f"Generated {r['generated_at']} by Termometro {r['termometro']}."
+           + (f" Filters: {', '.join(f'{k}={v}' for k, v in r['filters'].items())}." if r["filters"] else ""), ""]
+    g = r["glossary"]
+    out += ["## How to read this", f"- Score: {g['score']}", f"- Reach: {g['reach']}", f"- Pairs: {g['pairs']}",
+            "- Signals: " + "; ".join(f"**{k}** {v}" for k, v in g["signals"].items()),
+            "- Usage: " + "; ".join(f"**{k}** {v}" for k, v in g["usage"].items()), f"- Privacy: {g['privacy']}", ""]
+    n, b = r["overview"]["now"], r["overview"]["before"]
+    out += ["## Overview (this period vs the one before)", "| | now | before |", "|---|---|---|"]
+    out += [f"| {k} | {n[k]} | {b[k]} |" for k in ("score", "visits", "sessions", "users", "failures")]
+    out += ["", "Score per day: " + ", ".join(f"{d['day']} {d['score']} ({d['visits']} visits)" for d in r["overview"]["daily"]), ""]
+    def fact(k, v):
+        return f"{k}={time.strftime('%Y-%m-%d %H:%M', time.gmtime(v / 1000))} UTC" if k.endswith("_at") and v else f"{k}={v}"
+    out += ["### What deserves a look"] + [f"- [{i['severity']}] {i['kind']}: " + ", ".join(
+        fact(k, v) for k, v in i.items() if k not in ("kind", "severity", "weight", "link")) for i in r["overview"]["insights"]] + [""]
+    out += ["## Screens by frustration", "| screen | score | visits | signals | where | what failed |", "|---|---|---|---|---|---|"]
+    for x in r["screens_by_frustration"]:
+        out.append(f"| {x['key']} | {x['score']} | {x['visits']} | " + ", ".join(f"{k} {v}" for k, v in x["signals"].items())
+                   + " | " + "; ".join(f"{t['type']} on `{t['target']}` {t['n']}x" for t in x["targets"])
+                   + " | " + "; ".join(f"{t['type']} `{t['detail']}` {t['n']}x" for t in x["failures"]) + " |")
+    out += ["", "## Failures", "| kind | message | times | sessions | users | first version | new |", "|---|---|---|---|---|---|---|"]
+    out += [f"| {x['type']} | `{x['detail']}` | {x['n']} | {x['sessions']} | {x['users']} | {x['first_version']} | {x['new']} |"
+            for x in r["failures"]]
+    for d in r["failures_in_depth"]:
+        if not d.get("n"):
+            continue
+        names = lambda xs: ", ".join(f"{x['key'] or '?'} ({x['n']})" for x in xs)
+        out += ["", f"### {d['type']}: `{d['detail']}`", f"- screens: {names(d['routes'])}", f"- versions: {names(d['versions'])}",
+                f"- browsers: {names(d['agents'])}", f"- kinds of screen: {names(d['devices'])}"]
+        if d["after_clicking"]:
+            out.append(f"- right after clicking: {names(d['after_clicking'])}")
+        if d["stacks"]:
+            out += ["```", d["stacks"][0]["key"], "```"]
+        for t in d["trails"][:1]:
+            out.append(f"Steps up to it (session {t['session'][:8]}, {t['agent']}, {t['device']}, {t['version']}):")
+            for st in t["before"] + [t["failure"]]:
+                out.append(f"  {round((st['at'] - t['at']) / 1000)}s {st['type']} {st['route']} {st['target'] or ''} {st['detail'] or ''}".rstrip())
+    out += ["", "## Effort per action", "| action | times | users | clicks median | clicks p90 | seconds median | seconds p90 |",
+            "|---|---|---|---|---|---|---|"]
+    out += [f"| `{a['action']}` | {a['times']} | {a['users']} | {a['clicks_median']} | {a['clicks_p90']} | {a['seconds_median']} | "
+            f"{a['seconds_p90']} |" for a in r["effort_per_action"]]
+    jn = r["journeys"]
+    out += ["", "## Journeys", "### Used a lot and far away", "| kind | item | screen | uses | users | clicks to reach | screens on the way |",
+            "|---|---|---|---|---|---|---|"]
+    out += [f"| {x['kind']} | `{x['key']}` | {x['route']} | {x['uses']} | {x['users']} | {x['clicks_median']} | {x['screens_median']} |"
+            for x in jn["far"]]
+    out += ["", "### Actions that follow one another"]
+    out += [f"- after `{p['a']}` comes `{p['b']}` {round(p['share'] * 100)}% of the time ({p['n']}x), {p['clicks_median']} clicks and "
+            f"{p['screens_median']} screens between them" for p in jn["pairs"]]
+    out += ["", "### Screen to screen", "| screen | visits | median seconds | comes from | goes to |", "|---|---|---|---|---|"]
+    flow = lambda xs: ", ".join(f"{x['route']} {round(x['share'] * 100)}%" for x in xs[:4])
+    out += [f"| {x['route']} | {x['visits']} | {x['seconds_median']} | {flow(x['from'])} | {flow(x['to'])} |" for x in jn["screens"]]
+    out += ["", "## Usage", "| screen | visits | clicks | users | score |", "|---|---|---|---|---|"]
+    out += [f"| {x['route']} | {x['visits']} | {x['clicks']} | {x['users']} | {x['score']} |" for x in r["usage"]["screens"]]
+    for route, e in r["usage"]["elements_per_screen"].items():
+        out.append(f"- {route}: most clicked " + ", ".join(f"`{x['target']}` {x['clicks']}" for x in e["elements"][:8])
+                   + (f"; never clicked: " + ", ".join(f"`{t}`" for t in e["never_clicked"][:15]) if e["never_clicked"] else ""))
+    pp = r["people"]
+    out += ["", "## People", f"Identified users: {pp['identified_users']}.", "| role | users | visits | score |", "|---|---|---|---|"]
+    out += [f"| {x['key']} | {x['users']} | {x['visits']} | {x['score']} |" for x in pp["roles"]]
+    v = r["latest_version_vs_previous"]
+    if v["a"] and v["b"]:
+        out += ["", f"## Version {v['b']} against {v['a']}", f"Overall score {v['overall']['a']['score']} → {v['overall']['b']['score']}."]
+        out += [f"- {x['route']}: {x['a']['score']} → {x['b']['score']} ({'+' if x['delta'] > 0 else ''}{x['delta']})"
+                for x in v["routes"] if x["delta"]]
+        out += [f"- new failure: {x['type']} `{x['detail']}` on {x['route']} ({x['n']}x)" for x in v["new_failures"]]
+    out += ["", "## What to do with this",
+            "Find the problems that hurt the most people, tell bugs (failures with stack and steps) from design problems "
+            "(frustration, effort, reach, pairs, never clicked), and suggest concrete changes, each tied to the numbers above."]
+    return "\n".join(out) + "\n"
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -935,10 +1076,12 @@ def google_email(code: str) -> str:
 
 READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
-         "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel}
+         "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
+         "/api/report": report}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
-                "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8")}
+                "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8"),
+                "/termometro_mcp.py": ("termometro_mcp.py", "text/x-python; charset=utf-8")}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -982,6 +1125,9 @@ class Handler(BaseHTTPRequestHandler):
         """The signed-in person, from the session cookie: s.<expiry>.<e-mail, base64; empty for the password>."""
         if CONFIG.no_auth:
             return {"email": ""}
+        auth = self.headers.get("Authorization", "")
+        if auth.startswith("Bearer ") and any(hmac.compare_digest(auth[7:].encode(), t.encode()) for t in CONFIG.api_tokens):
+            return {"email": "api"}
         payload = verify(self.cookie("termometro_session"))
         parts = payload.split(".") if payload else []
         if len(parts) != 3 or parts[0] != "s" or not parts[1].isdigit() or int(parts[1]) <= time.time():
@@ -1144,6 +1290,8 @@ class Handler(BaseHTTPRequestHandler):
                 first, last, total = con.execute(
                     "SELECT MIN(at), MAX(at), COUNT(*) FROM events WHERE project = ?", (q.get("project", ""),)).fetchone()
                 return self.json(200, {"events": total, "first_at": first, "last_at": last}, headers)
+            if url.path == "/api/report" and q.get("format") == "md":
+                return self.send(200, report_markdown(report(con, Filter(q))).encode(), "text/markdown; charset=utf-8", headers)
             self.json(200, READS[url.path](con, Filter(q)), headers)
 
     do_HEAD = do_GET
@@ -1151,6 +1299,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv: list[str]) -> None:
     global CONFIG
+    if argv[1:2] == ["new-token"]:
+        print("tt_" + secrets.token_urlsafe(32))
+        return
     if argv[1:2] == ["new-key"]:
         print("tk_" + secrets.token_urlsafe(18))
         return

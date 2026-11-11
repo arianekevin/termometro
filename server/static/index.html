@@ -181,7 +181,8 @@ const L = PT ? {
   vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
   scoreByDay: 'Nota por dia', peak: (n) => `pior dia: nota ${n}`, dayTip: (d, s, v) => `${d}: nota ${s} em ${v} visitas`,
   whatToSee: 'O que merece atenção', insightsHint: 'Do mais grave para o menos. Cada item leva aonde dá para ver mais.', nothing: 'Nada fora do normal neste período.',
-  sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' }, see: 'Ver',
+  sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' },
+  forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
     screen_worse: (i, s) => `<b>${i.route}</b> piorou: nota ${i.before} → ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> está frustrante: nota ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
@@ -257,7 +258,8 @@ const L = PT ? {
   vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
   scoreByDay: 'Score per day', peak: (n) => `worst day: score ${n}`, dayTip: (d, s, v) => `${d}: score ${s} over ${v} visits`,
   whatToSee: 'What deserves a look', insightsHint: 'Most serious first. Each item leads where you can see more.', nothing: 'Nothing out of the ordinary in this period.',
-  sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' }, see: 'See',
+  sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' },
+  forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
     screen_worse: (i, s) => `<b>${i.route}</b> got worse: score ${i.before} → ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> is frustrating: score ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
@@ -506,7 +508,10 @@ async function overview() {
     <section class="card"><div class="label">${L.whatToSee}</div><div class="meta">${L.insightsHint}</div>
       ${o.insights.length ? `<ul class="insights">${o.insights.map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
         <div class="text">${sentence(i)}</div><a ${linkAttrs(i.link)}>${L.see} →</a></li>`).join('')}</ul>` : `<p class="meta">${L.nothing}</p>`}
-    </section>`
+    </section>
+    <section class="card"><div class="head"><div style="flex:1;min-width:240px"><div class="label">${L.forAi}</div><div class="meta">${L.forAiHint}</div></div>
+      <div class="field"><button id="copy-report" class="primary">${L.copyReport}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)"
+        href="/api/report?${esc(query())}" download="termometro-${esc($('#project').value)}.json">${L.downloadJson}</a></div></div></section>`
 }
 
 // Frustration ----------------------------------------------------------------------------------------------
@@ -843,6 +848,16 @@ function onContentClick(e) {
   if (flow) { e.preventDefault(); state.route = flow.dataset.flow; return render() }
   const drop = e.target.closest('[data-funnel-remove]')
   if (drop) { const s = funnelSteps(); s.splice(Number(drop.dataset.funnelRemove), 1); state.funnel = s.length ? JSON.stringify(s) : ''; return render() }
+  const report = e.target.closest('#copy-report')
+  if (report) {
+    report.textContent = L.copying
+    // Asked inside the click, so the browser lets the page write to the clipboard once the text arrives.
+    const text = fetch(`/api/report?${query({ format: 'md' })}`).then((r) => r.text())
+    const done = () => { report.textContent = L.copiedReport; setTimeout(() => { report.textContent = L.copyReport }, 1500) }
+    const item = typeof ClipboardItem !== 'undefined' ? new ClipboardItem({ 'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })) }) : null
+    ;(item ? navigator.clipboard.write([item]) : text.then((t) => navigator.clipboard.writeText(t))).then(done, () => { report.textContent = L.copyReport })
+    return
+  }
   const more = e.target.closest('[data-session]')
   if (more) return showSession(more)
   const tr = e.target.closest('tr.row'); if (!tr) return
