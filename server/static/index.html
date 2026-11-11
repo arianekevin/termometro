@@ -92,6 +92,28 @@ details summary { cursor: pointer; color: var(--fg2); }
 @keyframes pulse { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 .error { color: var(--bad); background: var(--bad-soft); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+/* Search */
+.search { position: relative; flex: 1 1 220px; max-width: 360px; }
+.search input { width: 100%; }
+.results { position: absolute; top: 40px; left: 0; right: 0; min-width: 300px; max-height: 70vh; overflow-y: auto; z-index: 10; background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.12); padding: 6px; }
+.results .group { padding: 8px 8px 4px; }
+.results a { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+.results a:hover, .results a.on { background: var(--accent-soft); }
+.results a code { flex: 1; min-width: 0; color: inherit; }
+/* Overview */
+.delta { font-size: 12px; font-weight: 600; margin-left: 4px; }
+.insights { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+.insights li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
+.insights li:first-child { border-top: 0; }
+.insights .text { flex: 1; min-width: 0; }
+.insights a { white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
+.insights a:hover { text-decoration: underline; }
+.trend { display: block; width: 100%; height: 72px; margin-top: 8px; }
+.trend rect.day { fill: var(--accent); }
+.trend rect.hit { fill: transparent; }
+.trend g:hover rect.day { fill: var(--accent-hover); }
+.trend line { stroke: var(--line-strong); stroke-width: 1; }
 </style>
 </head>
 <body>
@@ -106,7 +128,22 @@ const L = PT ? {
     state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
   signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
   day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
-  tabs: { frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  tabs: { overview: 'Início', frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  search: 'Buscar tela, botão, erro, ação, usuário…', noResults: 'Nada com esse nome neste período.',
+  kinds: { screen: 'Telas', element: 'Elementos', failure: 'Falhas', action: 'Ações', user: 'Usuários', account: 'Contas' },
+  vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
+  scoreByDay: 'Nota por dia', peak: (n) => `pior dia: nota ${n}`, dayTip: (d, s, v) => `${d}: nota ${s} em ${v} visitas`,
+  whatToSee: 'O que merece atenção', insightsHint: 'Do mais grave para o menos. Cada item leva aonde dá para ver mais.', nothing: 'Nada fora do normal neste período.',
+  sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou' }, see: 'Ver',
+  insight: {
+    screen_worse: (i, s) => `<b>${i.route}</b> piorou: nota ${i.before} → ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
+    screen_frustrating: (i, s) => `<b>${i.route}</b> está frustrante: nota ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
+    screen_better: (i) => `<b>${i.route}</b> melhorou: nota ${i.before} → ${i.now} em ${i.visits} visitas.`,
+    failure_new: (i, s) => `Falha nova em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
+    failure_recurring: (i, s) => `Falha recorrente em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
+    action_laborious: (i) => `<code>${i.action}</code> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
+    element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${i.rage} rage clicks e ${i.dead} cliques sem resposta.`,
+  },
   names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
   noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
   overall: 'Nota geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'tranquilo', attention: 'atenção', much: 'muita frustração',
@@ -140,7 +177,22 @@ const L = PT ? {
     state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
   signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
   day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
-  tabs: { frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
+  tabs: { overview: 'Overview', frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
+  search: 'Search screen, button, error, action, user…', noResults: 'Nothing by that name in this period.',
+  kinds: { screen: 'Screens', element: 'Elements', failure: 'Failures', action: 'Actions', user: 'Users', account: 'Accounts' },
+  vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
+  scoreByDay: 'Score per day', peak: (n) => `worst day: score ${n}`, dayTip: (d, s, v) => `${d}: score ${s} over ${v} visits`,
+  whatToSee: 'What deserves a look', insightsHint: 'Most serious first. Each item leads where you can see more.', nothing: 'Nothing out of the ordinary in this period.',
+  sev: { bad: 'serious', warn: 'attention', ok: 'improved' }, see: 'See',
+  insight: {
+    screen_worse: (i, s) => `<b>${i.route}</b> got worse: score ${i.before} → ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
+    screen_frustrating: (i, s) => `<b>${i.route}</b> is frustrating: score ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
+    screen_better: (i) => `<b>${i.route}</b> improved: score ${i.before} → ${i.now} over ${i.visits} visits.`,
+    failure_new: (i, s) => `New failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
+    failure_recurring: (i, s) => `Recurring failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
+    action_laborious: (i) => `<code>${i.action}</code> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
+    element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${i.rage} rage clicks and ${i.dead} dead clicks.`,
+  },
   names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
   noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
   overall: 'Overall score', visits: 'Visits', worst: 'Most frustrating screen', calm: 'calm', attention: 'attention', much: 'very frustrating',
@@ -189,7 +241,30 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'frustration', user: '', usageRoute: '', a: '', b: '' }
+const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', hash: new URLSearchParams(), focus: false }
+
+// Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
+const FILTERS = ['project', 'days', 'version', 'account', 'role']
+const PARAMS = ['user', 'route', 'action', 'a', 'b']
+function readHash() {
+  const [tab, qs] = location.hash.slice(1).split('?')
+  state.tab = TABS[tab] ? tab : 'overview'
+  state.hash = new URLSearchParams(qs || '')
+  for (const k of PARAMS) state[k] = state.hash.get(k) || ''
+}
+function hashFor(tab, params = {}) {
+  const p = new URLSearchParams()
+  for (const k of FILTERS) { const v = k in params ? params[k] : $('#' + k)?.value; if (v && !(k === 'days' && v === '7')) p.set(k, v) }
+  for (const k of PARAMS) { const v = k in params ? params[k] : k === 'user' ? state.user : ''; if (v) p.set(k, v) }
+  return '#' + tab + (p.toString() ? '?' + p : '')
+}
+function writeHash() {
+  const h = hashFor(state.tab, Object.fromEntries(PARAMS.map((k) => [k, state[k]])))
+  state.hash = new URLSearchParams(h.split('?')[1] || '')
+  if (location.hash !== h) history.replaceState(null, '', h)
+}
+const go = (tab, params) => { location.hash = hashFor(tab, params).slice(1) }
+const linkAttrs = (link) => `href="${esc(hashFor(link.tab, link.params))}"`
 
 // Sign-in --------------------------------------------------------------------------------------------------
 function signin(error) {
@@ -218,6 +293,8 @@ function shell() {
     <header>
       <div class="top">
         <div class="mark">${MARK}Termometro</div>
+        <div class="search" role="search"><input id="search" type="search" placeholder="${L.search}" aria-label="${L.search}" autocomplete="off"
+          aria-controls="results"><div id="results" class="results" hidden></div></div>
         <label class="field"><span class="meta">${L.project}</span><select id="project">${projects.map((p) => `<option>${esc(p.name)}</option>`).join('')}</select></label>
         <label class="field"><span class="meta">${L.period}</span><select id="days">
           <option value="1">${L.day}</option>${[7, 30, 90].map((n) => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${L.days(n)}</option>`).join('')}</select></label>
@@ -230,10 +307,18 @@ function shell() {
       <nav class="tabs">${Object.entries(L.tabs).map(([k, v]) => `<a href="#${k}" data-tab="${k}">${v}</a>`).join('')}</nav>
     </header>
     <main id="content"></main>`
-  const project = recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
-  const days = recall('days'); if (days) $('#days').value = days
-  $('#project').addEventListener('change', async () => { keep('project', $('#project').value); state.user = ''; state.usageRoute = ''; state.a = ''; state.b = ''; await loadFilters(); render() })
+  const project = state.hash.get('project') ?? recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
+  const days = state.hash.get('days') ?? recall('days'); if ([...$('#days').options].some((o) => o.value === days)) $('#days').value = days
+  $('#project').addEventListener('change', async () => {
+    keep('project', $('#project').value); for (const k of PARAMS) state[k] = ''
+    state.hash = new URLSearchParams(); await loadFilters(); render()
+  })
   for (const id of ['days', 'version', 'account', 'role']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
+  $('nav.tabs').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-tab]'); if (!a) return
+    e.preventDefault(); go(a.dataset.tab, { route: state.route, a: state.a, b: state.b })
+  })
+  wireSearch()
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
   $('#content').addEventListener('change', (e) => {
@@ -246,7 +331,7 @@ function shell() {
 async function loadFilters() {
   const f = await (await fetch('/api/filters?project=' + encodeURIComponent($('#project').value))).json()
   const fill = (id, values, all) => {
-    const current = $('#' + id).value || recall(id) || ''
+    const current = state.hash.has(id) ? state.hash.get(id) : state.hash.toString() ? '' : $('#' + id).value || recall(id) || ''
     $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option>${esc(v)}</option>`).join('')
     $('#' + id).value = values.includes(current) ? current : ''
   }
@@ -264,6 +349,86 @@ async function read(path, extra) {
   const res = await fetch(`${path}?${query(extra)}`)
   if (res.status === 401) { boot(); throw new Error('signed out') }
   return res.json()
+}
+
+// Search ---------------------------------------------------------------------------------------------------
+function wireSearch() {
+  const input = $('#search'), box = $('#results')
+  let timer = 0, seq = 0
+  const close = () => { box.hidden = true; input.setAttribute('aria-expanded', 'false') }
+  const show = async () => {
+    const q = input.value.trim()
+    if (q.length < 2) return close()
+    const mine = ++seq
+    const { results } = await read('/api/search', { q }).catch(() => ({ results: [] }))
+    if (mine !== seq) return
+    const groups = {}
+    for (const r of results) (groups[r.kind] ??= []).push(r)
+    box.innerHTML = results.length ? Object.entries(groups).map(([kind, list]) => `<div class="group label">${L.kinds[kind]}</div>` + list.map((r) =>
+      `<a ${linkAttrs(r.link)}><code>${esc(r.type ? (L.names[r.type] ?? r.type) + ': ' + r.label : r.label)}</code>
+        <span class="meta">${r.route && r.kind !== 'screen' ? esc(r.route) + ' · ' : ''}${r.n}</span></a>`).join('')).join('')
+      : `<div class="empty">${L.noResults}</div>`
+    box.hidden = false; input.setAttribute('aria-expanded', 'true')
+  }
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(show, 200) })
+  input.addEventListener('focus', () => { if (box.innerHTML && input.value.trim().length >= 2) box.hidden = false })
+  input.addEventListener('keydown', (e) => {
+    const items = [...box.querySelectorAll('a')], at = items.findIndex((a) => a.classList.contains('on'))
+    if (e.key === 'Escape') { close(); input.blur() }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (!items.length) return
+      const next = (at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+      items.forEach((a, i) => a.classList.toggle('on', i === next)); items[next].scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter' && items.length) { e.preventDefault(); (items[at] ?? items[0]).click() }
+  })
+  box.addEventListener('click', (e) => { if (e.target.closest('a')) { close(); input.blur() } })
+  document.addEventListener('click', (e) => { if (!e.target.closest('.search')) close() })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && !e.target.matches('input, select, textarea')) { e.preventDefault(); input.focus(); input.select() }
+  })
+}
+
+// Overview -------------------------------------------------------------------------------------------------
+async function overview() {
+  const o = await read('/api/overview')
+  const n = o.now, b = o.before
+  if (!n.visits && !b.visits) return empty(L.noVisits)
+  // Higher is worse for the score and the failures; for visits and people it is only change.
+  const diff = (now, before, worseUp) => {
+    if (!before) return ''
+    const pct = Math.round((now - before) / before * 100)
+    if (!pct) return `<span class="delta meta">=</span>`
+    const cls = worseUp === undefined ? 'meta' : (pct > 0) === worseUp ? 'bad' : 'ok'
+    return `<span class="delta ${cls}">${pct > 0 ? '+' : ''}${pct}%</span>`
+  }
+  const points = n.score - b.score
+  const vs = o.days === 1 ? L.vsDay : L.vsBefore(o.days)
+  const W = 600, H = 72, gap = 2, days = o.daily, bw = days.length ? W / days.length : W
+  const top = Math.max(10, ...days.map((d) => d.score)) // scaled to the worst day, so small changes still show
+  const trend = days.length > 1 ? `<div class="card"><div class="label">${L.scoreByDay}</div>
+    <svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${L.scoreByDay}">
+      <line x1="0" x2="${W}" y1="${H - 0.5}" y2="${H - 0.5}"/>
+      ${days.map((d, i) => { const h = Math.max(2, d.score / top * (H - 4)); return `<g><title>${esc(L.dayTip(d.day, d.score, d.visits))}</title>
+        <rect class="hit" x="${i * bw}" y="0" width="${bw}" height="${H}"/>
+        <rect class="day" x="${i * bw + gap / 2}" y="${H - h}" width="${Math.max(1, bw - gap)}" height="${h}" rx="2"/></g>` }).join('')}
+    </svg><div class="meta">${esc(days[0].day)} → ${esc(days[days.length - 1].day)} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>` : ''
+  const sentence = (i) => {
+    const safe = Object.fromEntries(Object.entries(i).map(([k, v]) => [k, typeof v === 'string' ? esc(v) : v]))
+    return L.insight[i.kind](safe, esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? ''))
+  }
+  return `
+    <section class="numbers">
+      <div class="card"><div class="label">${L.overall}</div><div class="big ${band(n.score)}">${n.score}${b.visits ? `<span class="delta ${points > 0 ? 'bad' : points < 0 ? 'ok' : 'meta'}">${points > 0 ? '+' : ''}${points || '='}</span>` : ''}</div>
+        <span class="pill ${band(n.score)}">${say(n.score)}</span></div>
+      <div class="card"><div class="label">${L.visits}</div><div class="big">${n.visits}${diff(n.visits, b.visits)}</div><div class="meta">${L.sessions(n.sessions)}</div></div>
+      <div class="card"><div class="label">${L.people}</div><div class="big">${n.users}${diff(n.users, b.users)}</div><div class="meta">${vs}</div></div>
+      <div class="card"><div class="label">${L.failures}</div><div class="big ${n.failures ? 'bad' : 'ok'}">${n.failures}${diff(n.failures, b.failures, true)}</div><div class="meta">${vs}</div></div>
+    </section>
+    ${trend}
+    <section class="card"><div class="label">${L.whatToSee}</div><div class="meta">${L.insightsHint}</div>
+      ${o.insights.length ? `<ul class="insights">${o.insights.map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
+        <div class="text">${sentence(i)}</div><a ${linkAttrs(i.link)}>${L.see} →</a></li>`).join('')}</ul>` : `<p class="meta">${L.nothing}</p>`}
+    </section>`
 }
 
 // Frustration ----------------------------------------------------------------------------------------------
@@ -288,11 +453,11 @@ async function frustration() {
     <section class="card">
       <div class="label">${L.screensByFrustration}</div><div class="meta">${L.openRow}</div>
       ${table(`<th>${L.screen}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.routes.map((x, i) => `
-        <tr class="row" data-open="${i}" tabindex="0" aria-expanded="false">
+        <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${esc(x.key)}</div></td>
           <td class="n">${scoreHtml(x.score)}<div class="bar"><i style="width:${x.score}%;background:var(--${band(x.score)})"></i></div></td>
           <td class="n">${x.visits}</td><td>${signals(x.signals)}</td></tr>
-        <tr class="detail" data-of="${i}" hidden><td colspan="4">${detail(x)}</td></tr>`).join(''))}
+        <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="4">${detail(x)}</td></tr>`).join(''))}
     </section>
     ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}</div><div class="meta">${L.versionHint}</div>
       ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
@@ -306,8 +471,8 @@ async function frustration() {
 async function usage() {
   const { screens } = await read('/api/usage')
   if (!screens.length) return empty(L.noVisits)
-  if (!screens.some((s) => s.route === state.usageRoute)) state.usageRoute = screens[0].route
-  const d = await read('/api/usage', { route: state.usageRoute })
+  if (!screens.some((s) => s.route === state.route)) state.route = screens[0].route
+  const d = await read('/api/usage', { route: state.route })
   const maxV = Math.max(...screens.map((s) => s.visits))
   const maxC = Math.max(1, ...d.elements.map((e) => e.clicks))
   const heat = (f) => `hsl(${Math.round(220 - f * 220)} 75% 50%)`
@@ -317,7 +482,7 @@ async function usage() {
       <div class="card">
         <div class="label">${L.screensByUse}</div><div class="meta">${L.pickScreen}</div>
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
-          <tr class="row ${s.route === state.usageRoute ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
+          <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
             <td><div class="route">${esc(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
             <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
       </div>
@@ -368,7 +533,7 @@ async function actions() {
   const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
   return `<section class="card"><div class="label">${L.effort}</div><div class="meta">${L.effortHint}</div>
     ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
-      actions.map((a) => `<tr><td><code>${esc(a.action)}</code></td><td class="n">${a.times}</td><td class="n">${a.users}</td>
+      actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td><code>${esc(a.action)}</code></td><td class="n">${a.times}</td><td class="n">${a.users}</td>
         <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td><td class="n">${a.clicks_p90}</td>
         <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
 }
@@ -429,7 +594,7 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
-const TABS = { frustration, usage, people, actions, versions }
+const TABS = { overview, frustration, usage, people, actions, versions }
 
 async function render() {
   clearTimeout(waitTimer)
@@ -454,6 +619,9 @@ async function render() {
   try {
     $('#content').innerHTML = await TABS[state.tab]()
     $('#open-map')?.addEventListener('click', openMap)
+    writeHash()
+    if (state.focus) $('#content tr.sel')?.scrollIntoView({ block: 'center' })
+    state.focus = false
   } catch (error) {
     if (error.message !== 'signed out') $('#content').innerHTML = empty(L.failed + esc(error.message))
   }
@@ -469,14 +637,30 @@ function onContentClick(e) {
   if (tr.dataset.open !== undefined) {
     const d = document.querySelector(`tr[data-of="${tr.dataset.open}"]`)
     d.hidden = !d.hidden; tr.setAttribute('aria-expanded', String(!d.hidden))
-  } else if (tr.dataset.route !== undefined) { state.usageRoute = tr.dataset.route; render() }
+    state.route = d.hidden ? '' : tr.dataset.key; writeHash()
+  } else if (tr.dataset.route !== undefined) { state.route = tr.dataset.route; render() }
   else if (tr.dataset.user !== undefined) { state.user = state.user === tr.dataset.user ? '' : tr.dataset.user; render() }
 }
 
-addEventListener('hashchange', () => { state.tab = TABS[location.hash.slice(1)] ? location.hash.slice(1) : 'frustration'; if ($('#content')) render() })
+// A link, the back button or a pasted address: the hash decides the tab, the filters and what is open.
+addEventListener('hashchange', async () => {
+  if (!$('#content')) return
+  const project = $('#project').value
+  readHash()
+  const want = state.hash.get('project')
+  if (want && [...$('#project').options].some((o) => o.value === want)) $('#project').value = want
+  $('#days').value = state.hash.get('days') || '7'
+  if ($('#project').value !== project) await loadFilters()
+  for (const k of ['version', 'account', 'role']) {
+    const v = state.hash.get(k) || ''
+    $('#' + k).value = [...$('#' + k).options].some((o) => o.value === v) ? v : ''
+  }
+  state.focus = true
+  render()
+})
 
 async function boot() {
-  state.tab = TABS[location.hash.slice(1)] ? location.hash.slice(1) : 'frustration'
+  readHash()
   state.me = await (await fetch('/api/me')).json()
   const params = new URLSearchParams(location.search)
   if (!state.me.signed_in) return signin(params.get('error'))

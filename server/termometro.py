@@ -9,7 +9,9 @@ and the API:
   GET  /auth/google    sign in with Google (then /auth/google/callback); only allowed e-mails or domains get in
   POST /api/logout
   GET  /api/me         is this browser signed in, and which projects exist
-  GET  /api/summary    frustration per screen and per version      ┐
+  GET  /api/overview   the period against the one before, and what deserves a look ┐
+  GET  /api/search     screens, elements, failures, actions and ids containing ?q=  │
+  GET  /api/summary    frustration per screen and per version      │
   GET  /api/usage      usage per screen, or per element of one      │ session cookie (or a heat-map token,
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
   GET  /api/actions    effort (clicks and time) per accepted write  │
@@ -259,13 +261,17 @@ SIGNALS = "(" + ",".join(f"'{t}'" for t in WEIGHTS) + ")"
 class Filter:
     """The WHERE every read shares: project, period and the optional cuts."""
 
-    def __init__(self, q: dict):
+    def __init__(self, q: dict, before: bool = False):
         try:
             self.days = max(1, min(CONFIG.retention_days, int(q.get("days", "7"))))
         except ValueError:
             self.days = 7
-        since = int((time.time() - self.days * 86400) * 1000)
-        self.sql, self.args = "project = ? AND at >= ?", [q.get("project", ""), since]
+        self.since = int((time.time() - self.days * 86400) * 1000)
+        self.sql, self.args = "project = ? AND at >= ?", [q.get("project", ""), self.since]
+        if before:  # the same length of time just before: what "now" is compared with
+            self.since -= self.days * 86400 * 1000
+            self.sql += " AND at < ?"
+            self.args = [q.get("project", ""), self.since, self.since + self.days * 86400 * 1000]
         for field, column in (("version", "version"), ("account", "account"), ("role", "role"),
                               ("user", "user_id"), ("route", "route")):
             if q.get(field):
@@ -438,6 +444,115 @@ def compare(con, f: Filter) -> dict:
             "routes": routes, "actions": acts, "new_failures": new[:20]}
 
 
+INSIGHT_MIN_VISITS = 10  # a screen needs this many visits before its score says anything
+INSIGHT_RISE = 10        # score points against the previous period that count as worse (or better)
+INSIGHT_EFFORT = 15      # median clicks of a laborious action
+INSIGHT_IRRITATION = 5   # rage + dead clicks on one element
+
+
+def totals(con, f: Filter) -> dict:
+    visits, points, failures, sessions, users = con.execute(f"""
+        SELECT COALESCE(SUM(type = 'page'), 0), COALESCE(SUM({WEIGHT_CASE}), 0), COALESCE(SUM(type IN {FAILURES}), 0),
+               COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql}""", f.args).fetchone()
+    return {"visits": visits, "sessions": sessions, "users": users, "failures": failures, "score": score(points, visits)}
+
+
+def daily(con, f: Filter) -> list[dict]:
+    """Score and visits per day of the period, oldest first; a day without visits is left out."""
+    rows = con.execute(f"""
+        SELECT date(at / 1000, 'unixepoch') d, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0), SUM(type IN {FAILURES})
+        FROM events WHERE {f.sql} GROUP BY d ORDER BY d""", f.args).fetchall()
+    return [{"day": d, "visits": v, "score": score(p, v), "failures": n} for d, v, p, n in rows if v]
+
+
+def overview(con, f: Filter) -> dict:
+    """The period against the one just before, and what deserves a look, most serious first. Every insight carries
+    the facts behind it and where in the dashboard to see more (`tab` and `params`)."""
+    prev = Filter(f.q, before=True)
+    now_routes = {g["key"]: g for g in frustration_by(con, f, "route")}
+    old_routes = {g["key"]: g for g in frustration_by(con, prev, "route")}
+    insights = []
+
+    def add(kind, severity, weight, link, **facts):
+        insights.append({"kind": kind, "severity": severity, "weight": weight, "link": link, **facts})
+
+    for route, g in now_routes.items():
+        if g["visits"] < INSIGHT_MIN_VISITS:
+            continue
+        old = old_routes.get(route)
+        top = max(g["signals"].items(), key=lambda kv: kv[1] * WEIGHTS[kv[0]])[0] if g["signals"] else ""
+        link = {"tab": "frustration", "params": {"route": route}}
+        if old and old["visits"] >= INSIGHT_MIN_VISITS and g["score"] - old["score"] >= INSIGHT_RISE:
+            add("screen_worse", "bad", 300 + g["score"] - old["score"], link, route=route, before=old["score"],
+                now=g["score"], visits=g["visits"], top_signal=top)
+        elif g["score"] >= 50:
+            add("screen_frustrating", "bad", 200 + g["score"], link, route=route, now=g["score"], visits=g["visits"], top_signal=top)
+        elif old and old["visits"] >= INSIGHT_MIN_VISITS and old["score"] - g["score"] >= INSIGHT_RISE:
+            add("screen_better", "ok", old["score"] - g["score"], link, route=route, before=old["score"], now=g["score"],
+                visits=g["visits"])
+    # A failure is new when the retained history has nothing of it before this period.
+    first = {(k, d): at for k, d, at in con.execute(
+        f"SELECT type, detail, MIN(at) FROM events WHERE project = ? AND type IN {FAILURES} GROUP BY type, detail",
+        (f.q.get("project", ""),))}
+    failures = con.execute(f"""
+        SELECT type, detail, MIN(route), COUNT(*) n, COUNT(DISTINCT session), MAX(at) FROM events
+        WHERE {f.sql} AND type IN {FAILURES} GROUP BY type, detail ORDER BY n DESC""", f.args).fetchall()
+    for kind, detail, route, n, sessions, last_at in failures:
+        facts = dict(type=kind, detail=detail, route=route, n=n, sessions=sessions, last_at=last_at)
+        link = {"tab": "frustration", "params": {"route": route}}
+        serious = kind in ("js_error", "http_5xx")
+        if first.get((kind, detail), 0) >= f.since:
+            add("failure_new", "bad" if serious else "warn", (250 if serious else 120) + min(n, 49), link, **facts)
+        elif serious and n >= 5:
+            add("failure_recurring", "warn", 100 + min(n, 99), link, **facts)
+    for a in actions(con, f)["actions"]:
+        if a["clicks_median"] >= INSIGHT_EFFORT and a["times"] >= 3:
+            add("action_laborious", "warn", 90 + a["clicks_median"], {"tab": "actions", "params": {"action": a["action"]}},
+                action=a["action"], clicks=a["clicks_median"], seconds=a["seconds_median"], times=a["times"])
+    for route, target, rage, dead in con.execute(f"""
+            SELECT route, target, SUM(type = 'rage'), SUM(type = 'dead') FROM events
+            WHERE {f.sql} AND type IN ('rage', 'dead') AND target != '' GROUP BY route, target
+            HAVING COUNT(*) >= {INSIGHT_IRRITATION} ORDER BY COUNT(*) DESC LIMIT 5""", f.args):
+        add("element_irritating", "warn", 80 + min(rage + dead, 99), {"tab": "usage", "params": {"route": route}},
+            route=route, target=target, rage=rage, dead=dead)
+    insights.sort(key=lambda i: -i["weight"])
+    return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
+            "insights": insights[:15]}
+
+
+SEARCH_LIMIT = 8
+
+
+def search(con, f: Filter) -> dict:
+    """Screens, elements, failures, actions, users and accounts whose name contains the text, in the period."""
+    text = f.q.get("q", "").strip().lower()[:100]
+    if len(text) < 2:
+        return {"q": text, "results": []}
+    has = "instr(lower({}), ?) > 0"
+    out = []
+    for route, n in con.execute(f"""SELECT route, SUM(type = 'page') FROM events WHERE {f.sql} AND {has.format('route')}
+            GROUP BY route ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+        out.append({"kind": "screen", "label": route, "n": n, "link": {"tab": "frustration", "params": {"route": route}}})
+    for target, route, n in con.execute(f"""SELECT target, route, COUNT(*) FROM events
+            WHERE {f.sql} AND type IN ('click', 'rage', 'dead') AND {has.format('target')}
+            GROUP BY target, route ORDER BY 3 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+        out.append({"kind": "element", "label": target, "route": route, "n": n, "link": {"tab": "usage", "params": {"route": route}}})
+    for kind, detail, route, n in con.execute(f"""SELECT type, detail, MIN(route), COUNT(*) FROM events
+            WHERE {f.sql} AND type IN {FAILURES} AND {has.format('detail')}
+            GROUP BY type, detail ORDER BY 4 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+        out.append({"kind": "failure", "type": kind, "label": detail, "route": route, "n": n,
+                    "link": {"tab": "frustration", "params": {"route": route}}})
+    for detail, n in con.execute(f"""SELECT detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'action'
+            AND {has.format('detail')} GROUP BY detail ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+        out.append({"kind": "action", "label": detail, "n": n, "link": {"tab": "actions", "params": {"action": detail}}})
+    for column, kind, param in (("user_id", "user", "user"), ("account", "account", "account")):
+        for value, n in con.execute(f"""SELECT {column}, SUM(type = 'page') FROM events WHERE {f.sql} AND {column} != ''
+                AND {has.format(column)} GROUP BY {column} ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+            out.append({"kind": kind, "label": value, "n": n, "link": {"tab": "people" if kind == "user" else "overview",
+                                                                      "params": {param: value}}})
+    return {"q": text, "results": out}
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -556,7 +671,7 @@ def google_email(code: str) -> str:
 
 
 READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
-         "/api/compare": compare}
+         "/api/compare": compare, "/api/overview": overview, "/api/search": search}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8")}

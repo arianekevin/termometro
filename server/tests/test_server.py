@@ -136,6 +136,45 @@ class Server(unittest.TestCase):
         self.assertEqual((back["a"], back["b"]), ("10.0", "2.0"))
         self.assertEqual(self.read("/api/compare?project=blog&days=1")["routes"], [])
 
+    def age(self, days):
+        """Moves everything sent so far `days` into the past."""
+        with t.connect() as con:
+            con.execute("UPDATE events SET at = at - ?", (days * 86400 * 1000,))
+
+    def test_overview_compares_with_the_period_before_and_says_what_deserves_a_look(self):
+        page = {"type": "page", "route": "/cart"}
+        self.send([page] * 10 + [{"type": "js_error", "route": "/cart", "detail": "TypeError: old"}] * 5)
+        self.age(8)
+        self.send([page] * 10 + [{"type": "rage", "route": "/cart", "target": "button#pay"}] * 5
+                  + [{"type": "js_error", "route": "/cart", "detail": "TypeError: old"}] * 5
+                  + [{"type": "http_5xx", "route": "/cart", "detail": "POST /api/pay 500"}] * 2
+                  + [{"type": "action", "route": "/cart", "detail": "POST /api/orders", "clicks": 20, "duration_ms": 9000}] * 3,
+                  user="u1")
+        o = self.read("/api/overview?project=shop&days=7")
+        self.assertEqual((o["before"]["visits"], o["before"]["score"]), (10, 50))  # 5 errors x 5 / 10 * 20
+        self.assertEqual((o["now"]["visits"], o["now"]["users"], o["now"]["failures"], o["now"]["score"]), (10, 1, 7, 100))
+        kinds = [i["kind"] for i in o["insights"]]
+        self.assertEqual(kinds[0], "screen_worse")
+        self.assertIn("failure_new", kinds)          # the 5xx never happened before this week
+        self.assertIn("failure_recurring", kinds)    # the TypeError did
+        self.assertIn("action_laborious", kinds)
+        self.assertIn("element_irritating", kinds)
+        worse = o["insights"][0]
+        self.assertEqual((worse["before"], worse["now"], worse["top_signal"], worse["link"]),
+                         (50, 100, "js_error", {"tab": "frustration", "params": {"route": "/cart"}}))
+        self.assertEqual(len(o["daily"]), 1)
+
+    def test_search_finds_screens_elements_failures_actions_and_ids(self):
+        self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
+                   {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
+                   {"type": "action", "route": "/orders", "detail": "POST /api/orders", "clicks": 2, "duration_ms": 10}],
+                  user="u-orders-1", account="acc-9")
+        r = self.read("/api/search?project=shop&days=1&q=ORDERS")["results"]
+        self.assertEqual(sorted({x["kind"] for x in r}), ["action", "element", "failure", "screen", "user"])
+        self.assertEqual(next(x for x in r if x["kind"] == "element")["link"], {"tab": "usage", "params": {"route": "/orders"}})
+        self.assertEqual(self.read("/api/search?project=shop&days=1&q=acc-9")["results"][0]["kind"], "account")
+        self.assertEqual(self.read("/api/search?project=shop&days=1&q=o")["results"], [])  # too short to mean anything
+
     def test_unknown_key_and_foreign_origin_are_refused(self):
         self.assertEqual(self.send([{"type": "page"}], key="tk_nope")[0], 403)
         self.assertEqual(self.send([{"type": "page"}], origin="https://evil.example")[0], 403)
