@@ -8,15 +8,26 @@ não coleta o que o usuário digita ou vê e roda no seu próprio servidor.
 
 [English](README.md)
 
+- **Um início que explica:** o período contra o anterior e a lista do que merece atenção — tela que piorou, falha
+  nova, ação trabalhosa, botão muito usado e longe — cada item levando ao detalhe.
 - **Uma nota por tela**, de 0 a 100, para saber por onde começar.
 - **Onde irrita:** o elemento de cada rage click e qual requisição falhou depois de qual clique.
+- **Falhas que o dev consegue corrigir:** agrupadas por mensagem, com o stack do código, navegadores, versões, tipo de
+  tela, o que foi clicado logo antes e os passos das últimas sessões até ela — copiadas em Markdown para uma issue.
 - **Esforço por ação:** "criar um pedido leva 12 cliques e 25 s" (mediana e p90).
+- **Jornadas:** quantos cliques e telas até chegar a cada botão e ação, contra o quanto é usado (muito usado e longe =
+  merece um lugar melhor), ações que costumam vir em sequência (aproximar ou juntar), de onde vêm e para onde vão em
+  cada tela, e funis montados com telas, ações e botões.
 - **Uso:** telas mais e menos usadas, e os elementos que ninguém clica.
 - **Pessoas:** uso por papel, conta e usuário — só ids.
 - **Mapa de calor** sobre o seu próprio app, aberto pelo painel.
 - **Por versão:** o último deploy melhorou ou piorou? Tela a tela, ação a ação, e as falhas que só a versão nova
   tem — com mensagem no Slack ou no Google Chat quando piorou.
 - **Cada falha datada:** em que versão começou e quando apareceu pela última vez, para saber se a correção funcionou.
+- **Busca e links:** uma caixa acha telas, botões, erros, ações e ids (`/` foca nela); cada visão fica no endereço, dá
+  para compartilhar e o voltar funciona. Toda tabela baixa em CSV.
+- **Para IA:** o período inteiro num documento com as definições para ler os números (copiar em Markdown ou baixar
+  JSON), e um servidor MCP para um assistente consultar sozinho.
 
 ## Por quê
 
@@ -29,6 +40,8 @@ dado bancário ou qualquer coisa sob a LGPD. O Termometro guarda só a forma da 
 | a rota como padrão (`/pedidos/:id`) | os ids reais da URL |
 | um seletor curto (`button#salvar`) | nomes, e-mails |
 | os ids que você escolher mandar (conta, usuário, papel) | gravações, prints |
+| família do navegador e do sistema (`Chrome 130 · macOS`), tipo de tela (celular, tablet, computador) | versões exatas, tamanho da tela, IP |
+| onde o erro aconteceu no seu código (`loadRows @ /assets/index.js:1:4567`) | a query string ou os dados da página |
 
 E-mails, uuids, números com 3 dígitos ou mais e texto entre aspas são limpos no navegador antes de sair.
 
@@ -67,6 +80,26 @@ cada versão) e sobre cada erro novo que já aconteceu 5 vezes.
 Para entrar com Google: no Google Cloud Console, crie um cliente OAuth do tipo *Aplicativo da Web* com o URI de
 redirecionamento `https://SEU-SERVIDOR/auth/google/callback` e defina `TERMOMETRO_GOOGLE_CLIENT_ID`,
 `TERMOMETRO_GOOGLE_CLIENT_SECRET`, `TERMOMETRO_PUBLIC_URL` e `TERMOMETRO_ALLOWED_EMAILS` ou `_DOMAINS`.
+
+## Deixar uma IA analisar
+
+**Colar:** no Início, *Copiar análise (Markdown)* põe o período inteiro — números, falhas com stack e passos,
+jornadas, esforço e as definições — na área de transferência. Cole num assistente e peça os problemas e as melhorias.
+O mesmo documento está em `GET /api/report?project=…&days=…` (JSON, ou `&format=md`).
+
+**MCP:** para um assistente consultar sozinho (Claude Code, Claude Desktop, Cursor…), dê ao servidor um token de API
+(`TERMOMETRO_API_TOKENS`) e rode o servidor MCP, um arquivo só, sem dependências, que o seu Termometro serve:
+
+```bash
+docker compose run --rm termometro python termometro.py new-token   # ponha em TERMOMETRO_API_TOKENS
+curl -O https://termometro.example.com/termometro_mcp.py
+claude mcp add termometro -e TERMOMETRO_URL=https://termometro.example.com -e TERMOMETRO_TOKEN=tt_… \
+  -e TERMOMETRO_PROJECT=meu-app -- python3 termometro_mcp.py
+```
+
+Ferramentas: `report` (comece por ela), `overview`, `search`, `frustration`, `failures`, `failure`, `session`,
+`journeys`, `funnel`, `usage`, `effort`, `people`, `compare_versions` e `list_projects`. O token lê todos os projetos da
+instância; guarde como senha.
 
 ## Colocar o coletor no seu app
 

@@ -46,6 +46,7 @@ nav.tabs a.on { color: var(--fg); border-bottom-color: var(--accent); font-weigh
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .chip button { height: 22px; width: 22px; padding: 0; border: 0; background: none; color: inherit; }
 main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; }
+.card { position: relative; } .card > .csv { position: absolute; top: 12px; right: 12px; } .card > .csv ~ .label, .card > .csv ~ .meta { padding-right: 56px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; min-width: 0; }
 .label { font-size: 12px; line-height: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
 .meta { color: var(--faint); font-size: 12px; line-height: 16px; }
@@ -194,6 +195,8 @@ const L = PT ? {
     pair_linked: (i) => `Depois de <code>${i.a}</code>, ${Math.round(i.share * 100)}% das vezes vem <code>${i.b}</code> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
     element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${i.rage} rage clicks e ${i.dead} cliques sem resposta.`,
   },
+  help: { rage: '3 cliques no mesmo ponto em 1 s', dead: 'Clique num botão ou link que não mudou nada em 1 s', js_error: 'Erro de JavaScript não tratado', http_5xx: 'Requisição com erro 5xx ou falha de rede', http_4xx: 'Requisição recusada com 4xx (401 não conta)', abandon: 'Começou a preencher um formulário e saiu sem salvar', bounce: 'Voltou em menos de 4 s', slow: 'Requisição que levou 3 s ou mais com a tela à frente' },
+  csv: 'CSV', csvTip: 'Baixar esta tabela em CSV',
   names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
   noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
   overall: 'Nota geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'tranquilo', attention: 'atenção', much: 'muita frustração',
@@ -271,6 +274,8 @@ const L = PT ? {
     pair_linked: (i) => `After <code>${i.a}</code>, ${Math.round(i.share * 100)}% of the time comes <code>${i.b}</code> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
     element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${i.rage} rage clicks and ${i.dead} dead clicks.`,
   },
+  help: { rage: '3 clicks on the same spot within 1 s', dead: 'A click on a button or link that changed nothing within 1 s', js_error: 'An uncaught JavaScript error', http_5xx: 'A request answered with 5xx, or a network failure', http_4xx: 'A request refused with 4xx (401 left out)', abandon: 'Started filling a form and left without saving', bounce: 'Went back within 4 s', slow: 'A request that took 3 s or more while on screen' },
+  csv: 'CSV', csvTip: 'Download this table as CSV',
   names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
   noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
   overall: 'Overall score', visits: 'Visits', worst: 'Most frustrating screen', calm: 'calm', attention: 'attention', much: 'very frustrating',
@@ -316,7 +321,7 @@ const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr>
 const empty = (msg) => `<div class="card empty">${msg}</div>`
 const signals = (s) => {
   const items = Object.entries(s).sort((a, b) => b[1] - a[1])
-  return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
+  return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
 const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
@@ -614,6 +619,26 @@ async function failures() {
         <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td></tr>`).join(''))}</section>`
 }
 
+// Every table can leave as CSV: what is on screen, so the numbers match what was read.
+function addCsvButtons() {
+  document.querySelectorAll('#content .card').forEach((card, i) => {
+    const t = card.querySelector(':scope > .table table, :scope > details > .table table')
+    if (!t || card.querySelector(':scope > .csv')) return
+    const b = Object.assign(document.createElement('button'), { className: 'small csv', textContent: L.csv, title: L.csvTip })
+    b.addEventListener('click', () => {
+      const cell = (c) => `"${c.textContent.replace(/\s+/g, ' ').trim().replace(/"/g, '""')}"`
+      const rows = [...t.querySelectorAll('tr')].filter((r) => !r.hidden && !r.classList.contains('detail')).map((r) => [...r.children].map(cell).join(','))
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' })),
+        download: `termometro-${state.tab}-${i + 1}.csv` })
+      a.click(); URL.revokeObjectURL(a.href)
+    })
+    const head = card.querySelector(':scope > .head')
+    // The main action stays at the right end; CSV sits before it.
+    const main = head?.querySelector(':scope > .primary')
+    if (main) main.before(b); else if (head) head.append(b); else card.prepend(b)
+  })
+}
+
 async function showSession(button) {
   const box = button.closest('.trail'), zero = Number(box.dataset.zero)
   const s = await read('/api/session', { session: button.dataset.session })
@@ -830,6 +855,7 @@ async function render() {
   try {
     $('#content').innerHTML = await TABS[state.tab]()
     $('#open-map')?.addEventListener('click', openMap)
+    addCsvButtons()
     writeHash()
     if (state.focus) ($('#content .failure') ?? $('#content tr.sel'))?.scrollIntoView({ block: $('#content .failure') ? 'start' : 'center' })
     state.focus = false

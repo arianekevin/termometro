@@ -8,15 +8,26 @@ collects what users type or see, and it runs on your own server.
 
 [Português](README.pt-BR.md)
 
+- **An overview that explains:** this period against the one before, and a list of what deserves a look —
+  a screen that got worse, a new failure, a laborious action, a button used a lot and far away — each linking to the details.
 - **A score per screen**, 0 to 100, so you know where to look first.
 - **Where it irritates:** the element behind each rage click, and which request failed after which click.
+- **Failures a developer can fix:** grouped by message, with the code stack, browsers, versions, kind of screen, what
+  was clicked right before and the steps of the last sessions up to it — copied as Markdown for an issue.
 - **Effort per action:** "creating an order takes 12 clicks and 25 s" (median and p90).
+- **Journeys:** how many clicks and screens it takes to reach each button and action against how much it is used
+  (used a lot and far away = it deserves a better place), actions that tend to follow one another (bring them closer
+  or merge them), where people come from and go to on each screen, and funnels you build from screens, actions and buttons.
 - **Usage:** most and least used screens, and the elements nobody clicks.
 - **People:** usage by role, account and user — ids only.
 - **Heat map** over your own app, opened from the dashboard.
 - **By version:** did the last deploy make things better or worse? Screen by screen, action by action, and the
   failures only the new version has — and a Slack or Google Chat message when it got worse.
 - **Each failure dated:** in which version it started and when it was last seen, so you know whether the fix worked.
+- **Search and links:** one box finds screens, buttons, errors, actions and ids (`/` focuses it); every view lives in the
+  address, so it can be shared and the back button works. Every table downloads as CSV.
+- **For an AI:** the whole period in one document with the definitions needed to read it (copy as Markdown or
+  download JSON), and an MCP server so an assistant can look things up by itself.
 
 ## Why
 
@@ -29,6 +40,8 @@ bank data or anything under LGPD/GDPR. Termometro keeps only the shape of the in
 | the route as a pattern (`/orders/:id`) | the real ids in the URL |
 | a short selector (`button#save`) | names, e-mails |
 | the ids you choose to give (account, user, role) | recordings, screenshots |
+| browser and system family (`Chrome 130 · macOS`), kind of screen (phone, tablet, desktop) | exact versions, screen size, IP |
+| where an error happened in your code (`loadRows @ /assets/index.js:1:4567`) | the page's query string or data |
 
 E-mails, uuids, numbers with 3+ digits and quoted text are scrubbed in the browser before anything is sent.
 
@@ -70,6 +83,7 @@ Then open http://localhost:8080 (password `try`). For a real project, make a key
 | `TERMOMETRO_RETENTION_DAYS` | how long events with user ids are kept (default 90); after that they become id-less daily totals |
 | `TERMOMETRO_WEBHOOK_URL` | a Slack or Google Chat incoming webhook; a project can have its own `webhook` in `TERMOMETRO_PROJECTS` |
 | `TERMOMETRO_LANGUAGE` | language of the webhook messages: `en` (default) or `pt-BR` |
+| `TERMOMETRO_API_TOKENS` | comma-separated tokens that read everything with `Authorization: Bearer <token>`, for the MCP server or your scripts; `python termometro.py new-token` makes one |
 | `TERMOMETRO_NO_AUTH=1` | no sign-in, for a dashboard already behind your own VPN or proxy auth |
 
 At least one way in — Google or a password — is required unless `TERMOMETRO_NO_AUTH=1`.
@@ -118,6 +132,26 @@ Without a bundler:
 </script>
 ```
 
+## Let an AI analyse it
+
+**Paste:** on the Overview, *Copy analysis (Markdown)* puts the whole period — numbers, failures with stack and
+steps, journeys, effort, definitions — on the clipboard. Paste it into any assistant and ask for the problems and
+the improvements. The same document is at `GET /api/report?project=…&days=…` (JSON, or `&format=md`).
+
+**MCP:** for an assistant that looks things up by itself (Claude Code, Claude Desktop, Cursor…), give the server an
+API token and run the MCP server, a single file with no dependencies that your Termometro serves:
+
+```bash
+docker compose run --rm termometro python termometro.py new-token   # add it to TERMOMETRO_API_TOKENS
+curl -O https://termometro.example.com/termometro_mcp.py
+claude mcp add termometro -e TERMOMETRO_URL=https://termometro.example.com -e TERMOMETRO_TOKEN=tt_… \
+  -e TERMOMETRO_PROJECT=my-app -- python3 termometro_mcp.py
+```
+
+Tools: `report` (start there), `overview`, `search`, `frustration`, `failures`, `failure`, `session`, `journeys`,
+`funnel`, `usage`, `effort`, `people`, `compare_versions` and `list_projects`. The token reads every project of the
+instance; keep it like a password.
+
 ## How the score works
 
 Each signal weighs points: rage click 3, dead click 2, screen error 5, server error 5, refused request 2,
@@ -135,6 +169,8 @@ time since the previous one; two idle minutes start the count again, and a write
 - Selectors are short (the element and up to two ancestors). Identical elements, like table rows, add up under
   one selector; the heat map shows `×N` when that happens.
 - An automatic write right after a click (e.g. "mark as read" on open) takes that click as its effort.
+- Stacks come from the built code: minified names and positions. Look them up in your source maps.
+- Collectors before 0.2.1 send no time per event, stack or kind of screen: their trails keep the order but not the gaps.
 
 ## Develop
 

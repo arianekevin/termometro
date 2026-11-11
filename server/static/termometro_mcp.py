@@ -114,7 +114,7 @@ def handle(msg: dict):
         return  # a notification (initialized, cancelled): nothing to answer
     if method == "initialize":
         return reply(msg_id, {"protocolVersion": msg.get("params", {}).get("protocolVersion", PROTOCOL),
-                              "capabilities": {"tools": {}}, "serverInfo": {"name": "termometro", "version": "0.3.0"},
+                              "capabilities": {"tools": {}}, "serverInfo": {"name": "termometro", "version": "0.2.1"},
                               "instructions": "Call `report` first: it has the whole picture and the definitions. Then "
                                               "drill down with failure, session, journeys, funnel, usage or search."})
     if method == "ping":
