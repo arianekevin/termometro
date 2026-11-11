@@ -142,6 +142,30 @@ describe('termometro', () => {
     ])
   })
 
+  it('ignores the CDN proxy beacon (/cdn-cgi/) on any host: no failure, no slow', async () => {
+    window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body instanceof Blob) {
+        sent.push(JSON.parse(await init.body.text()))
+        return new Response(null, { status: 204 })
+      }
+      if (String(input).includes('blocked')) throw new TypeError('Failed to fetch')
+      await new Promise((r) => setTimeout(r, 3500))
+      return new Response(null, { status: String(input).includes('rum') ? 200 : 500 })
+    }) as typeof fetch
+    start().page('/tickets/:id')
+    const wait = async (url: string, init?: RequestInit) => {
+      const p = fetch(url, init).catch(() => {})
+      await vi.advanceTimersByTimeAsync(3500)
+      await p
+    }
+    await wait('/cdn-cgi/rum', { method: 'POST' })
+    await wait('https://app.example.com/cdn-cgi/rum?x=1', { method: 'POST' })
+    await wait('/cdn-cgi/blocked', { method: 'POST' })
+    await wait('/api/tickets/9182', { method: 'PUT' })
+    const e = (await events()).filter((x) => x.type.startsWith('http') || x.type === 'slow')
+    expect(e.map((x) => x.detail)).toEqual(['PUT /api/tickets/:id 500'])
+  })
+
   it('reports a slow request once per visit, and not a quick or failed one', async () => {
     window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.body instanceof Blob) {

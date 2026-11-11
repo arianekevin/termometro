@@ -86,6 +86,10 @@ const MAX_QUEUE = 500
 const MAX_BATCH = 100
 const MAX_SAME_ERROR = 3
 const SLOW_MS = 3000
+// Requests under this path prefix (any host) belong to the proxy/CDN, not the app: Cloudflare's RUM beacon
+// (POST /cdn-cgi/rum) is injected into pages and ad blockers cancel it (ERR_BLOCKED_BY_CLIENT), which would
+// otherwise show up as a "network failure" on every screen.
+const INFRA_PATH = '/cdn-cgi/'
 const MAX_FRAMES = 8
 const OVERLAY = '[data-termometro]'
 
@@ -177,6 +181,14 @@ function sessionId(): string {
   return storage('termometro.session', fresh) ?? fresh // private window: a session for this load only
 }
 
+function isInfra(url: string): boolean {
+  try {
+    return new URL(url, location.href).pathname.startsWith(INFRA_PATH)
+  } catch {
+    return false
+  }
+}
+
 function pathOf(url: string): string {
   try {
     return routeFromPath(new URL(url, location.href).pathname)
@@ -262,7 +274,7 @@ export function start(options: Options): Termometro {
   }
 
   function network(method: string, url: string, status: number, ms: number) {
-    if (url.startsWith(base)) return
+    if (url.startsWith(base) || isInfra(url)) return
     networkCount++
     const verb = method.toUpperCase()
     const where = `${verb} ${pathOf(url)}`
