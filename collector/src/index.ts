@@ -42,6 +42,17 @@ export interface Options {
   pagesFromRouter?: boolean
   /** A request slower than this is a "slow" signal. Default: 3000 ms; 0 turns it off (long polling, big exports). */
   slowMs?: number
+  /** Requests that are not the user's experience of the app. Each item is `"METHOD /path"` or `"/path"`: the path is
+   *  matched by prefix against the request's path with ids replaced by `:id` (an item may use `:id` too); the method,
+   *  if given, ignores case; the host never matters. */
+  requests?: {
+    /** Never counted: not a failure, not slow, not an action. `/cdn-cgi/` is always here. */
+    ignore?: string[]
+    /** Requests the app makes on its own (polling, health checks): never slow, never an action; while they keep failing, only the first failure of the episode is recorded, and the episode ends at the next background request that succeeds. */
+    background?: string[]
+    /** Writes that are not something the user did (heartbeats, counters, "seen" marks): not recorded as actions and they do not reset the clicks/time counted towards the next action. Their failures still count. */
+    notActions?: string[]
+  }
 }
 
 export interface Termometro {
@@ -88,8 +99,8 @@ const MAX_SAME_ERROR = 3
 const SLOW_MS = 3000
 // Requests under this path prefix (any host) belong to the proxy/CDN, not the app: Cloudflare's RUM beacon
 // (POST /cdn-cgi/rum) is injected into pages and ad blockers cancel it (ERR_BLOCKED_BY_CLIENT), which would
-// otherwise show up as a "network failure" on every screen.
-const INFRA_PATH = '/cdn-cgi/'
+// otherwise show up as a "network failure" on every screen. Always part of `requests.ignore`.
+const BUILT_IN_IGNORE = ['/cdn-cgi/']
 const MAX_FRAMES = 8
 const OVERLAY = '[data-termometro]'
 
@@ -141,14 +152,19 @@ function cssEscape(value: string): string {
   return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(value) : value.replace(/[^\w-]/g, (c) => `\\${c}`)
 }
 
+// PrimeVue numbers its generated ids (`pv_id_95_tab_mine`), so the same tab would look like a new element on every visit.
+function stableId(value: string): string {
+  return value.replace(/pv_id_\\?\d+/g, 'pv_id_:id')
+}
+
 function selectorPart(el: Element): string {
   const tag = el.tagName.toLowerCase()
   const id = el.getAttribute('id')
   const testId = el.getAttribute('data-testid')
-  if (id) return `${tag}#${cssEscape(scrub(id))}`
+  if (id) return `${tag}#${cssEscape(stableId(scrub(id)))}`
   if (testId) return `${tag}[data-testid="${scrub(testId).replace(/"/g, '')}"]`
   const classes = Array.from(el.classList).filter((c) => !/\d{3,}/.test(c)).slice(0, 2)
-  return classes.length ? `${tag}.${classes.map(cssEscape).join('.')}` : tag
+  return classes.length ? `${tag}.${classes.map((c) => cssEscape(stableId(c))).join('.')}` : tag
 }
 
 /** Short selector: the element and up to two ancestors, stopping at the first one with an id. */
@@ -181,20 +197,26 @@ function sessionId(): string {
   return storage('termometro.session', fresh) ?? fresh // private window: a session for this load only
 }
 
-function isInfra(url: string): boolean {
-  try {
-    return new URL(url, location.href).pathname.startsWith(INFRA_PATH)
-  } catch {
-    return false
-  }
-}
-
 function pathOf(url: string): string {
   try {
     return routeFromPath(new URL(url, location.href).pathname)
   } catch {
     return '?'
   }
+}
+
+interface RequestRule { method: string; path: string }
+
+function rulesOf(items: string[] | undefined): RequestRule[] {
+  return (items ?? []).map((item) => {
+    const m = /^(?:([A-Za-z]+)\s+)?(\S+)$/.exec(item.trim())
+    return { method: (m?.[1] ?? '').toUpperCase(), path: routeFromPath(m?.[2] ?? item.trim()) }
+  })
+}
+
+/** `path` is the request's path after `routeFromPath`; `method` is upper case. */
+function matches(rules: RequestRule[], method: string, path: string): boolean {
+  return rules.some((r) => (!r.method || r.method === method) && path.startsWith(r.path))
 }
 
 export function start(options: Options): Termometro {
@@ -208,6 +230,11 @@ export function start(options: Options): Termometro {
   const slowSeen = new Set<string>()
   const slowMs = options.slowMs ?? SLOW_MS
   const inventoried = new Set<string>()
+  const ignore = rulesOf([...BUILT_IN_IGNORE, ...(options.requests?.ignore ?? [])])
+  const background = rulesOf(options.requests?.background)
+  const notActions = rulesOf(options.requests?.notActions)
+  // Background endpoints that are failing right now: the episode is recorded once, until one of them succeeds.
+  const backgroundDown = new Set<string>()
 
   let identified: Identity | null = null
   let currentRoute = options.route?.() ?? routeFromPath(location.pathname)
@@ -274,15 +301,26 @@ export function start(options: Options): Termometro {
   }
 
   function network(method: string, url: string, status: number, ms: number) {
-    if (url.startsWith(base) || isInfra(url)) return
-    networkCount++
+    if (url.startsWith(base)) return
     const verb = method.toUpperCase()
-    const where = `${verb} ${pathOf(url)}`
-    if (slowMs > 0 && ms >= slowMs && status > 0 && status < 400 && document.visibilityState === 'visible' && !slowSeen.has(where)) {
+    const path = pathOf(url)
+    if (matches(ignore, verb, path)) return
+    const where = `${verb} ${path}`
+    const isBackground = matches(background, verb, path)
+    const ok = status > 0 && status < 400
+    if (isBackground) {
+      // The app's own polling is not the user's experience: it does not make a click "alive" either.
+      if (ok) { backgroundDown.delete(where); return }
+      if (status === 401 || backgroundDown.has(where)) return
+      backgroundDown.add(where)
+    } else {
+      networkCount++
+    }
+    if (!isBackground && slowMs > 0 && ms >= slowMs && ok && document.visibilityState === 'visible' && !slowSeen.has(where)) {
       slowSeen.add(where)
       record({ type: 'slow', route: currentRoute, target: recentClick(), detail: where, duration_ms: Math.round(ms) })
     }
-    if (/^(POST|PUT|PATCH|DELETE)$/.test(verb) && status > 0 && status < 400) {
+    if (!isBackground && /^(POST|PUT|PATCH|DELETE)$/.test(verb) && ok && !matches(notActions, verb, path)) {
       filling = null
       // A write nobody clicked for (a heartbeat, a background save) is not an action.
       if (actionClicks > 0) {
@@ -290,7 +328,7 @@ export function start(options: Options): Termometro {
         actionClicks = 0
       }
     }
-    if (status === 401 || (status > 0 && status < 400)) return
+    if (status === 401 || ok) return
     const type = status >= 400 && status < 500 ? 'http_4xx' : 'http_5xx'
     record({ type, route: currentRoute, target: recentClick(), detail: `${where} ${status || 'network failure'}` })
   }

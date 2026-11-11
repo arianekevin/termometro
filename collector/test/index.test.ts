@@ -166,6 +166,117 @@ describe('termometro', () => {
     expect(e.map((x) => x.detail)).toEqual(['PUT /api/tickets/:id 500'])
   })
 
+  // A fetch whose status comes from a script, and that takes `delay` ms.
+  function scripted(status: (url: string, method: string) => number | 'fail', delay = 0) {
+    window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body instanceof Blob) {
+        sent.push(JSON.parse(await init.body.text()))
+        return new Response(null, { status: 204 })
+      }
+      const r = status(String(input), (init?.method ?? 'GET').toUpperCase())
+      if (delay) await new Promise((res) => setTimeout(res, delay))
+      if (r === 'fail') throw new TypeError('Failed to fetch')
+      return new Response(null, { status: r })
+    }) as typeof fetch
+  }
+  async function call(url: string, init?: RequestInit, wait = 0) {
+    const p = fetch(url, init).catch(() => {})
+    if (wait) await vi.advanceTimersByTimeAsync(wait)
+    await p
+  }
+  const signals = (all: Array<{ type: string }>) => all.filter((x) => x.type !== 'click' && x.type !== 'page' && x.type !== 'inventory')
+
+  it('requests.ignore: never a failure, slow or action (host and case do not matter)', async () => {
+    scripted((url) => (url.includes('/api/beacon') ? 500 : 200), 3500)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { ignore: ['POST /api/beacon', 'get /api/quiet'] } })
+    termometro.page('/x')
+    document.body.innerHTML = '<button id="a">a</button>'
+    click(document.querySelector('#a')!)
+    await call('/api/beacon', { method: 'POST' }, 3500)
+    await call('https://other.example.com/api/beacon/1', { method: 'POST' }, 3500)
+    await call('/api/quiet', undefined, 3500)
+    expect(signals(await events())).toEqual([])
+  })
+
+  it('requests.background: one failure per episode, never slow, never an action', async () => {
+    let down = true
+    scripted(() => (down ? 503 : 200), 3500)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { background: ['/api/poll'] } })
+    termometro.page('/x')
+    document.body.innerHTML = '<button id="a">a</button>'
+    click(document.querySelector('#a')!)
+    for (let i = 0; i < 3; i++) await call('/api/poll', undefined, 3500)
+    down = false
+    await call('/api/poll', { method: 'POST' }, 3500) // succeeds: ends the episode, no slow, no action
+    await call('/api/poll', undefined, 3500)
+    down = true
+    await call('/api/poll', undefined, 3500)
+    await call('/api/poll', undefined, 3500)
+    expect(signals(await events()).map((e) => [e.type, (e as { detail?: string }).detail])).toEqual([
+      ['http_5xx', 'GET /api/poll 503'],
+      ['http_5xx', 'GET /api/poll 503']
+    ])
+  })
+
+  it('requests.notActions: not an action, and the next action counts the clicks from before it', async () => {
+    scripted(() => 200)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { notActions: ['/api/heartbeat'] } })
+    termometro.page('/x')
+    document.body.innerHTML = '<button id="a">a</button>'
+    click(document.querySelector('#a')!, 10, 10)
+    click(document.querySelector('#a')!, 100, 10)
+    await call('/api/heartbeat', { method: 'POST' })
+    click(document.querySelector('#a')!, 200, 10)
+    await call('/api/save', { method: 'POST' })
+    expect((await events()).filter((e) => e.type === 'action')).toEqual([
+      { type: 'action', route: '/x', detail: 'POST /api/save', clicks: 3, duration_ms: 0 }
+    ])
+  })
+
+  it('requests.notActions: a failed write still counts as a failure', async () => {
+    scripted(() => 500)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { notActions: ['/api/heartbeat'] } })
+    termometro.page('/x')
+    await call('/api/heartbeat', { method: 'POST' })
+    expect(signals(await events()).map((e) => e.type)).toEqual(['http_5xx'])
+  })
+
+  it('a request rule with a method only matches that method', async () => {
+    scripted(() => 500)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { ignore: ['post /api/things'] } })
+    termometro.page('/x')
+    await call('/api/things', { method: 'POST' })
+    await call('/api/things', { method: 'PUT' })
+    await call('/api/things')
+    expect(signals(await events()).map((e) => (e as { detail?: string }).detail)).toEqual(['PUT /api/things 500', 'GET /api/things 500'])
+  })
+
+  it('a request rule can use :id and matches by prefix', async () => {
+    scripted(() => 500)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+      requests: { ignore: ['/api/tickets/:id/presence'] } })
+    termometro.page('/x')
+    await call('/api/tickets/4821/presence', { method: 'PUT' })
+    await call('/api/tickets/4821/presence/extra')
+    await call('/api/tickets/4821/other')
+    expect(signals(await events()).map((e) => (e as { detail?: string }).detail)).toEqual(['GET /api/tickets/:id/other 500'])
+  })
+
+  it('gives PrimeVue generated ids a stable selector', () => {
+    document.body.innerHTML = '<div id="pv_id_95_tab_mine" class="pv_id_1234"><b id="pv_id_7"></b></div>'
+    expect(selectorOf(document.querySelector('div'))).toBe('div#pv_id_\\:id_tab_mine')
+    expect(selectorOf(document.querySelector('b'))).toBe('b#pv_id_\\:id')
+    document.body.innerHTML = '<div id="pv_id_12_tab_mine"></div>'
+    expect(selectorOf(document.querySelector('div'))).toBe('div#pv_id_\\:id_tab_mine')
+    document.body.innerHTML = '<div id="pv_id_\\95_x"></div>'
+    expect(selectorOf(document.querySelector('div'))).toBe('div#pv_id_\\:id_x')
+  })
+
   it('reports a slow request once per visit, and not a quick or failed one', async () => {
     window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.body instanceof Blob) {

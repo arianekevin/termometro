@@ -122,6 +122,20 @@ router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matc
 app.config.errorHandler = (err) => { termometro.error(err); console.error(err) }
 ```
 
+Requests that are not the user's experience can be declared with `requests`. Each item is `"METHOD /path"` or `"/path"`;
+the path is matched by prefix after ids become `:id` (an item may use `:id` too), the method ignores case, the host never matters.
+
+```ts
+start({
+  // ...
+  requests: {
+    ignore: ['POST /api/analytics'],              // never counted (`/cdn-cgi/` is always ignored)
+    background: ['GET /api/notifications'],       // polling: never slow or an action; one failure per outage
+    notActions: ['PUT /api/tickets/:id/presence'] // heartbeats: not an action, and they do not reset the click count
+  }
+})
+```
+
 Without a bundler:
 
 ```html

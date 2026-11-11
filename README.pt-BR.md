@@ -123,6 +123,21 @@ router.afterEach((to, _from, failure) => { if (!failure) termometro.page(to.matc
 app.config.errorHandler = (err) => { termometro.error(err); console.error(err) }
 ```
 
+Pedidos que não são a experiência do usuário podem ser declarados em `requests`. Cada item é `"METODO /caminho"` ou
+`"/caminho"`; o caminho é comparado por prefixo depois que os ids viram `:id` (o item também pode usar `:id`), o método
+não diferencia maiúsculas e o host não importa.
+
+```ts
+start({
+  // ...
+  requests: {
+    ignore: ['POST /api/analytics'],              // nunca conta (`/cdn-cgi/` já é sempre ignorado)
+    background: ['GET /api/notifications'],       // polling: nunca lento nem ação; uma falha por queda
+    notActions: ['PUT /api/tickets/:id/presence'] // heartbeat: não é ação e não zera a contagem de cliques
+  }
+})
+```
+
 Sem bundler:
 
 ```html
