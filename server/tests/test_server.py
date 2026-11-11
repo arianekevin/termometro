@@ -175,6 +175,64 @@ class Server(unittest.TestCase):
         self.assertEqual(self.read("/api/search?project=shop&days=1&q=acc-9")["results"][0]["kind"], "account")
         self.assertEqual(self.read("/api/search?project=shop&days=1&q=o")["results"], [])  # too short to mean anything
 
+    def test_events_take_the_browser_time_lined_up_with_the_server_and_keep_browser_and_stack(self):
+        sent = 1_000_000_000_000
+        call(self.base, "/api/events", {"key": KEY, "version": "1.0", "session": "s9", "device": "phone", "sent": sent, "events": [
+            {"type": "page", "route": "/a", "t": sent - 60_000},
+            {"type": "js_error", "route": "/a", "detail": "TypeError: x", "stack": "f @ /app.js:1:2", "t": sent - 1000},
+            {"type": "click", "route": "/a", "target": "button#b", "stack": "ignored", "t": sent - 30 * 86400_000}]}, origin=ORIGIN)
+        with t.connect() as con:
+            rows = con.execute("SELECT type, at, stack, device FROM events WHERE session = 's9' ORDER BY id").fetchall()
+        (_, page_at, _, device), (_, error_at, stack, _), (_, click_at, click_stack, _) = rows
+        self.assertEqual(error_at - page_at, 59_000)           # the gap the browser saw, on the server's clock
+        self.assertLessEqual(abs(int(time.time() * 1000) - 86400_000 - click_at), 5000)  # a wild clock is capped at a day
+        self.assertEqual((stack, click_stack, device), ("f @ /app.js:1:2", "", "phone"))
+        self.assertEqual(t.agent_of("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+                                    "Chrome/130.0.0.0 Safari/537.36"), "Chrome 130 · macOS")
+        self.assertEqual(t.agent_of("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                                    "Version/17.0 Mobile/15E148 Safari/604.1"), "Safari 17 · iOS")
+
+    def test_an_old_database_gets_the_new_columns(self):
+        import sqlite3
+        db = Path(tempfile.mkdtemp()) / "old.db"
+        con = sqlite3.connect(db)
+        con.execute("""CREATE TABLE events (id INTEGER PRIMARY KEY, project TEXT NOT NULL, version TEXT NOT NULL, session TEXT NOT NULL,
+            account TEXT NOT NULL DEFAULT '', user_id TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '', type TEXT NOT NULL,
+            route TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', clicks INTEGER, duration_ms INTEGER,
+            at INTEGER NOT NULL)""")
+        con.execute("INSERT INTO events (project, version, session, type, route, at) VALUES ('shop', '1', 's', 'page', '/', 1)")
+        con.commit(); con.close()
+        t.CONFIG.db = db
+        with t.connect() as con:
+            self.assertEqual(con.execute("SELECT stack, agent, device FROM events").fetchone(), ("", "", ""))
+
+    def test_failures_are_grouped_and_one_shows_its_trail_stack_and_browsers(self):
+        sent = int(time.time() * 1000)
+        steps = [{"type": "page", "route": "/orders", "t": sent - 5000},
+                 {"type": "click", "route": "/orders", "target": "button#export", "t": sent - 3000},
+                 {"type": "js_error", "route": "/orders", "target": "button#export", "detail": "TypeError: rows", "stack": "load @ /a.js:1:2",
+                  "t": sent - 2000},
+                 {"type": "click", "route": "/orders", "target": "button#retry", "t": sent - 1000}]
+        for session in ("s1", "s2"):
+            call(self.base, "/api/events", {"key": KEY, "version": "2.0", "session": session, "user": "u-" + session,
+                                            "device": "desktop", "sent": sent, "events": steps}, origin=ORIGIN)
+        self.send([{"type": "http_4xx", "route": "/x", "detail": "GET /api/x 404"}], session="s3")
+        [first, second] = self.read("/api/failures?project=shop&days=1")["failures"]
+        self.assertEqual((first["type"], first["sessions"], first["users"], first["new"], first["first_version"]),
+                         ("js_error", 2, 2, True, "2.0"))
+        self.assertEqual(second["type"], "http_4xx")
+        d = self.read("/api/failure?project=shop&days=1&signal=js_error&detail=TypeError%3A%20rows")
+        self.assertEqual((d["n"], d["sessions"], d["stacks"], d["after_clicking"]),
+                         (2, 2, [{"key": "load @ /a.js:1:2", "n": 2}], [{"key": "button#export", "n": 2}]))
+        self.assertEqual(d["devices"], [{"key": "desktop", "n": 2}])
+        trail = d["trails"][0]
+        self.assertEqual([s["type"] for s in trail["before"]], ["page", "click"])
+        self.assertEqual((trail["failure"]["type"], [s["target"] for s in trail["after"]]), ("js_error", ["button#retry"]))
+        self.assertEqual(trail["before"][1]["at"] - trail["before"][0]["at"], 2000)
+        whole = self.read("/api/session?project=shop&days=1&session=s1")
+        self.assertEqual(([s["type"] for s in whole["steps"]], whole["user"]), (["page", "click", "js_error", "click"], "u-s1"))
+        self.assertEqual(self.read("/api/failure?project=shop&days=1&signal=js_error&detail=nope")["n"], 0)
+
     def test_unknown_key_and_foreign_origin_are_refused(self):
         self.assertEqual(self.send([{"type": "page"}], key="tk_nope")[0], 403)
         self.assertEqual(self.send([{"type": "page"}], origin="https://evil.example")[0], 403)
@@ -317,8 +375,7 @@ class Alerts(unittest.TestCase):
     def store(self, version, events):
         _, rows, _ = t.parse_batch({"key": KEY, "version": version, "session": "s", "events": events}, ORIGIN)
         with t.connect() as con:
-            con.executemany("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, "
-                            "detail, clicks, duration_ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+            con.executemany(t.INSERT_EVENT, rows)
 
     def deploy(self, version, rage, errors=0, visits=40):
         self.store(version, [{"type": "page", "route": "/cart"}] * visits +

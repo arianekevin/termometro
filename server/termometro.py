@@ -11,6 +11,9 @@ and the API:
   GET  /api/me         is this browser signed in, and which projects exist
   GET  /api/overview   the period against the one before, and what deserves a look ┐
   GET  /api/search     screens, elements, failures, actions and ids containing ?q=  │
+  GET  /api/failures   every failure, grouped by kind and message       │
+  GET  /api/failure    one failure in depth (?signal=&detail=): stack, browsers, trails │
+  GET  /api/session    everything one session did, in order (?session=) │
   GET  /api/summary    frustration per screen and per version      │
   GET  /api/usage      usage per screen, or per element of one      │ session cookie (or a heat-map token,
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
@@ -46,6 +49,7 @@ import urllib.request
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import statistics
@@ -81,7 +85,11 @@ ALERT_MIN_VISITS = 30   # visits to a screen in each of the two versions before 
 ALERT_RISE = 15         # score points a screen has to get worse by
 ALERT_MIN_NEW = 5       # times a failure the previous version never had must happen
 SIZES = {"version": 40, "session": 40, "account": 64, "user": 64, "role": 32,
-         "route": 200, "target": 200, "detail": 200}
+         "route": 200, "target": 200, "detail": 200, "stack": 1200, "device": 10}
+MAX_CLOCK_GAP = 86400 * 1000  # an event older than this inside a batch is put at the batch's arrival
+TRAIL_BEFORE, TRAIL_AFTER, TRAIL_SAMPLES, SESSION_MAX = 15, 3, 5, 500
+# Added after 0.2: old databases get them on start (empty for what was already there).
+NEW_COLUMNS = {"stack": "TEXT NOT NULL DEFAULT ''", "agent": "TEXT NOT NULL DEFAULT ''", "device": "TEXT NOT NULL DEFAULT ''"}
 
 
 class Config:
@@ -160,6 +168,14 @@ def connect() -> sqlite3.Connection:
             project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, version, key));
     """)
+    have = {row[1] for row in con.execute("PRAGMA table_info(events)")}
+    for column, kind in NEW_COLUMNS.items():
+        if column not in have:
+            try:
+                con.execute(f"ALTER TABLE events ADD COLUMN {column} {kind}")
+            except sqlite3.OperationalError:  # another thread added it first
+                pass
+    con.execute("CREATE INDEX IF NOT EXISTS events_session ON events (project, session, at)")
     return con
 
 
@@ -197,7 +213,25 @@ def integer(value) -> int | None:
     return int(value) if isinstance(value, (int, float)) and 0 <= value < 10**9 else None
 
 
-def parse_batch(batch, origin: str | None) -> tuple[str, list[tuple], list[tuple]]:
+BROWSERS = (("Edge", r"Edg(?:e|A|iOS)?/(\d+)"), ("Opera", r"OPR/(\d+)"), ("Samsung", r"SamsungBrowser/(\d+)"),
+            ("Firefox", r"(?:Firefox|FxiOS)/(\d+)"), ("Chrome", r"(?:Chrome|CriOS)/(\d+)"), ("Safari", r"Version/(\d+).*Safari"))
+SYSTEMS = (("iOS", r"iPhone|iPad|iPod"), ("Android", r"Android"), ("Windows", r"Windows"), ("ChromeOS", r"CrOS"),
+           ("macOS", r"Mac OS X|Macintosh"), ("Linux", r"Linux"))
+
+
+def agent_of(ua: str) -> str:
+    """Browser and major version, and the system: "Chrome 130 · macOS". Nothing finer, so it cannot single anyone out."""
+    ua = ua or ""
+    browser = next((f"{name} {m.group(1)}" for name, pat in BROWSERS if (m := re.search(pat, ua))), "")
+    system = next((name for name, pat in SYSTEMS if re.search(pat, ua)), "")
+    return " · ".join(x for x in (browser, system) if x)
+
+
+def moment(value) -> int | None:
+    return int(value) if isinstance(value, (int, float)) and 0 < value < 10**14 else None
+
+
+def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[tuple], list[tuple]]:
     """A collector batch -> (project, event rows, inventory rows). Raises ValueError or PermissionError."""
     if not isinstance(batch, dict):
         raise ValueError("batch is not an object")
@@ -213,7 +247,9 @@ def parse_batch(batch, origin: str | None) -> tuple[str, list[tuple], list[tuple
     if not isinstance(events, list) or not events or len(events) > MAX_EVENTS:
         raise ValueError(f"events must be a list of 1 to {MAX_EVENTS}")
     who = [text(batch.get(f), f) for f in ("version", "account", "user", "role")]
+    device = text(batch.get("device"), "device")
     now = int(time.time() * 1000)
+    sent = moment(batch.get("sent"))
     rows, elements = [], []
     for e in events:
         if not isinstance(e, dict) or e.get("type") not in TYPES:
@@ -223,10 +259,18 @@ def parse_batch(batch, origin: str | None) -> tuple[str, list[tuple], list[tuple
             targets = e.get("targets") if isinstance(e.get("targets"), list) else []
             elements += [(project["name"], route, text(t, "target"), now) for t in targets[:MAX_INVENTORY] if t]
             continue
+        # The browser's clock only says how long before sending it happened; the server's says when that was.
+        t = moment(e.get("t"))
+        at = now - min(max(sent - t, 0), MAX_CLOCK_GAP) if sent and t else now
         rows.append((project["name"], who[0] or "?", session, who[1], who[2], who[3], e["type"], route,
                      text(e.get("target"), "target"), text(e.get("detail"), "detail"),
-                     integer(e.get("clicks")), integer(e.get("duration_ms")), now))
+                     integer(e.get("clicks")), integer(e.get("duration_ms")), at,
+                     text(e.get("stack"), "stack") if e["type"] == "js_error" else "", agent, device))
     return project["name"], rows, elements
+
+
+INSERT_EVENT = ("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, detail, clicks, "
+                "duration_ms, at, stack, agent, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
 
 def within_limit(bucket: str, n: int, limit: int) -> bool:
@@ -499,7 +543,7 @@ def overview(con, f: Filter) -> dict:
         WHERE {f.sql} AND type IN {FAILURES} GROUP BY type, detail ORDER BY n DESC""", f.args).fetchall()
     for kind, detail, route, n, sessions, last_at in failures:
         facts = dict(type=kind, detail=detail, route=route, n=n, sessions=sessions, last_at=last_at)
-        link = {"tab": "frustration", "params": {"route": route}}
+        link = {"tab": "failures", "params": {"signal": kind, "detail": detail}}
         serious = kind in ("js_error", "http_5xx")
         if first.get((kind, detail), 0) >= f.since:
             add("failure_new", "bad" if serious else "warn", (250 if serious else 120) + min(n, 49), link, **facts)
@@ -541,7 +585,7 @@ def search(con, f: Filter) -> dict:
             WHERE {f.sql} AND type IN {FAILURES} AND {has.format('detail')}
             GROUP BY type, detail ORDER BY 4 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
         out.append({"kind": "failure", "type": kind, "label": detail, "route": route, "n": n,
-                    "link": {"tab": "frustration", "params": {"route": route}}})
+                    "link": {"tab": "failures", "params": {"signal": kind, "detail": detail}}})
     for detail, n in con.execute(f"""SELECT detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'action'
             AND {has.format('detail')} GROUP BY detail ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
         out.append({"kind": "action", "label": detail, "n": n, "link": {"tab": "actions", "params": {"action": detail}}})
@@ -551,6 +595,92 @@ def search(con, f: Filter) -> dict:
             out.append({"kind": kind, "label": value, "n": n, "link": {"tab": "people" if kind == "user" else "overview",
                                                                       "params": {param: value}}})
     return {"q": text, "results": out}
+
+
+FAILURE_WEIGHT = {"js_error": 5, "http_5xx": 5, "http_4xx": 2, "slow": 1}
+
+
+def first_seen(con, project: str) -> dict:
+    """(type, detail) -> (first time, its version), over everything still kept: when a failure started."""
+    return {(k, d): (at, v) for k, d, at, v in con.execute(
+        f"SELECT type, detail, MIN(at), version FROM events WHERE project = ? AND type IN {FAILURES} GROUP BY type, detail",
+        (project,))}
+
+
+def failures(con, f: Filter) -> dict:
+    """Every failure of the period, grouped by kind and message, the ones that hit the most people first."""
+    first = first_seen(con, f.q.get("project", ""))
+    rows = con.execute(f"""
+        SELECT type, detail, COUNT(*), COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')), MAX(at), version,
+               COUNT(DISTINCT route), MIN(route)
+        FROM events WHERE {f.sql} AND type IN {FAILURES} GROUP BY type, detail""", f.args).fetchall()
+    out = []
+    for kind, detail, n, sessions, users, last_at, last_version, routes, route in rows:
+        first_at, first_version = first.get((kind, detail), (last_at, last_version))
+        out.append({"type": kind, "detail": detail, "n": n, "sessions": sessions, "users": users, "routes": routes,
+                    "route": route, "first_at": first_at, "first_version": first_version, "last_at": last_at,
+                    "last_version": last_version, "new": first_at >= f.since})
+    out.sort(key=lambda x: (-x["sessions"] * FAILURE_WEIGHT[x["type"]], -x["n"]))
+    return {"failures": out}
+
+
+STEP = "type, route, target, detail, at, version, clicks, duration_ms"
+
+
+def steps(rows) -> list[dict]:
+    return [{"type": k, "route": r, "target": t, "detail": d, "at": at, "version": v, "clicks": c, "duration_ms": ms}
+            for k, r, t, d, at, v, c, ms in rows]
+
+
+def failure(con, f: Filter) -> dict:
+    """One failure in depth: where, in which versions, browsers and kinds of screen, the code stack, what was
+    clicked just before, and the trail of a few sessions up to it — what a developer needs to reproduce it."""
+    kind, detail = f.q.get("signal", ""), f.q.get("detail", "")
+    where, args = f"{f.sql} AND type = ? AND detail = ?", f.args + [kind, detail]
+
+    def count_by(column, limit=10):
+        return [{"key": k, "n": n} for k, n in con.execute(
+            f"SELECT {column}, COUNT(*) n FROM events WHERE {where} GROUP BY {column} ORDER BY n DESC LIMIT {limit}", args)]
+
+    n, sessions, users, accounts, last_at = con.execute(f"""
+        SELECT COUNT(*), COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')), COUNT(DISTINCT NULLIF(account, '')),
+               MAX(at) FROM events WHERE {where}""", args).fetchone()
+    if not n:
+        return {"type": kind, "detail": detail, "n": 0}
+    first_at, first_version = first_seen(con, f.q.get("project", "")).get((kind, detail), (None, ""))
+    # The latest occurrence of each session (SQLite gives the bare columns of the MAX row), newest sessions first.
+    samples = con.execute(f"""SELECT id, session, MAX(at), version, user_id, account, role, agent, device FROM events
+        WHERE {where} GROUP BY session ORDER BY MAX(at) DESC LIMIT {TRAIL_SAMPLES}""", args).fetchall()
+    trails = []
+    for eid, session, at, version, user, account, role, agent, device in samples:
+        project = f.q.get("project", "")
+        before = con.execute(f"""SELECT {STEP} FROM events WHERE project = ? AND session = ? AND (at, id) < (?, ?)
+            ORDER BY at DESC, id DESC LIMIT {TRAIL_BEFORE}""", (project, session, at, eid)).fetchall()[::-1]
+        after = con.execute(f"""SELECT {STEP} FROM events WHERE project = ? AND session = ? AND (at, id) > (?, ?)
+            ORDER BY at, id LIMIT {TRAIL_AFTER}""", (project, session, at, eid)).fetchall()
+        here = con.execute(f"SELECT {STEP} FROM events WHERE id = ?", (eid,)).fetchall()
+        trails.append({"session": session, "at": at, "version": version, "user": user, "account": account, "role": role,
+                       "agent": agent, "device": device, "before": steps(before), "failure": steps(here)[0],
+                       "after": steps(after)})
+    return {"type": kind, "detail": detail, "n": n, "sessions": sessions, "users": users, "accounts": accounts,
+            "first_at": first_at, "first_version": first_version, "last_at": last_at, "new": (first_at or 0) >= f.since,
+            "routes": count_by("route"), "versions": count_by("version"), "agents": count_by("agent"),
+            "devices": count_by("device"), "after_clicking": [x for x in count_by("target", 5) if x["key"]],
+            "stacks": [x for x in count_by("stack", 3) if x["key"]],
+            "per_day": [{"day": d, "n": c} for d, c in con.execute(
+                f"SELECT date(at / 1000, 'unixepoch') d, COUNT(*) FROM events WHERE {where} GROUP BY d ORDER BY d", args)],
+            "trails": trails}
+
+
+def session_trail(con, f: Filter) -> dict:
+    """Everything one session did, in order (up to SESSION_MAX steps): ids of who it was, never content."""
+    project, session = f.q.get("project", ""), f.q.get("session", "")
+    rows = con.execute(f"SELECT {STEP} FROM events WHERE project = ? AND session = ? ORDER BY at, id LIMIT {SESSION_MAX}",
+                       (project, session)).fetchall()
+    who = con.execute("""SELECT user_id, account, role, agent, device FROM events WHERE project = ? AND session = ?
+        ORDER BY at DESC LIMIT 1""", (project, session)).fetchone() or ("", "", "", "", "")
+    return {"session": session, "user": who[0], "account": who[1], "role": who[2], "agent": who[3], "device": who[4],
+            "steps": steps(rows), "truncated": len(rows) == SESSION_MAX}
 
 
 def filters(con, project: str) -> dict:
@@ -671,7 +801,8 @@ def google_email(code: str) -> str:
 
 
 READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
-         "/api/compare": compare, "/api/overview": overview, "/api/search": search}
+         "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
+         "/api/failure": failure, "/api/session": session_trail}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8")}
@@ -813,7 +944,7 @@ class Handler(BaseHTTPRequestHandler):
             batch = json.loads(self.body())
             project = CONFIG.projects.get(str(batch.get("key", ""))) if isinstance(batch, dict) else None
             headers = self.cors_for(project)
-            name, rows, elements = parse_batch(batch, origin)
+            name, rows, elements = parse_batch(batch, origin, agent_of(self.headers.get("User-Agent", "")))
         except PermissionError as error:
             return self.json(403, {"error": str(error)})
         except (ValueError, UnicodeDecodeError) as error:
@@ -821,8 +952,7 @@ class Handler(BaseHTTPRequestHandler):
         if not within_limit("ingest:" + self.ip(), len(rows) + (1 if elements else 0), MAX_PER_MINUTE):
             return self.json(429, {"error": "rate limit"}, headers)
         with connect() as con:
-            con.executemany("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, "
-                            "detail, clicks, duration_ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+            con.executemany(INSERT_EVENT, rows)
             con.executemany("INSERT INTO elements (project, route, target, last_seen) VALUES (?, ?, ?, ?) "
                             "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen", elements)
         self.send(204, headers=headers)

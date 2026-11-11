@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { routeFromPath, scrub, selectorOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
+import { routeFromPath, scrub, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
 
-interface SentEvent { type: string; route: string; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[] }
-interface SentBatch { key: string; version: string; session: string; account: string; user: string; role: string; events: SentEvent[] }
+interface SentEvent { type: string; route: string; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string }
+interface SentBatch { key: string; version: string; session: string; account: string; user: string; role: string; device?: string; sent?: number; events: SentEvent[] }
 
 describe('termometro', () => {
   let sent: SentBatch[]
@@ -36,7 +36,8 @@ describe('termometro', () => {
   async function events() {
     await vi.advanceTimersByTimeAsync(1000)
     await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0))
-    return sent.flatMap((b) => b.events)
+    // Every event carries its time; the tests below look at the rest.
+    return sent.flatMap((b) => b.events).map(({ t: _t, ...e }) => e)
   }
 
   function click(el: Element, x = 10, y = 10) {
@@ -59,7 +60,7 @@ describe('termometro', () => {
     const [batch] = (await events(), sent)
     expect(batch).toMatchObject({ key: 'tk_1', version: '1.0' })
     expect(batch!.session).toBeTruthy()
-    expect(batch!.events).toEqual([{ type: 'page', route: '/tickets/:id' }])
+    expect(batch!.events).toEqual([{ type: 'page', route: '/tickets/:id', t: expect.any(Number) }])
     expect(batch).toMatchObject({ account: '', user: '', role: '' })
   })
 
@@ -186,6 +187,28 @@ describe('termometro', () => {
     const errors = (await events()).filter((e) => e.type === 'js_error')
     expect(errors).toHaveLength(3)
     expect(errors[0]!.detail).toBe('TypeError: Cannot read "…" of ticket :id')
+  })
+
+  it('stamps each event with the browser time and the batch with when it was sent and the kind of screen', async () => {
+    start().page('/x')
+    await events()
+    const [batch] = sent
+    expect(typeof batch!.events[0]!.t).toBe('number')
+    expect(batch!.sent).toBeGreaterThanOrEqual(batch!.events[0]!.t!)
+    expect(['phone', 'tablet', 'desktop']).toContain(batch!.device)
+  })
+
+  it('sends where an error happened in the code, without host or query', async () => {
+    const err = new TypeError('boom')
+    err.stack = 'TypeError: boom\n    at loadRows (https://app.example.com/assets/index-a1b2c3.js?v=123:1:4567)\n' +
+      '    at https://app.example.com/assets/vendor.js:2:10\n    at async Object.save [as run] (http://localhost:5173/src/pages/Tickets.vue:88:12)'
+    expect(stackOf(err)).toBe('loadRows @ /assets/index-a1b2c3.js:1:4567\n? @ /assets/vendor.js:2:10\nObject.save [as run] @ /src/pages/Tickets.vue:88:12')
+    const firefox = new Error('x'); firefox.stack = 'save@https://app.example.com/a.js:3:4\n@https://app.example.com/b.js:5:6'
+    expect(stackOf(firefox)).toBe('save @ /a.js:3:4\n? @ /b.js:5:6')
+    start().page('/x')
+    termometro!.error(err)
+    const [e] = (await events()).filter((x) => x.type === 'js_error')
+    expect(e!.stack).toContain('loadRows @ /assets/index-a1b2c3.js:1:4567')
   })
 
   it('reports a bounce when the user goes back right after arriving', async () => {

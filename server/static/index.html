@@ -101,6 +101,20 @@ details summary { cursor: pointer; color: var(--fg2); }
 .results a { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
 .results a:hover, .results a.on { background: var(--accent-soft); }
 .results a code { flex: 1; min-width: 0; color: inherit; }
+/* Failures */
+.failure .title { margin: 4px 0; font-size: 15px; } .failure .title code { font-size: 14px; line-height: 20px; color: var(--fg); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
+.counts { list-style: none; margin: 6px 0 0; padding: 0; } .counts li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.counts li span { overflow-wrap: anywhere; }
+pre.stack { margin: 8px 0 0; padding: 10px 12px; background: var(--sunken); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto;
+  font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+.trails { display: grid; gap: 12px; margin-top: 8px; }
+.trail { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.steps { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.steps li { display: flex; gap: 10px; padding: 3px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.steps .t { flex: 0 0 76px; text-align: right; color: var(--faint); font-size: 12px; }
+.steps li.sig { color: var(--warn); } .steps li.here { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+button.small { height: 28px; font-size: 12px; }
 /* Overview */
 .delta { font-size: 12px; font-weight: 600; margin-left: 4px; }
 .insights { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
@@ -128,7 +142,20 @@ const L = PT ? {
     state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
   signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
   day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
-  tabs: { overview: 'Início', frustration: 'Frustração', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  failureTab: {
+    list: 'Falhas, das que atingem mais sessões para as que atingem menos', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
+    none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
+    occurrences: (f) => `${f.n}× em ${f.sessions} ${f.sessions === 1 ? 'sessão' : 'sessões'} · ${f.users} ${f.users === 1 ? 'usuário' : 'usuários'} · ${f.accounts} ${f.accounts === 1 ? 'conta' : 'contas'}`,
+    where: 'Telas', versions: 'Versões', agents: 'Navegadores', devices: 'Tipo de tela', afterClicking: 'Logo depois de clicar em',
+    stack: 'Onde no código', noStack: 'Sem stack: falhas de rede e lentidão não têm, e erros de versões antigas do coletor também não.',
+    trails: 'Passos até a falha', trailsHint: (b, a) => `As sessões mais recentes em que aconteceu: até ${b} passos antes e ${a} depois.`,
+    fullSession: 'Sessão inteira', copyIssue: 'Copiar para issue', close: 'Fechar', unknown: 'desconhecido',
+    devicesNames: { phone: 'celular', tablet: 'tablet', desktop: 'computador' }, session: 'Sessão', truncated: 'Mostrando só os primeiros 500 passos.',
+    step: { page: (s) => `Abriu ${s.route}`, click: (s) => `Clicou em ${s.target}`, rage: (s) => `Rage click em ${s.target}`, dead: (s) => `Clique sem resposta em ${s.target}`,
+      action: (s) => `Gravou ${s.detail}${s.clicks ? ` (${s.clicks} cliques)` : ''}`, abandon: (s) => `Abandonou ${s.target}`, bounce: () => 'Voltou na hora' },
+    issue: { occurrences: 'Ocorrências', period: (d) => `nos últimos ${d} dias`, first: 'Desde', last: 'Última vez', steps: 'Passos até a falha', link: 'No Termometro' },
+  },
+  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
   search: 'Buscar tela, botão, erro, ação, usuário…', noResults: 'Nada com esse nome neste período.',
   kinds: { screen: 'Telas', element: 'Elementos', failure: 'Falhas', action: 'Ações', user: 'Usuários', account: 'Contas' },
   vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
@@ -147,7 +174,7 @@ const L = PT ? {
   names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
   noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
   overall: 'Nota geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'tranquilo', attention: 'atenção', much: 'muita frustração',
-  sessions: (n) => `${n} ${n === 1 ? 'sessão' : 'sessões'}`, visitsN: (n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`, scoreIn: (s, v) => `nota ${s} em ${v}`,
+  sessionsCol: 'Sessões', sessions: (n) => `${n} ${n === 1 ? 'sessão' : 'sessões'}`, visitsN: (n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`, scoreIn: (s, v) => `nota ${s} em ${v}`,
   screensByFrustration: 'Telas, da mais frustrante para a menos', openRow: 'Clique numa tela para ver onde irrita e o que falhou.',
   screen: 'Tela', score: 'Nota', signals: 'Sinais', none: 'nenhum sinal', where: 'Onde irrita', whatFailed: 'O que falhou', after: 'depois de clicar em',
   noDetail: 'Os sinais desta tela não têm elemento nem falha (voltas, abandonos).', byVersion: 'Por versão', versionHint: 'Um deploy que sobe a nota piorou a experiência.',
@@ -177,7 +204,20 @@ const L = PT ? {
     state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
   signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
   day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
-  tabs: { overview: 'Overview', frustration: 'Frustration', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
+  failureTab: {
+    list: 'Failures, the ones hitting the most sessions first', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
+    none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
+    occurrences: (f) => `${f.n}× in ${f.sessions} ${f.sessions === 1 ? 'session' : 'sessions'} · ${f.users} ${f.users === 1 ? 'user' : 'users'} · ${f.accounts} ${f.accounts === 1 ? 'account' : 'accounts'}`,
+    where: 'Screens', versions: 'Versions', agents: 'Browsers', devices: 'Kind of screen', afterClicking: 'Right after clicking',
+    stack: 'Where in the code', noStack: 'No stack: network failures and slowness have none, and neither do errors from older collectors.',
+    trails: 'Steps up to the failure', trailsHint: (b, a) => `The latest sessions where it happened: up to ${b} steps before and ${a} after.`,
+    fullSession: 'Whole session', copyIssue: 'Copy for an issue', close: 'Close', unknown: 'unknown',
+    devicesNames: { phone: 'phone', tablet: 'tablet', desktop: 'desktop' }, session: 'Session', truncated: 'Showing only the first 500 steps.',
+    step: { page: (s) => `Opened ${s.route}`, click: (s) => `Clicked ${s.target}`, rage: (s) => `Rage click on ${s.target}`, dead: (s) => `Dead click on ${s.target}`,
+      action: (s) => `Saved ${s.detail}${s.clicks ? ` (${s.clicks} clicks)` : ''}`, abandon: (s) => `Abandoned ${s.target}`, bounce: () => 'Went right back' },
+    issue: { occurrences: 'Occurrences', period: (d) => `in the last ${d} days`, first: 'Since', last: 'Last seen', steps: 'Steps up to the failure', link: 'On Termometro' },
+  },
+  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', people: 'People', actions: 'Actions', versions: 'Versions' },
   search: 'Search screen, button, error, action, user…', noResults: 'Nothing by that name in this period.',
   kinds: { screen: 'Screens', element: 'Elements', failure: 'Failures', action: 'Actions', user: 'Users', account: 'Accounts' },
   vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
@@ -196,7 +236,7 @@ const L = PT ? {
   names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
   noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
   overall: 'Overall score', visits: 'Visits', worst: 'Most frustrating screen', calm: 'calm', attention: 'attention', much: 'very frustrating',
-  sessions: (n) => `${n} ${n === 1 ? 'session' : 'sessions'}`, visitsN: (n) => `${n} ${n === 1 ? 'visit' : 'visits'}`, scoreIn: (s, v) => `score ${s} over ${v}`,
+  sessionsCol: 'Sessions', sessions: (n) => `${n} ${n === 1 ? 'session' : 'sessions'}`, visitsN: (n) => `${n} ${n === 1 ? 'visit' : 'visits'}`, scoreIn: (s, v) => `score ${s} over ${v}`,
   screensByFrustration: 'Screens, most frustrating first', openRow: 'Click a screen to see where it irritates and what failed.',
   screen: 'Screen', score: 'Score', signals: 'Signals', none: 'no signals', where: 'Where it irritates', whatFailed: 'What failed', after: 'after clicking',
   noDetail: 'This screen\'s signals have no element or failure (bounces, abandoned forms).', byVersion: 'By version', versionHint: 'A deploy that raises the score made things worse.',
@@ -241,11 +281,11 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span>${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', hash: new URLSearchParams(), focus: false }
+const state = { me: null, tab: 'overview', user: '', route: '', action: '', a: '', b: '', signal: '', detail: '', hash: new URLSearchParams(), focus: false }
 
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
 const FILTERS = ['project', 'days', 'version', 'account', 'role']
-const PARAMS = ['user', 'route', 'action', 'a', 'b']
+const PARAMS = ['user', 'route', 'action', 'a', 'b', 'signal', 'detail']
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
   state.tab = TABS[tab] ? tab : 'overview'
@@ -439,7 +479,7 @@ async function frustration() {
   const worst = r.routes.find((x) => x.visits)
   const detail = (x) => {
     const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — <code>${esc(a.target)}</code> ${a.n}×</li>`).join('')}</ul>` : ''
-    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
       <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`
   }
@@ -465,6 +505,77 @@ async function frustration() {
     <details class="card"><summary>${L.how}</summary>
       <p>${L.howText(Object.entries(r.weights).map(([k, w]) => `${esc(L.names[k] ?? k)} ${w}`).join(', '), r.factor)}</p>
       <p class="meta">${L.privacy}</p></details>`
+}
+
+// Failures -------------------------------------------------------------------------------------------------
+const F = () => L.failureTab
+const when = (at) => (at ? new Date(at).toLocaleString(PT ? 'pt-BR' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—')
+const offset = (ms) => {
+  const s = Math.round(ms / 1000), a = Math.abs(s)
+  const txt = a < 60 ? `${a} s` : a < 3600 ? `${Math.floor(a / 60)} min ${a % 60} s` : `${Math.floor(a / 3600)} h ${Math.floor(a % 3600 / 60)} min`
+  return s ? (s < 0 ? '−' : '+') + txt : '0 s'
+}
+const stepText = (s) => (F().step[s.type] ?? ((x) => `${L.names[x.type] ?? x.type}: ${x.detail}`))(s)
+const isFailure = (s) => ['js_error', 'http_5xx', 'http_4xx', 'slow'].includes(s.type)
+const stepHtml = (s, zero, here) => `<li class="${here ? 'here' : isFailure(s) || s.type === 'rage' || s.type === 'dead' ? 'sig' : ''}">
+  <span class="t">${offset(s.at - zero)}</span><span>${esc(stepText(s))}${s.route && s.type !== 'page' ? ` <span class="meta">${esc(s.route)}</span>` : ''}</span></li>`
+const counts = (title, list, name = (k) => k) => `<div><div class="label">${title}</div>${list.length
+  ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${x.n}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
+const sameStep = (a, b) => a.at === b.at && a.type === b.type && a.detail === b.detail
+
+function issueMarkdown(d) {
+  const I = F().issue, name = L.names[d.type] ?? d.type, list = (xs) => xs.map((x) => `${x.key || F().unknown} (${x.n})`).join(', ')
+  const t = d.trails[0]
+  const lines = [`## ${name}: ${d.detail}`, '',
+    `- ${I.occurrences}: ${F().occurrences(d)} ${I.period($('#days').value)}`,
+    `- ${I.first}: ${d.first_version} (${when(d.first_at)}) · ${I.last}: ${when(d.last_at)}`,
+    `- ${F().where}: ${list(d.routes)}`, `- ${F().versions}: ${list(d.versions)}`, `- ${F().agents}: ${list(d.agents)}`,
+    `- ${F().devices}: ${list(d.devices.map((x) => ({ ...x, key: F().devicesNames[x.key] ?? x.key })))}`]
+  if (d.after_clicking.length) lines.push(`- ${F().afterClicking}: ${list(d.after_clicking)}`)
+  if (d.stacks.length) lines.push('', `### ${F().stack}`, '```', d.stacks[0].key, '```')
+  if (t) {
+    lines.push('', `### ${I.steps} (${t.agent || F().unknown}, ${F().devicesNames[t.device] ?? t.device}, ${t.version})`)
+    ;[...t.before, t.failure].forEach((s, i, all) => lines.push(`${i + 1}. ${i === all.length - 1 ? '**' : ''}${stepText(s)}${s.type !== 'page' ? ` — ${s.route}` : ''}${i === all.length - 1 ? '**' : ''} (${offset(s.at - t.at)})`))
+  }
+  lines.push('', `${I.link}: ${location.href}`)
+  return lines.join('\n')
+}
+
+async function failures() {
+  const { failures: list } = await read('/api/failures')
+  if (!list.length) return empty(F().none)
+  const d = state.signal ? await read('/api/failure', { signal: state.signal, detail: state.detail }) : null
+  const isSel = (f) => f.type === state.signal && f.detail === state.detail
+  const detail = d?.n ? `<section class="card failure">
+      <div class="head"><div style="min-width:0;flex:1"><div class="label">${esc(L.names[d.type] ?? d.type)} ${d.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div>
+        <div class="title"><code>${esc(d.detail)}</code></div>
+        <div class="meta">${esc(F().occurrences(d))} · ${F().since} ${esc(d.first_version)} (${when(d.first_at)}) · ${F().last} ${ago(d.last_at)}</div></div>
+        <div class="field"><button data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)" ${linkAttrs({ tab: 'failures', params: {} })}>${F().close}</a></div></div>
+      <div class="facts">${counts(F().where, d.routes)}${counts(F().versions, d.versions)}${counts(F().agents, d.agents)}
+        ${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking) : ''}</div>
+      <div class="label" style="margin-top:16px">${F().stack}</div>
+      ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${x.n}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
+      <div class="label" style="margin-top:16px">${F().trails}</div><div class="meta">${F().trailsHint(15, 3)}</div>
+      <div class="trails">${d.trails.map((t, i) => `<details class="trail" data-trail="${esc(t.session)}" data-zero="${t.at}" ${i ? '' : 'open'}>
+        <summary class="meta"><b>${F().session} ${esc(short(t.session))}</b> · ${when(t.at)} · ${esc(t.version)} · ${esc(t.agent || F().unknown)} · ${esc(F().devicesNames[t.device] ?? t.device ?? '')}
+          ${t.user ? ` · ${L.user} <code>${esc(short(t.user))}</code>` : ''}${t.role ? ` · ${esc(t.role)}` : ''}</summary>
+        <ol class="steps">${t.before.map((s) => stepHtml(s, t.at)).join('')}${stepHtml(t.failure, t.at, true)}${t.after.map((s) => stepHtml(s, t.at)).join('')}</ol>
+        <button class="small" data-session="${esc(t.session)}">${F().fullSession}</button></details>`).join('')}</div>
+    </section>` : ''
+  return `${detail}<section class="card"><div class="label">${F().list}</div><div class="meta">${F().hint}</div>
+    ${table(`<th>${F().failure}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th>`,
+      list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
+        <td><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
+          <div class="meta">${esc(f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
+        <td class="n">${f.sessions}</td><td class="n">${f.users}</td><td class="n">${f.n}</td>
+        <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td></tr>`).join(''))}</section>`
+}
+
+async function showSession(button) {
+  const box = button.closest('.trail'), zero = Number(box.dataset.zero)
+  const s = await read('/api/session', { session: button.dataset.session })
+  box.querySelector('.steps').innerHTML = s.steps.map((x) => stepHtml(x, zero, x.at === zero && isFailure(x))).join('')
+  button.replaceWith(Object.assign(document.createElement('div'), { className: 'meta', textContent: s.truncated ? F().truncated : '' }))
 }
 
 // Usage ----------------------------------------------------------------------------------------------------
@@ -594,7 +705,7 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
-const TABS = { overview, frustration, usage, people, actions, versions }
+const TABS = { overview, frustration, failures, usage, people, actions, versions }
 
 async function render() {
   clearTimeout(waitTimer)
@@ -620,7 +731,7 @@ async function render() {
     $('#content').innerHTML = await TABS[state.tab]()
     $('#open-map')?.addEventListener('click', openMap)
     writeHash()
-    if (state.focus) $('#content tr.sel')?.scrollIntoView({ block: 'center' })
+    if (state.focus) ($('#content .failure') ?? $('#content tr.sel'))?.scrollIntoView({ block: $('#content .failure') ? 'start' : 'center' })
     state.focus = false
   } catch (error) {
     if (error.message !== 'signed out') $('#content').innerHTML = empty(L.failed + esc(error.message))
@@ -633,7 +744,10 @@ function onContentClick(e) {
     navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = L.copy }, 1500) })
     return
   }
+  const more = e.target.closest('[data-session]')
+  if (more) return showSession(more)
   const tr = e.target.closest('tr.row'); if (!tr) return
+  if (tr.dataset.signal !== undefined) return go('failures', { signal: tr.dataset.signal, detail: tr.dataset.detail })
   if (tr.dataset.open !== undefined) {
     const d = document.querySelector(`tr[data-of="${tr.dataset.open}"]`)
     d.hidden = !d.hidden; tr.setAttribute('aria-expanded', String(!d.hidden))

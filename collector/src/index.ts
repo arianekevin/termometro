@@ -65,6 +65,10 @@ interface TrackedEvent {
   clicks?: number
   duration_ms?: number
   targets?: string[]
+  /** When it happened (the browser's clock); the server lines it up with its own by the batch's `sent`. */
+  t?: number
+  /** js_error only: where in the code, as `function @ /path/file.js:line:col` lines — never the page's query or data. */
+  stack?: string
 }
 interface Who { account: string; user: string; role: string }
 interface Queued { event: TrackedEvent; who: Who }
@@ -82,6 +86,7 @@ const MAX_QUEUE = 500
 const MAX_BATCH = 100
 const MAX_SAME_ERROR = 3
 const SLOW_MS = 3000
+const MAX_FRAMES = 8
 const OVERLAY = '[data-termometro]'
 
 const CLICKABLE = 'a[href],button,[role="button"],[role="menuitem"],[role="tab"],summary,' +
@@ -94,6 +99,29 @@ export function scrub(text: string): string {
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id')
     .replace(/\d{3,}/g, ':id')
     .replace(/(["'`])[^"'`]*\1/g, '"…"')
+}
+
+/** The code locations of an error's stack: function and file path with line and column; the host, the query and the
+ * message are left out (the message is already in `detail`, scrubbed). */
+export function stackOf(err: Error): string {
+  const frames: string[] = []
+  for (const line of String(err.stack ?? '').split('\n')) {
+    // Chrome: "    at fn (https://app/x.js:1:2)" or "    at https://app/x.js:1:2"; Firefox/Safari: "fn@https://app/x.js:1:2"
+    const m = line.match(/^\s*(?:at\s+)?(?:(.*?)\s*[@(]\s*)?((?:https?|file|webpack|blob):\/*[^\s)]*?|\/[^\s)]*?):(\d+):(\d+)\)?\s*$/)
+    if (!m) continue
+    let path = m[2]!
+    try { path = new URL(path).pathname } catch { path = path.split(/[?#]/)[0]! }
+    const fn = (m[1] ?? '').replace(/^async\s+/, '').replace(/[^\w$.<>\[\] -]/g, '').slice(0, 60)
+    frames.push(`${fn || '?'} @ ${path.slice(0, 120)}:${m[3]}:${m[4]}`)
+    if (frames.length >= MAX_FRAMES) break
+  }
+  return frames.join('\n')
+}
+
+/** The kind of screen, not its size: enough to tell a phone problem from a desktop one. */
+function device(): string {
+  const w = typeof innerWidth === 'number' ? innerWidth : 0
+  return !w ? '' : w < 640 ? 'phone' : w < 1024 ? 'tablet' : 'desktop'
 }
 
 /** URL path with the segments that look like ids replaced by `:id`. */
@@ -195,7 +223,7 @@ export function start(options: Options): Termometro {
   }
 
   const record = (event: TrackedEvent) => {
-    if (queue.length < MAX_QUEUE) queue.push({ event, who: who() })
+    if (queue.length < MAX_QUEUE) queue.push({ event: { ...event, t: Date.now() }, who: who() })
   }
   const recentClick = () => (lastClick && Date.now() - lastClick.t < AFTER_CLICK_MS ? lastClick.target : undefined)
 
@@ -206,7 +234,8 @@ export function start(options: Options): Termometro {
       let n = 0
       while (n < queue.length && n < MAX_BATCH && JSON.stringify(queue[n]!.who) === first) n++
       const items = queue.splice(0, n)
-      const batch = { key: options.key, version: options.version ?? '', session, ...items[0]!.who, events: items.map((q) => q.event) }
+      const batch = { key: options.key, version: options.version ?? '', session, ...items[0]!.who, device: device(), sent: Date.now(),
+        events: items.map((q) => q.event) }
       // text/plain needs no CORS preflight; the server parses the JSON all the same.
       const body = new Blob([JSON.stringify(batch)], { type: 'text/plain' })
       if (leaving && navigator.sendBeacon?.(endpoint, body)) continue
@@ -229,7 +258,7 @@ export function start(options: Options): Termometro {
     const detail = scrub(`${err.name}: ${err.message}`).slice(0, 200)
     const times = (errorsSeen.get(detail) ?? 0) + 1
     errorsSeen.set(detail, times)
-    if (times <= MAX_SAME_ERROR) record({ type: 'js_error', route: currentRoute, target: recentClick(), detail })
+    if (times <= MAX_SAME_ERROR) record({ type: 'js_error', route: currentRoute, target: recentClick(), detail, stack: stackOf(err) || undefined })
   }
 
   function network(method: string, url: string, status: number, ms: number) {
