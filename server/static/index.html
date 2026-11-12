@@ -32,7 +32,7 @@
   --k1: #2a78d6; --k2: #eb6834; --k3: #1baf7a; --k4: #eda100; --k5: #e87ba4;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
   --canvas: #15120d; --surface: #1e1a14; --sunken: #191610; --line: #3a3328; --line-strong: #5a4f3e;
   --fg: #f1ebe0; --fg2: #d6cdbd; --faint: #ada290;
   --accent: #fec10d; --accent-hover: #ffd24d; --accent-soft: #2a2412; --on-accent: #1f1a14; --fill: #fec10d; --on-fill: #1f1a14;
@@ -40,14 +40,14 @@
   --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
   --brand: #ff6b70; --shadow: none; color-scheme: dark;
 }
-  :root[data-palette="cold"] {
+  :root:not([data-theme="light"])[data-palette="cold"] {
   --canvas: #0f131a; --surface: #161a22; --sunken: #12161d; --line: #262d3a; --line-strong: #384254;
   --fg: #eef2f8; --fg2: #c5cfdd; --faint: #94a0b4;
   --accent: #8ab4ff; --accent-hover: #b0cbff; --accent-soft: #1c2740; --on-accent: #0f131a; --fill: #8ab4ff; --on-fill: #0f131a;
   --ok: #6ee7a0; --ok-soft: #12261b; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
   --k1: #3987e5; --k2: #1f9d55; --k3: #8b7cf0; --k4: #14a3bd; --k5: #6d6ee8;
 }
-  :root[data-palette="contrast"] {
+  :root:not([data-theme="light"])[data-palette="contrast"] {
   --canvas: #000000; --surface: #000000; --sunken: #111111; --line: #ffffff; --line-strong: #ffffff;
   --fg: #ffffff; --fg2: #ffffff; --faint: #dddddd;
   --accent: #ffd400; --accent-hover: #ffe666; --accent-soft: #222222; --on-accent: #000000; --fill: #ffffff; --on-fill: #000000;
@@ -55,6 +55,38 @@
   --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
 }
 }
+:root[data-theme="dark"] {
+  --canvas: #15120d; --surface: #1e1a14; --sunken: #191610; --line: #3a3328; --line-strong: #5a4f3e;
+  --fg: #f1ebe0; --fg2: #d6cdbd; --faint: #ada290;
+  --accent: #fec10d; --accent-hover: #ffd24d; --accent-soft: #2a2412; --on-accent: #1f1a14; --fill: #fec10d; --on-fill: #1f1a14;
+  --ok: #7fd1a5; --ok-soft: #173327; --warn: #ff9a6b; --warn-soft: #3d2215; --bad: #ff8fab; --bad-soft: #3d1a26;
+  --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
+  --brand: #ff6b70; --shadow: none; color-scheme: dark;
+}
+:root[data-theme="dark"][data-palette="cold"] {
+  --canvas: #0f131a; --surface: #161a22; --sunken: #12161d; --line: #262d3a; --line-strong: #384254;
+  --fg: #eef2f8; --fg2: #c5cfdd; --faint: #94a0b4;
+  --accent: #8ab4ff; --accent-hover: #b0cbff; --accent-soft: #1c2740; --on-accent: #0f131a; --fill: #8ab4ff; --on-fill: #0f131a;
+  --ok: #6ee7a0; --ok-soft: #12261b; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
+  --k1: #3987e5; --k2: #1f9d55; --k3: #8b7cf0; --k4: #14a3bd; --k5: #6d6ee8;
+}
+:root[data-theme="dark"][data-palette="contrast"] {
+  --canvas: #000000; --surface: #000000; --sunken: #111111; --line: #ffffff; --line-strong: #ffffff;
+  --fg: #ffffff; --fg2: #ffffff; --faint: #dddddd;
+  --accent: #ffd400; --accent-hover: #ffe666; --accent-soft: #222222; --on-accent: #000000; --fill: #ffffff; --on-fill: #000000;
+  --ok: #6ee7a0; --ok-soft: #0c2416; --warn: #ffd166; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
+  --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
+}
+/* Colour-blind mode: low / moderate / high become blue / neutral / orange (no red against green); labels stay. */
+:root[data-cvd="on"] { --ok: #2a78d6; --ok-soft: #e6f0fb; --warn: #8c8579; --warn-soft: #f1efea; --bad: #c2410c; --bad-soft: #fde8dc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"])[data-cvd="on"] { --ok: #3987e5; --ok-soft: #142338; --warn: #8a8478; --warn-soft: #24211c; --bad: #d95926; --bad-soft: #3d2215; } }
+:root[data-theme="dark"][data-cvd="on"] { --ok: #3987e5; --ok-soft: #142338; --warn: #8a8478; --warn-soft: #24211c; --bad: #d95926; --bad-soft: #3d2215; }
+/* Bigger text: the whole dashboard, charts included, scales; the tooltip follows. */
+:root[data-text="large"] #app { zoom: 1.15; } :root[data-text="larger"] #app { zoom: 1.3; }
+:root[data-text="large"] .tip { font-size: 14px; line-height: 19px; } :root[data-text="larger"] .tip { font-size: 16px; line-height: 22px; }
+/* Less motion: the system's wish, or the viewer's. */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { font: 400 14px/20px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--canvas); color: var(--fg);
@@ -201,6 +233,13 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .kind .kshare { display: block; height: 4px; border-radius: 999px; background: var(--sunken); overflow: hidden; } .kind .kshare i { display: block; height: 100%; }
 .kind.effort { border-style: dashed; } .kind.effort .kval { font-size: 18px; }
 .card > .legend { margin-top: 12px; }
+.prefs-wrap { position: relative; }
+.prefs { position: fixed; z-index: 20; width: min(380px, calc(100vw - 32px)); display: grid; gap: 12px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.16); }
+.pref .faint { color: var(--faint); }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.seg button { height: 32px; font-size: 13px; border-radius: 8px; }
+.seg button[aria-pressed="true"] { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
 .chips button { height: 30px; border-radius: 999px; font-size: 13px; display: inline-flex; gap: 6px; }
 .chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
@@ -340,17 +379,43 @@ const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><p
 const PT = /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
 // The colours: Nectar by default, or the viewer's pick, kept in this browser.
-// Warm tones are Nectar's palette, the one a page opens with.
-const PALETTES = PT ? { warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' }
-  : { warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }
-const palette = () => { try { const k = localStorage.getItem('termometro.palette'); return k in PALETTES ? k : 'warm' } catch { return 'warm' } }
-const usePalette = (k) => { if (k === 'warm') delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = k }
-usePalette(palette())
-document.addEventListener('change', (e) => {
-  if (e.target.id !== 'palette') return
-  try { localStorage.setItem('termometro.palette', e.target.value) } catch {}
-  usePalette(e.target.value)
+// Appearance, per viewer and kept in this browser: colours (warm tones are Nectar's, the default), light or dark,
+// text size, colour-blind mode and less motion. Each one is an attribute on <html> the CSS reads.
+const PREFS = {
+  palette: { label: PT ? 'Cores' : 'Colours', values: PT ? { warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' } : { warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }, attr: 'palette', off: 'warm' },
+  theme: { label: PT ? 'Tema' : 'Theme', values: PT ? { system: 'Do sistema', light: 'Claro', dark: 'Escuro' } : { system: 'System', light: 'Light', dark: 'Dark' }, attr: 'theme', off: 'system' },
+  text: { label: PT ? 'Tamanho do texto' : 'Text size', values: PT ? { normal: 'Normal', large: 'Grande', larger: 'Maior' } : { normal: 'Normal', large: 'Large', larger: 'Larger' }, attr: 'text', off: 'normal' },
+  cvd: { label: PT ? 'Modo para daltônicos' : 'Colour-blind mode', hint: PT ? 'azul, cinza e laranja no lugar de verde, amarelo e vermelho' : 'blue, grey and orange instead of green, yellow and red',
+    values: PT ? { off: 'Desligado', on: 'Ligado' } : { off: 'Off', on: 'On' }, attr: 'cvd', off: 'off' },
+  motion: { label: PT ? 'Reduzir movimento' : 'Reduce motion', values: PT ? { system: 'Do sistema', reduce: 'Sempre' } : { system: 'System', reduce: 'Always' }, attr: 'motion', off: 'system' },
+}
+const pref = (k) => { try { const v = localStorage.getItem('termometro.' + k); return v in PREFS[k].values ? v : PREFS[k].off } catch { return PREFS[k].off } }
+const applyPref = (k) => { const v = pref(k); if (v === PREFS[k].off) delete document.documentElement.dataset[PREFS[k].attr]; else document.documentElement.dataset[PREFS[k].attr] = v }
+Object.keys(PREFS).forEach(applyPref)
+const prefsPanel = () => `<div class="prefs" id="prefs" role="dialog" aria-label="${PT ? 'Aparência' : 'Appearance'}">${Object.entries(PREFS).map(([k, p]) =>
+  `<div class="pref"><div class="meta">${p.label}${p.hint ? ` <span class="faint">· ${p.hint}</span>` : ''}</div><div class="seg" role="group" aria-label="${p.label}">${Object.entries(p.values).map(([v, t]) =>
+    `<button data-pref="${k}" data-value="${v}" aria-pressed="${pref(k) === v}">${t}</button>`).join('')}</div></div>`).join('')}</div>`
+document.addEventListener('click', (e) => {
+  const open = e.target.closest?.('#prefs-open'), b = e.target.closest?.('[data-pref]'), panel = $('#prefs')
+  if (open) {
+    if (panel) panel.remove()
+    else { // under the button, always inside the screen
+      open.insertAdjacentHTML('afterend', prefsPanel())
+      const box = $('#prefs'), r = open.getBoundingClientRect(), w = box.offsetWidth
+      box.style.top = r.bottom + 6 + 'px'; box.style.left = Math.max(16, Math.min(r.left, innerWidth - w - 16)) + 'px'
+      box.querySelector('button[aria-pressed="true"]')?.focus()
+    }
+    open.setAttribute('aria-expanded', String(!panel)); return
+  }
+  if (b) {
+    try { localStorage.setItem('termometro.' + b.dataset.pref, b.dataset.value) } catch {}
+    applyPref(b.dataset.pref)
+    b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    return
+  }
+  if (panel && !e.target.closest('#prefs')) { panel.remove(); $('#prefs-open')?.setAttribute('aria-expanded', 'false') }
 })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#prefs')) { $('#prefs').remove(); $('#prefs-open')?.focus() } })
 const L = PT ? {
   signinTitle: 'Entre para ver seus projetos', google: 'Entrar com Google', password: 'Senha', enter: 'Entrar', or: 'ou',
   errors: { not_allowed: 'Este e-mail não tem acesso. Peça a quem cuida desta instalação.', google: 'O Google não confirmou o login. Tente de novo.',
@@ -743,8 +808,7 @@ function shell() {
         <label class="field"><span class="meta">${L.account}</span><select id="account"></select></label>
         <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
         <label class="field"><span class="meta">${L.feature}</span><select id="feature"></select></label>
-        <label class="field"><span class="meta">${PT ? 'Cores' : 'Colours'}</span><select id="palette">${Object.entries(PALETTES).map(([k, v]) =>
-          `<option value="${k}" ${k === palette() ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <span class="prefs-wrap"><button id="prefs-open" aria-expanded="false" aria-controls="prefs">${PT ? 'Aparência' : 'Appearance'}</button></span>
         <span id="mark-chip"></span>
         <span id="user-chip"></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
@@ -1052,7 +1116,7 @@ for (const [on, off] of [['pointerover', 'pointerout'], ['focusin', 'focusout']]
   document.addEventListener(on, (e) => { const el = e.target.closest?.('[data-tip]'); if (el) showTip(el) })
   document.addEventListener(off, (e) => { if (e.target.closest?.('[data-tip]')) tip.hidden = true })
 }
-addEventListener('scroll', () => { tip.hidden = true }, { passive: true })
+addEventListener('scroll', () => { tip.hidden = true; $('#prefs')?.remove(); $('#prefs-open')?.setAttribute('aria-expanded', 'false') }, { passive: true })
 
 // Frustration ----------------------------------------------------------------------------------------------
 async function frustration() {
