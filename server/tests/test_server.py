@@ -400,6 +400,47 @@ class Server(unittest.TestCase):
         self.assertEqual(down["moves"], {"users_day": "down", "sessions_day": "down"})
         self.assertEqual([d["what"] for d in down["drops"]], ["users_day"])  # the alerts keep their own rule
 
+    def test_accounts_say_how_much_they_suffer_now_and_before(self):
+        page, rage = {"type": "page", "route": "/cart"}, {"type": "rage", "route": "/cart", "target": "button#pay"}
+        fail = {"type": "http_5xx", "route": "/cart", "target": "button#pay", "detail": "POST /api/pay 500"}
+        self.send([page], session="first")
+        self.age(1)
+        self.send([page] * 10 + [rage], account="a1", user="u1", session="b1")  # before: calm, no failure
+        self.age(1.5)
+        self.send([page, page, rage, fail, fail], account="a1", user="u1", session="n1")  # now: suffering
+        [a1] = [a for a in self.read("/api/engagement?project=shop&days=1")["accounts"] if a["account"] == "a1"]
+        self.assertEqual((a1["now"]["score"], a1["now"]["failures"]), (100, 2))
+        self.assertEqual((a1["before"]["score"], a1["before"]["failures"]), (6, 0))
+
+    def test_usage_people_product_and_features_carry_the_period_before(self):
+        page = {"type": "page", "route": "/cart"}
+        click = {"type": "click", "route": "/cart", "target": "button#pay"}
+        self.send([{"type": "page", "route": "/home"}], session="first")
+        self.age(1)
+        for i in range(4):  # before: four sessions on the cart, one of them paying
+            self.send([page] + ([click] if not i else []), session=f"b{i}", user=f"u{i}", role="agent")
+        self.age(1.5)
+        for i in range(2):  # now: two sessions on the cart, both paying; one more only at home
+            self.send([page, click], session=f"n{i}", user=f"u{i}", role="agent")
+        self.send([{"type": "page", "route": "/home"}], session="n9", user="u9", role="agent")
+        u = self.read("/api/usage?project=shop&days=1")
+        cart = next(x for x in u["screens"] if x["route"] == "/cart")
+        self.assertTrue(u["comparable"])
+        self.assertEqual((cart["visits"], cart["before"]["visits"], cart["before"]["clicks"]), (2, 4, 1))
+        el = self.read("/api/usage?project=shop&days=1&route=/cart")
+        self.assertEqual((el["visits_before"], el["elements"][0]["before"]), (4, 1))
+        [role] = self.read("/api/people?project=shop&days=1")["roles"]
+        self.assertEqual((role["visits"], role["before"]["visits"]), (3, 4))
+        areas = {a["area"]: a for a in self.read("/api/product?project=shop&days=1")["areas"]}
+        # everyone active used both areas would read 100% adoption; the share of the sessions tells them apart
+        self.assertEqual((areas["Cart"]["session_share"], areas["Cart"]["before"]["visits"], areas["Cart"]["before"]["session_share"]),
+                         (0.667, 4, 1.0))
+        fid = self.feature({"name": "Pagar", "rules": [{"kind": "control", "key": "/cart\tbutton#pay"}]})
+        [ft] = self.read("/api/features?project=shop&days=1")["features"]
+        self.assertEqual((ft["uses"], ft["before"], ft["session_share"]), (2, 1, 0.667))
+        self.assertEqual((ft["before_detail"]["users"], ft["before_detail"]["session_share"]), (1, 0.25))
+        self.assertTrue(fid)
+
     def test_trend_rule_is_the_drop_and_its_mirror_beyond_chance(self):
         self.assertEqual(t.move(210, 60, True), "down")
         self.assertEqual(t.move(22, 11, True), "flat")  # a small count halving is chance
@@ -769,7 +810,7 @@ class Server(unittest.TestCase):
         screens = self.read("/api/usage?project=shop")["screens"]
         self.assertEqual([(s["route"], s["visits"], s["clicks"], s["users"]) for s in screens], [("/t", 2, 3, 1), ("/c", 1, 0, 1)])
         screen = self.read("/api/usage?project=shop&route=/t")
-        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "label": ""})
+        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "label": "", "before": None})
         self.assertEqual(screen["never_clicked"], ["button#delete"])
 
     def test_clicks_and_actions_do_not_weigh(self):
@@ -786,7 +827,7 @@ class Server(unittest.TestCase):
         p = self.read("/api/people?project=shop")
         self.assertEqual({g["key"]: g["visits"] for g in p["roles"]}, {"agent": 2, "manager": 1})
         self.assertEqual(p["accounts"][0] | {"screens": None},
-                         {"key": "77", "users": 2, "sessions": 2, "visits": 3, "clicks": 1, "score": 20, "screens": None})
+                         {"key": "77", "users": 2, "sessions": 2, "visits": 3, "clicks": 1, "score": 20, "screens": None, "before": None})
         u1 = next(g for g in p["users"] if g["key"] == "u1")
         self.assertEqual((u1["role"], u1["account"], u1["screens"]), ("agent", "77", [{"route": "/queue", "visits": 2}]))
         self.assertEqual(self.read("/api/summary?project=shop&role=agent")["overall"]["visits"], 2)

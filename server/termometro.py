@@ -643,7 +643,16 @@ def usage(con, f: Filter) -> dict:
             FROM events WHERE {f.sql} GROUP BY route""", f.args).fetchall()
         screens = [{"route": r, "visits": v, "clicks": c, "sessions": s, "users": u, "score": score(p, v)}
                    for r, v, c, s, u, p in rows if v]
-        return {"screens": sorted(screens, key=lambda s: -s["visits"])}
+        # The same screens in the period before (same length), when it has enough data: what rose and what fell.
+        prev = Filter(f.q, before=True)
+        before = {}
+        if comparable(con, f, prev):
+            before = {r: {"visits": v, "clicks": c, "users": u, "score": score(p, v)} for r, v, c, u, p in con.execute(f"""
+                SELECT route, SUM(type = 'page'), SUM(type = 'click'), COUNT(DISTINCT NULLIF(user_id, '')), COALESCE(SUM({WEIGHT_CASE}), 0)
+                FROM events WHERE {prev.sql} GROUP BY route""", prev.args) if v}
+        for x in screens:
+            x["before"] = before.get(x["route"], {"visits": 0, "clicks": 0, "users": 0, "score": None}) if before else None
+        return {"screens": sorted(screens, key=lambda s: -s["visits"]), "comparable": bool(before)}
     rows = con.execute(f"""
         SELECT target, SUM(type = 'click'), COUNT(DISTINCT NULLIF(user_id, '')), SUM(type = 'rage'), SUM(type = 'dead'),
                SUM(type IN ('js_error', 'http_5xx', 'http_4xx'))
@@ -651,6 +660,14 @@ def usage(con, f: Filter) -> dict:
         GROUP BY target""", f.args).fetchall()
     elements = {t: {"target": t, "clicks": c, "users": u, "rage": r, "dead": d, "errors": e} for t, c, u, r, d, e in rows}
     visits = con.execute(f"SELECT COUNT(*) FROM events WHERE {f.sql} AND type = 'page'", f.args).fetchone()[0]
+    prev = Filter(f.q, before=True)
+    visits_before = None
+    if comparable(con, f, prev):  # each element's clicks before, and the screen's visits: clicks per visit is what compares
+        visits_before = con.execute(f"SELECT COUNT(*) FROM events WHERE {prev.sql} AND type = 'page'", prev.args).fetchone()[0]
+        clicks_before = dict(con.execute(f"""SELECT target, COUNT(*) FROM events WHERE {prev.sql} AND target != '' AND type = 'click'
+            GROUP BY target""", prev.args).fetchall())
+    for e in elements.values():
+        e["before"] = clicks_before.get(e["target"], 0) if visits_before is not None else None
     seen = [t for (t,) in con.execute("SELECT target FROM elements WHERE project = ? AND route = ?", (f.q.get("project"), route))]
     # Click routes on this screen: one element to the next within the same visit, for the map's arrows.
     steps: dict = {}
@@ -670,13 +687,24 @@ def usage(con, f: Filter) -> dict:
         e["label"] = labels.get(route + "\t" + e["target"], "")
     paths = [{"from": a, "to": b, "n": n, "from_label": labels.get(route + "\t" + a, ""), "to_label": labels.get(route + "\t" + b, "")}
              for (a, b), n in sorted(steps.items(), key=lambda kv: -kv[1])[:PATHS_MAX]]
-    return {"route": route, "visits": visits, "paths": paths,
+    return {"route": route, "visits": visits, "visits_before": visits_before, "paths": paths,
             "elements": sorted(elements.values(), key=lambda e: -e["clicks"]),
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}
 
 
 def people(con, f: Filter) -> dict:
+    prev = Filter(f.q, before=True)
+    has_before = comparable(con, f, prev)
+
+    def before_by(column: str) -> dict:
+        if not has_before:
+            return {}
+        return {k: {"visits": v, "score": score(p, v)} for k, v, p in con.execute(f"""
+            SELECT {column}, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0) FROM events
+            WHERE {prev.sql} AND {column} != '' GROUP BY {column}""", prev.args) if v}
+
     def by(column: str) -> list[dict]:
+        old = before_by(column)
         rows = con.execute(f"""
             SELECT {column}, COUNT(DISTINCT NULLIF(user_id, '')), COUNT(DISTINCT session), SUM(type = 'page'),
                    SUM(type = 'click'), COALESCE(SUM({WEIGHT_CASE}), 0)
@@ -689,7 +717,8 @@ def people(con, f: Filter) -> dict:
             if len(top.setdefault(k, [])) < 3:
                 top[k].append({"route": route, "visits": n})
         groups = [{"key": k, "users": u, "sessions": s, "visits": v, "clicks": c, "score": score(p, v),
-                   "screens": top.get(k, [])} for k, u, s, v, c, p in rows]
+                   "screens": top.get(k, []), "before": old.get(k, {"visits": 0, "score": None}) if has_before else None}
+                  for k, u, s, v, c, p in rows]
         return sorted(groups, key=lambda g: -g["visits"])
 
     users = by("user_id")
@@ -697,7 +726,7 @@ def people(con, f: Filter) -> dict:
         f"SELECT user_id, MAX(role), MAX(account) FROM events WHERE {f.sql} AND user_id != '' GROUP BY user_id", f.args)}
     for g in users:
         g["role"], g["account"] = who.get(g["key"], ("", ""))
-    return {"roles": by("role"), "accounts": by("account"), "users": users[:200]}
+    return {"roles": by("role"), "accounts": by("account"), "users": users[:200], "comparable": has_before}
 
 
 def split(pairs: list) -> dict:
@@ -998,6 +1027,11 @@ def covered_days(con, f: Filter) -> float:
     return max(0, f.until - max(f.since, first)) / 86400000
 
 
+def comparable(con, f: Filter, prev: Filter) -> bool:
+    """The period before says something when it has data on at least half as many days as now (as the summary does)."""
+    return covered_days(con, prev) >= max(1, covered_days(con, f) / 2)
+
+
 DROP = 0.6           # now at or below 60% of before is a drop...
 
 
@@ -1043,9 +1077,11 @@ def engagement(con, f: Filter) -> dict:
                       FROM events WHERE {fl.sql} AND account != '' GROUP BY account, d) GROUP BY account""", fl.args):
             out[account] = {"users_day": round(users_days / days, 1) if days else 0,
                             "sessions_day": round(sessions / days, 1) if days else 0, "users": 0, "visits": visits}
-        for account, users in con.execute(f"""SELECT account, COUNT(DISTINCT NULLIF(user_id, '')) FROM events
+        for account, users, points, fails in con.execute(f"""SELECT account, COUNT(DISTINCT NULLIF(user_id, '')),
+                COALESCE(SUM({WEIGHT_CASE}), 0), SUM(type IN {FAILURES}) FROM events
                 WHERE {fl.sql} AND account != '' GROUP BY account""", fl.args):
-            out[account]["users"] = users
+            # Is the account suffering, besides how much it uses: frustration per visit and the failures it ran into.
+            out[account].update(users=users, score=score(points, out[account]["visits"]), failures=fails)
         for ft in feats:
             sql, args = feature_sql(ft["rules"], uses_only=True)
             for account, n in con.execute(f"SELECT account, COUNT(*) FROM events WHERE {fl.sql} AND account != '' AND {sql} GROUP BY account",
@@ -1073,8 +1109,9 @@ def engagement(con, f: Filter) -> dict:
                 drops.append({"what": "feature", "feature": ft["id"], "name": ft["name"], "before": m, "now": n})
         all_moves = list(moves.values()) + [x["move"] for x in feats_row]
         trend = None if not comparable else "down" if "down" in all_moves else "up" if "up" in all_moves else "flat"
-        rows.append({"account": account, "now": {k: a.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")},
-                     "before": {k: b.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")} if comparable else None,
+        keys = ("users_day", "sessions_day", "users", "visits", "score", "failures")
+        rows.append({"account": account, "now": {k: a.get(k, 0) for k in keys},
+                     "before": {k: b.get(k, 0) for k in keys} if comparable else None,
                      "features": feats_row, "drops": drops, "moves": moves, "trend": trend})
     # The ones falling first (the biggest drops ahead), then the steady, then the rising.
     rows.sort(key=lambda r: (TREND_ORDER[r["trend"]], -len(r["drops"]), -r["now"]["visits"]))
@@ -1108,22 +1145,33 @@ def features_report(con, f: Filter) -> dict:
     the share of the people active in the product), its uses per day, how much it frustrates and fails."""
     project = f.q.get("project", "")
     prev = Filter(f.q, before=True)
-    active = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql}", f.args).fetchone()[0]
+    active, sessions = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')), COUNT(DISTINCT session) FROM events WHERE {f.sql}",
+                                   f.args).fetchone()
+    sessions_before = con.execute(f"SELECT COUNT(DISTINCT session) FROM events WHERE {prev.sql}", prev.args).fetchone()[0]
     out = []
     for ft in FEATURES.get(project, {}).values():
         uses_sql, uses_args = feature_sql(ft["rules"], uses_only=True)
         scope_sql, scope_args = feature_sql(ft["rules"])
-        n, users, accounts, first_at, first_version = con.execute(f"""SELECT COUNT(*), COUNT(DISTINCT NULLIF(user_id, '')),
-            COUNT(DISTINCT NULLIF(account, '')), MIN(at), version FROM events WHERE {f.sql} AND {uses_sql}""", f.args + uses_args).fetchone()
-        before = con.execute(f"SELECT COUNT(*) FROM events WHERE {prev.sql} AND {uses_sql}", prev.args + uses_args).fetchone()[0]
+        n, users, accounts, used_in, first_at, first_version = con.execute(f"""SELECT COUNT(*), COUNT(DISTINCT NULLIF(user_id, '')),
+            COUNT(DISTINCT NULLIF(account, '')), COUNT(DISTINCT session), MIN(at), version FROM events WHERE {f.sql} AND {uses_sql}""",
+            f.args + uses_args).fetchone()
+        before, users_before, used_before = con.execute(f"""SELECT COUNT(*), COUNT(DISTINCT NULLIF(user_id, '')), COUNT(DISTINCT session)
+            FROM events WHERE {prev.sql} AND {uses_sql}""", prev.args + uses_args).fetchone()
         points, fails = con.execute(f"""SELECT COALESCE(SUM({WEIGHT_CASE}), 0), COALESCE(SUM(type IN {FAILURES}), 0) FROM events
             WHERE {f.sql} AND {scope_sql}""", f.args + scope_args).fetchone()
+        points_b, fails_b = con.execute(f"""SELECT COALESCE(SUM({WEIGHT_CASE}), 0), COALESCE(SUM(type IN {FAILURES}), 0) FROM events
+            WHERE {prev.sql} AND {scope_sql}""", prev.args + scope_args).fetchone()
         daily_uses = [{"day": d, "n": c} for d, c in con.execute(f"""SELECT date(at / 1000, 'unixepoch') d, COUNT(*) FROM events
             WHERE {f.sql} AND {uses_sql} GROUP BY d ORDER BY d""", f.args + uses_args)]
         out.append({**ft, "uses": n, "before": before, "users": users, "accounts": accounts,
                     "adoption": round(users / active, 2) if active else 0, "score": score(points, n), "failures": fails,
+                    # Adoption among people reaches 100% fast in a product used every day; the share of the sessions
+                    # that used it keeps telling features apart.
+                    "session_share": round(used_in / sessions, 3) if sessions else 0,
+                    "before_detail": {"users": users_before, "score": score(points_b, before), "failures": fails_b,
+                                      "session_share": round(used_before / sessions_before, 3) if sessions_before else 0} if before else None,
                     "daily": daily_uses})
-    return {"days": f.days, "active_users": active, "features": out}
+    return {"days": f.days, "active_users": active, "sessions": sessions, "features": out}
 
 
 def area_of(route: str, n: dict) -> str:
@@ -1145,6 +1193,19 @@ def product(con, f: Filter) -> dict:
     project = f.q.get("project", "")
     n = names(con, project)
     active = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql}", f.args).fetchone()[0]
+    prev = Filter(f.q, before=True)
+    has_before = comparable(con, f, prev)
+
+    def sessions_of(fl, keys=None):
+        extra, args = (f" AND route IN ({','.join('?' * len(keys))})", keys) if keys is not None else ("", [])
+        return con.execute(f"SELECT COUNT(DISTINCT session) FROM events WHERE {fl.sql} AND type = 'page'{extra}", fl.args + args).fetchone()[0]
+    all_sessions, all_before = sessions_of(f), sessions_of(prev) if has_before else 0
+    old: dict[str, dict] = {}
+    if has_before:
+        for route, visits, points, fails in con.execute(f"""SELECT route, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0),
+                SUM(type IN {FAILURES}) FROM events WHERE {prev.sql} GROUP BY route""", prev.args):
+            o = old.setdefault(area_of(route, n), {"visits": 0, "points": 0, "failures": 0, "routes": []})
+            o["visits"] += visits; o["points"] += points; o["failures"] += fails; o["routes"].append(route)
     total = 0
     routes = {}
     for route, visits, sessions, points, fails in con.execute(f"""SELECT route, SUM(type = 'page'),
@@ -1169,10 +1230,18 @@ def product(con, f: Filter) -> dict:
         daily_v = [{"day": d, "n": v} for d, v in con.execute(f"""SELECT date(at / 1000, 'unixepoch') d, SUM(type = 'page') FROM events
             WHERE {f.sql} AND route IN ({marks}) GROUP BY d ORDER BY d""", f.args + keys)]
         a["screens"].sort(key=lambda r: -r["visits"])
+        o = old.get(a["area"])
         out_areas.append({"area": a["area"], "screens": [{k: r[k] for k in ("route", "visits", "score", "failures")} for r in a["screens"]],
                           "visits": a["visits"], "share": round(a["visits"] / total, 3) if total else 0, "users": users,
                           "adoption": round(users / active, 2) if active else 0, "score": score(a["points"], a["visits"]),
-                          "failures": a["failures"], "daily": daily_v})
+                          # Adoption among people is 100% in every area of a product used all day; the share of the
+                          # sessions that went through the area keeps them apart.
+                          "session_share": round(sessions_of(f, keys) / all_sessions, 3) if all_sessions else 0,
+                          "failures": a["failures"], "daily": daily_v,
+                          "before": None if not has_before else {
+                              "visits": o["visits"], "score": score(o["points"], o["visits"]) if o["visits"] else None, "failures": o["failures"],
+                              "session_share": round(sessions_of(prev, o["routes"]) / all_before, 3) if all_before else 0}
+                          if o else {"visits": 0, "score": None, "failures": 0, "session_share": 0}})
     out_areas.sort(key=lambda a: -a["visits"])
 
     # Per element: the sessions that saw its screen while it existed, and the ones that clicked it.
@@ -1196,7 +1265,7 @@ def product(con, f: Filter) -> dict:
             low.append({"route": route, "target": target, "sessions": seen, "clicked": c, "share": round(c / seen, 3)})
     low.sort(key=lambda x: -x["sessions"])
     new.sort(key=lambda x: -x["first_seen"])
-    return {"days": f.days, "active_users": active, "areas": out_areas, "low_use": low[:200], "new": new[:100]}
+    return {"days": f.days, "active_users": active, "comparable": has_before, "areas": out_areas, "low_use": low[:200], "new": new[:100]}
 
 
 FIELD_TAGS = ("input", "textarea", "select")

@@ -452,6 +452,23 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .arrived .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
 .widened { margin-top: 8px; color: var(--fg2); font-weight: 500; }
 #marks-open:empty::before { content: '…'; }
+/* Accounts' health, deltas on Uso/Produto/Pessoas/Features (usability sprint 2). */
+.acc-cell { display: grid; min-width: 13em; max-width: 18em; }
+.table:has(td.act) { border-radius: 0 0 13px 13px; } .acc-cell .acc-name { min-width: 0; max-width: none; }
+.acc-cell code.tech { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+th.act, td.act { position: sticky; right: 0; width: 1%; padding-left: 8px; padding-right: 8px; background: var(--surface); box-shadow: -1px 0 0 var(--line); }
+tbody tr.row:hover td.act { background: var(--sunken); }
+button.icon { width: 32px; height: 32px; padding: 0; color: var(--fg2); }
+button.icon svg { width: 16px; height: 16px; } button.icon .ok-i, button.icon.done .copy-i { display: none; } button.icon.done .ok-i { display: block; color: var(--ok); }
+.chips .sep { align-self: center; margin-left: 8px; font-size: 12px; color: var(--faint); }
+.pain { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 8px; }
+.pain .counts li { align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); } .pain .counts li:first-child { border-top: 0; }
+.pain .counts li > span:first-child { min-width: 0; } .pain .counts li > span:last-child { flex: none; text-align: right; }
+.pain .why { display: block; margin-top: 2px; }
+.pain code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pointer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.pointer .button { height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); }
+td.n .delta { display: inline-block; }
 </style>
 </head>
 <body>
@@ -468,7 +485,7 @@ const HELP_PT = {
   whereIrritates: ['O que é', 'Os botões e elementos desta tela com sinais de irritação, do que mais acontece para o que menos: rage click (vários cliques seguidos), clique sem resposta e falhas logo depois do clique. "Por quê" diz o que veio depois do rage click: esperando resposta, deu erro, nada aconteceu ou não era clicável.', 'Elemento sem nome no dicionário aparece pelo tipo (ícone, botão…), com o seletor embaixo. Dê um nome a ele no Dicionário.'],
   failureDays: ['O que é', 'Quantas vezes a falha aconteceu em cada dia do período. O risco marca o dia em que ela apareceu pela primeira vez.', 'Subida depois de um dia tranquilo costuma vir de um deploy: compare com a primeira versão em que apareceu.'],
   screensByUse: ['O que é', 'As telas pela quantidade de visitas, com cliques, pessoas e frustração.', 'Tela muito visitada e com frustração alta é onde uma melhoria rende mais.'],
-  elements: ['O que é', 'Os botões e links da tela, com cliques, pessoas e problemas (rage, clique sem resposta e falhas logo depois do clique).', 'Muitos problemas num elemento muito usado é prioridade. O mapa de calor mostra onde ele fica na tela.'],
+  elements: ['O que é', 'Os botões e links da tela, com cliques, pessoas e problemas (rage, clique sem resposta e falhas logo depois do clique) A variação dos cliques é por visita: o "antes" é ajustado ao número de visitas de agora.', 'Muitos problemas num elemento muito usado é prioridade. O mapa de calor mostra onde ele fica na tela.'],
   never: ['O que é', 'Elementos que apareceram na tela e ninguém clicou no período.', 'Candidatos a sair, mudar de lugar ou ser explicados. Confira antes se não são de uso raro por natureza, como excluir conta.'],
   reach: ['O que é', 'Quantos cliques e telas as pessoas percorrem, desde a última gravação, até usar cada botão ou ação.', 'Muito usado e longe é candidato a atalho: traga para perto de onde as pessoas já estão.'],
   pairs: ['O que é', 'Ações que costumam vir uma logo depois da outra, e o esforço entre elas.', 'Par marcado como "juntas" e com muitos cliques no meio sugere juntar as duas numa tela ou num passo só.'],
@@ -481,17 +498,18 @@ const HELP_PT = {
   follow: ['O que é', 'O que você decidiu corrigir. Ao clicar em Acompanhar, o valor de hoje vira a linha de base: a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da conta. Depois, o mesmo número é medido só com o que veio desde então, com os filtros em uso.', 'Melhorou ou piorou só quando a mudança passa da tolerância (5 pontos de frustração, ou 20% nas outras medidas); dentro dela é Igual. Sem dados ainda: ninguém passou por ali desde que começou.'],
   todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
-  adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
+  adoption: ['O que é', 'A parte das sessões do período em que a feature foi usada ao menos uma vez. Abaixo, quantas das pessoas ativas usaram. A adoção por pessoa chega a 100% rápido num produto de uso diário e deixa de separar uma feature da outra; a parte das sessões continua separando.', 'Presente em poucas sessões e usada por muita gente: é de uso esporádico. Em poucas sessões e por pouca gente: pede divulgação ou revisão.'],
   featureScore: ['O que é', 'A frustração da feature: sinais nas telas e botões dela, divididos pelos usos.', 'Feature importante com frustração alta é a melhor candidata a revisão de experiência.'],
   byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
-  accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. A Tendência diz "Caiu" quando um desses números ficou em 60% ou menos do que era e além da oscilação normal; "Subiu" é o espelho (o de antes era 60% ou menos do atual, além da oscilação) sem nada caindo; o resto é "Estável". A variação aparece em %; passe o mouse para ver o número de antes.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
+  accountPain: ['O que é', 'As telas com mais frustração e as falhas que mais atingiram esta conta no período, só com o uso dela. Os links abrem a aba já filtrada pela conta.', 'Leve isto para a conversa com o cliente e para o time: o que dói nesta conta, com a evidência a um clique.'],
+  accounts: ['O que é', 'Para cada conta: frustração (de 0 a 100, pontos dos sinais por visita), falhas que ela encontrou, pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Pior primeiro" soma 25 pontos por número que caiu, a frustração, o quanto ela subiu e as falhas a cada 100 visitas. A Tendência diz "Caiu" quando um desses números ficou em 60% ou menos do que era e além da oscilação normal; "Subiu" é o espelho (o de antes era 60% ou menos do atual, além da oscilação) sem nada caindo; o resto é "Estável". A variação aparece em %; passe o mouse para ver o número de antes.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
   kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
   map: ['O que é', 'O mapa abre o próprio app numa aba nova, com o uso desenhado por cima da tela real: no Calor, cada elemento pintado pelo quanto é clicado (tracejado é o que ninguém clica); nas Rotas, setas de um clique para o próximo, mais grossas e quentes nas mais feitas. O link vale por uma hora.', 'Rotas que vão e voltam entre os mesmos dois pontos, ou que atravessam a tela de ponta a ponta, sugerem aproximar os elementos ou mudar a ordem.'],
   detours: ['O que é', 'Tarefas começadas numa tela (clicou ou digitou, sem salvar) em que a pessoa sai e volta para concluir: para outra tela do sistema, ou para fora do navegador. Vale para formulário, filtro, modal, configuração — qualquer coisa. Nada do que foi digitado é coletado.', 'Saída frequente para a mesma tela é informação que falta aqui: trazer, buscar ou preencher automaticamente. Saída do navegador é informação que vem de fora: integração ou importação.'],
   ways: ['O que é', 'Por quais telas as pessoas passam, desde a última coisa que salvaram, antes de usar cada botão ou ação, comparado com o normal do app. A tela inicial e os menus estão no caminho de tudo, por isso só se destaca a tela que aparece bem mais do que o normal.', 'Uma tela que aparece no caminho muito mais do que o normal, e onde a pessoa clicou por lá, é onde ela procura aquilo primeiro: um atalho ali, ou mudar o recurso de lugar.'],
   patterns: ['O que é', 'O que as pessoas fazem sempre do mesmo jeito: o campo em que clicam primeiro ao abrir uma tela, o clique que quase sempre vem depois de outro, o botão que clicam depois de digitar em vez de usar Enter, o botão que precisou de dois cliques e o clique que quase acertou um botão. Só clique de pessoa conta; nada do que é digitado sai do navegador.', 'Cada padrão é um atrito pequeno e repetido: foco automático, Enter que funciona, área de clique maior. Somados, viram minutos por dia de quem usa muito.'],
-  areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a adoção entre as pessoas ativas, a frustração e as falhas de cada uma. A área de cada tela se ajusta no Dicionário.', 'Área com muita adoção e frustração alta é onde o time mais incomoda gente. Área com pouca adoção pode ser nicho ou algo difícil de achar.'],
+  areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a parte das sessões que passaram pela área, a frustração e as falhas de cada uma, contra o período anterior. "Nas sessões" troca a adoção por pessoa: num produto de uso diário quase todo mundo passa por tudo, então 100% das pessoas não separa uma área da outra; a parte das sessões separa. A variação das falhas é por visita: o "antes" é ajustado ao número de visitas de agora. A área de cada tela se ajusta no Dicionário.', 'Área presente em muitas sessões e com frustração alta é onde o time mais incomoda gente. Área em poucas sessões pode ser nicho ou algo difícil de achar.'],
   low: ['O que é', 'Botões que muitas sessões viram e quase ninguém clicou.', 'Construído e pouco usado: candidato a sair, mudar de lugar ou ser explicado. Confira se não é de uso raro por natureza.'],
   news: ['O que é', 'O que apareceu pela primeira vez no período, e a parte das sessões que viram e usaram.', 'Novidade com uso baixo depois de alguns dias pede divulgação, ajuste ou revisão do valor.'],
   dictionary: ['O que é', 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra.', 'Dê nome primeiro aos ícones sem rótulo e às telas de detalhe: são os que aparecem crus no painel.'],
@@ -507,7 +525,7 @@ const HELP_EN = {
   whereIrritates: ['What it is', 'The buttons and elements of this screen with signs of irritation, the most frequent first: rage clicks (many clicks in a row), dead clicks and failures right after a click. "Why" says what came after the rage click: waiting for an answer, an error, nothing happened or it was not clickable.', 'An element with no name in the dictionary shows by its kind (icon, button…), the selector underneath. Name it in the Dictionary.'],
   failureDays: ['What it is', 'How many times the failure happened on each day of the period. The mark is the day it first appeared.', 'A rise after a quiet day usually comes from a deploy: compare with the first version it showed up in.'],
   screensByUse: ['What it is', 'Screens by visits, with clicks, people and frustration.', 'A much-visited screen with high frustration is where an improvement pays the most.'],
-  elements: ['What it is', 'The screen\'s buttons and links, with clicks, people and problems (rage, dead clicks and failures right after the click).', 'Many problems on a much-used element is a priority. The heat map shows where it sits on the screen.'],
+  elements: ['What it is', 'The screen\'s buttons and links, with clicks, people and problems (rage, dead clicks and failures right after the click) The clicks\' change is per visit: the "before" is scaled to today\'s visits.', 'Many problems on a much-used element is a priority. The heat map shows where it sits on the screen.'],
   never: ['What it is', 'Elements that were on screen and nobody clicked in the period.', 'Candidates to remove, move or explain. Check first they are not rare by nature, like deleting an account.'],
   reach: ['What it is', 'How many clicks and screens people go through, since the last save, to use each button or action.', 'Used a lot and far away is a shortcut candidate: bring it closer to where people already are.'],
   pairs: ['What it is', 'Actions that usually come one right after the other, and the effort between them.', 'A pair marked "together" with many clicks in between suggests merging them into one screen or step.'],
@@ -520,17 +538,18 @@ const HELP_EN = {
   follow: ['What it is', 'What you decided to fix. Clicking Follow keeps today\'s value as the baseline: the screen\'s frustration, failures per 100 sessions, the action\'s clicks per use or the account\'s people a day. Afterwards the same number is measured only on what came since, with the filters in use.', 'Improved or worse only when the change goes past the tolerance (5 frustration points, or 20% for the other measures); within it, Same. No data yet: nobody went there since it started.'],
   todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
-  adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
+  adoption: ['What it is', 'The share of the period\'s sessions in which the feature was used at least once. Below it, how many of the active people used it. Adoption per person reaches 100% fast in a product used every day and stops telling features apart; the share of the sessions keeps doing it.', 'In few sessions but used by many people: occasional use. In few sessions and by few people: it needs announcing or a second look.'],
   featureScore: ['What it is', 'The feature\'s frustration: signals on its screens and buttons, divided by its uses.', 'An important feature with high frustration is the best candidate for an experience review.'],
   byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
-  accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. The Trend says "Dropped" when one of those numbers is at 60% or less of before and beyond the usual ups and downs; "Rose" is the mirror (before was 60% or less of now, beyond the ups and downs) with nothing dropping; the rest is "Steady". The change shows as a %; hover it to see the number before.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
+  accountPain: ['What it is', 'The screens with the most frustration and the failures that hit this account the most in the period, from its use only. The links open the tab already narrowed to the account.', 'Take this to the talk with the customer and to the team: what hurts in this account, with the evidence a click away.'],
+  accounts: ['What it is', 'Per account: frustration (0 to 100, signal points per visit), the failures it ran into, people and sessions a day and the use of watched features, against the period before. "Worst first" adds 25 points per number that dropped, the frustration, how much it rose and the failures per 100 visits. The Trend says "Dropped" when one of those numbers is at 60% or less of before and beyond the usual ups and downs; "Rose" is the mirror (before was 60% or less of now, beyond the ups and downs) with nothing dropping; the rest is "Steady". The change shows as a %; hover it to see the number before.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
   kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
   map: ['What it is', 'The map opens the app itself in a new tab, with use drawn over the real screen: Heat paints each element by how much it is clicked (dashed is what nobody clicks); Routes draws arrows from one click to the next, thicker and hotter the more taken. The link lasts an hour.', 'Routes going back and forth between the same two points, or crossing the screen end to end, suggest bringing the elements closer or changing their order.'],
   detours: ['What it is', 'Tasks started on a screen (clicked or typed, not saved) that people leave and come back to finish: for another screen of the system, or outside the browser. Forms, filters, dialogs, settings — anything. Nothing typed is collected.', 'A frequent trip to the same screen is information missing here: bring it, search it or fill it in. Leaving the browser is information from outside: integration or import.'],
   ways: ['What it is', 'Which screens people go through, since the last thing they saved, before using each button or action, against the app\'s usual. Home and menus are on the way to everything, so only a screen that shows up far more than usual stands out.', 'A screen that is on the way far more than usual, where people clicked around, is where they look for that thing first: a shortcut there, or moving the feature.'],
   patterns: ['What it is', 'What people always do the same way: the field they click first on opening a screen, the click that nearly always follows another, the button they click after typing instead of pressing Enter, the button that needed two clicks and the click that nearly hit a button. Only a person\'s clicks count; nothing typed leaves the browser.', 'Each pattern is a small, repeated friction: auto focus, Enter that works, a bigger click area. Added up, they are minutes a day for heavy users.'],
-  areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, adoption among the people active, frustration and failures. Each screen\'s area is set in the Dictionary.', 'An area with wide adoption and high frustration is where the product bothers the most people. Low adoption may be a niche or something hard to find.'],
+  areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, share of the sessions that went through it, frustration and failures, against the period before. "In sessions" replaces adoption per person: in a product used every day almost everyone goes everywhere, so 100% of the people tells no area apart; the share of the sessions does. The failures\' change is per visit: the "before" is scaled to today\'s visits. Each screen\'s area is set in the Dictionary.', 'An area present in many sessions with high frustration is where the product bothers the most people. One in few sessions may be a niche or something hard to find.'],
   low: ['What it is', 'Buttons many sessions saw and almost nobody clicked.', 'Built and little used: a candidate to remove, move or explain. Check it is not rare by nature.'],
   news: ['What it is', 'What showed up for the first time in the period, and the share of the sessions that saw it and used it.', 'Something new still little used after a few days needs announcing, adjusting or a second look at its value.'],
   dictionary: ['What it is', 'The name people use for each screen, button, action and account. Empty uses the name the app shows.', 'Name first the icons without a label and the detail screens: they are the ones shown raw on the dashboard.'],
@@ -662,7 +681,8 @@ const L = PT ? {
   prod: { areas: 'Áreas do produto', areasHint: 'Telas agrupadas por área. Clique numa área para ver as telas dela.', area: 'Área', screens: 'Telas', share: 'das visitas',
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
     seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
-    nScreens: (n) => plural(n, 'tela', 'telas'), since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
+    nScreens: (n) => plural(n, 'tela', 'telas'), since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…',
+    inSessions: 'Nas sessões', nPeople: (n) => plural(n, 'pessoa', 'pessoas'), watch: 'Vigiar', watchTip: 'Criar uma feature vigiada com este botão' },
   cat: { title: 'Frustração por tipo', hint: 'O que está pesando: cada tipo é uma parte da frustração. O esforço fica à parte.', all: 'Todos os tipos',
     names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
@@ -721,13 +741,19 @@ const L = PT ? {
     kinds: { screen: 'Tela', control: 'Botão', action: 'Ação', track: 'Evento do app' }, pick: 'escolha…', trackPh: 'nome passado a termometro.track()', add: 'Adicionar',
     save: 'Salvar feature', cancel: 'Cancelar', needs: 'Dê um nome e adicione pelo menos uma parte.', duplicate: 'Já existe uma feature com esse nome.', usesByDay: 'Usos por dia', byAccount: 'Por conta',
     byAccountHint: 'Usos da feature em cada conta, agora contra o período anterior.', back: 'Todas as features', before: (b) => `antes: ${b}`, failures: 'Falhas', score: 'Frustração',
-    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'uso', 'usos')}` },
+    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'uso', 'usos')}`, inSessions: 'Nas sessões', sessionsOf: (p) => `das sessões do período`,
+    peopleOf: (u, n) => `${num(u)} de ${num(n)} pessoas ativas` },
   acc: { title: 'Engajamento por conta', hint: (d) => `Pessoas e sessões por dia (média dos ${d} dias com dados) e o uso das features vigiadas, agora contra o período anterior. Quem caiu aparece primeiro.`,
     trendCol: 'Tendência', trend: { down: 'Caiu', flat: 'Estável', up: 'Subiu' }, onlyDown: (n) => `Só quem caiu (${n})`, noneDown: 'Nenhuma conta caiu neste período.',
     copySummary: 'Copiar resumo', fromZero: 'novo', fellFeatures: 'Features vigiadas que caíram', period: (d) => `últimos ${d} dias contra os ${d} anteriores`,
     noCompare: 'Ainda não há período anterior com dados para comparar.', account: 'Conta', usersDay: 'Pessoas/dia', sessionsDay: 'Sessões/dia', people: 'Pessoas no período', fell: 'caiu',
     none: 'Nenhuma conta com id neste período.', noFeatures: 'Vigie features na aba Features para ver o uso delas por conta.', pulse: 'Pessoas por dia',
-    open: 'Clique numa conta para ver o pulso dela; o painel inteiro passa a mostrar só ela.', back: 'Todas as contas', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'pessoa', 'pessoas')}`, featureUses: 'Uso das features' },
+    open: 'Clique numa conta para ver o pulso dela; o painel inteiro passa a mostrar só ela.', back: 'Todas as contas', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'pessoa', 'pessoas')}`, featureUses: 'Uso das features',
+    score: 'Frustração', failures: 'Falhas', sort: 'Ordenar', byTrend: 'Tendência', worst: 'Pior primeiro', copyOf: (n) => `Copiar resumo de ${n}`,
+    pain: 'O que está irritando esta conta', painHint: 'Só com o uso desta conta. Os links abrem a aba já filtrada por ela.', painScreens: 'Telas com mais frustração',
+    painFailures: 'Falhas que mais atingiram', noPain: 'Nada irritou esta conta neste período.', noFail: 'Nenhuma falha nesta conta neste período.',
+    sessionsN: (n) => plural(n, 'sessão', 'sessões'), hot: (what, n) => `${what}: ${num(n)}×`,
+    inAccounts: 'O uso por conta, com tendência, frustração e falhas, fica na aba Contas.', openAccounts: 'Abrir Contas' },
   dict: { title: 'Dicionário', hint: 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra. O nome de uma conta fica só neste servidor.',
     filter: 'Filtrar por nome ou chave…', screens: 'Telas', controls: 'Botões e elementos', actions: 'Ações (gravações)', accounts: 'Contas',
     key: 'Chave técnica', auto: 'Nome no app', name: 'Nome', used: 'Uso', users: 'Usuários', placeholder: 'dar nome…', accountPlaceholder: 'ex.: Contrato Acme Saúde',
@@ -874,7 +900,8 @@ const L = PT ? {
   prod: { areas: 'Product areas', areasHint: 'Screens grouped by area. Click an area to see its screens.', area: 'Area', screens: 'Screens', share: 'of the visits',
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
     seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
-    nScreens: (n) => plural(n, 'screen', 'screens'), since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
+    nScreens: (n) => plural(n, 'screen', 'screens'), since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…',
+    inSessions: 'In sessions', nPeople: (n) => plural(n, 'person', 'people'), watch: 'Watch', watchTip: 'Create a watched feature with this button' },
   cat: { title: 'Frustration by kind', hint: 'What is weighing: each kind is a part of the frustration. Effort stays apart.', all: 'All kinds',
     names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
@@ -933,13 +960,19 @@ const L = PT ? {
     kinds: { screen: 'Screen', control: 'Button', action: 'Action', track: 'App event' }, pick: 'pick…', trackPh: 'name given to termometro.track()', add: 'Add',
     save: 'Save feature', cancel: 'Cancel', needs: 'Give it a name and add at least one part.', duplicate: 'There is already a feature with this name.', usesByDay: 'Uses per day', byAccount: 'By account',
     byAccountHint: 'The feature\'s uses in each account, now against the period before.', back: 'All features', before: (b) => `before: ${b}`, failures: 'Failures', score: 'Frustration',
-    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'use', 'uses')}` },
+    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'use', 'uses')}`, inSessions: 'In sessions', sessionsOf: (p) => `of the period\'s sessions`,
+    peopleOf: (u, n) => `${num(u)} of ${num(n)} active people` },
   acc: { title: 'Engagement by account', hint: (d) => `People and sessions a day (average of the ${d} days with data) and the use of the watched features, now against the period before. Who dropped comes first.`,
     trendCol: 'Trend', trend: { down: 'Dropped', flat: 'Steady', up: 'Rose' }, onlyDown: (n) => `Only who dropped (${n})`, noneDown: 'No account dropped in this period.',
     copySummary: 'Copy summary', fromZero: 'new', fellFeatures: 'Watched features that dropped', period: (d) => `last ${d} days against the ${d} before`,
     noCompare: 'No previous period with data to compare with yet.', account: 'Account', usersDay: 'People/day', sessionsDay: 'Sessions/day', people: 'People in the period', fell: 'dropped',
     none: 'No account with an id in this period.', noFeatures: 'Watch features on the Features tab to see their use per account.', pulse: 'People per day',
-    open: 'Click an account to see its pulse; the whole dashboard then shows only it.', back: 'All accounts', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'person', 'people')}`, featureUses: 'Use of the features' },
+    open: 'Click an account to see its pulse; the whole dashboard then shows only it.', back: 'All accounts', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'person', 'people')}`, featureUses: 'Use of the features',
+    score: 'Frustration', failures: 'Failures', sort: 'Sort', byTrend: 'Trend', worst: 'Worst first', copyOf: (n) => `Copy summary of ${n}`,
+    pain: 'What is bothering this account', painHint: 'From this account\'s use only. The links open the tab already narrowed to it.', painScreens: 'Screens with the most frustration',
+    painFailures: 'Failures that hit it the most', noPain: 'Nothing bothered this account in this period.', noFail: 'No failure in this account in this period.',
+    sessionsN: (n) => plural(n, 'session', 'sessions'), hot: (what, n) => `${what}: ${num(n)}×`,
+    inAccounts: 'Use per account, with trend, frustration and failures, is on the Accounts tab.', openAccounts: 'Open Accounts' },
   dict: { title: 'Dictionary', hint: 'The name people use for each screen, control, action and account. Empty uses the name the app shows. An account\'s name stays on this server.',
     filter: 'Filter by name or key…', screens: 'Screens', controls: 'Buttons and elements', actions: 'Actions (writes)', accounts: 'Accounts',
     key: 'Technical key', auto: 'Name in the app', name: 'Name', used: 'Use', users: 'Users', placeholder: 'give it a name…', accountPlaceholder: 'e.g. Acme Health contract',
@@ -1200,7 +1233,7 @@ function shell() {
     if (e.target.closest('[data-feat="no-account"]')) { $('#account').value = ''; keep('account', ''); return render() }
     const c = e.target.closest('[data-cat]')
     if (c) { state.cat = c.dataset.cat; return render() }
-    if (state.tab === 'features' || state.tab === 'accounts') onFeatureClick(e)
+    if (state.tab === 'features' || state.tab === 'accounts' || state.tab === 'product') onFeatureClick(e)
   })
   $('#content').addEventListener('input', (e) => {
     if (e.target.id === 'dict-filter') { state.dictFilter = e.target.value; $('#dict-body').innerHTML = dictBody(); paginate($('#dict-body')) }
@@ -2052,7 +2085,10 @@ function addCsvButtons() {
     const b = Object.assign(document.createElement('button'), { className: 'small csv', textContent: L.csv, title: L.csvTip })
     b.addEventListener('click', () => {
       const cell = (c) => `"${c.textContent.replace(/\s+/g, ' ').trim().replace(/"/g, '""')}"`
-      const rows = [...t.querySelectorAll('tr')].filter((r) => !r.hidden && !r.classList.contains('detail')).map((r) => [...r.children].map(cell).join(','))
+      // Action columns (copy, watch…) are not data: a header or cell marked data-nocsv stays out, the whole column with it.
+      const skip = new Set([...(t.tHead?.rows[0]?.cells ?? [])].flatMap((c, j) => c.hasAttribute('data-nocsv') ? [j] : []))
+      const rows = [...t.querySelectorAll('tr')].filter((r) => !r.hidden && !r.classList.contains('detail'))
+        .map((r) => [...r.children].filter((c, j) => !skip.has(j) && !c.hasAttribute('data-nocsv')).map(cell).join(','))
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' })),
         download: `termometro-${state.tab}-${i + 1}.csv` })
       a.click(); URL.revokeObjectURL(a.href)
@@ -2204,14 +2240,15 @@ async function usage() {
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
             <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--fill)"></i></div></td>
-            <td class="n">${num(s.visits)}</td><td class="n">${num(s.clicks)}</td><td class="n">${num(s.users)}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
+            <td class="n">${num(s.visits)}${countDelta(s.visits, s.before?.visits)}</td><td class="n">${num(s.clicks)}${countDelta(s.clicks, s.before?.clicks)}</td>
+            <td class="n">${num(s.users)}${countDelta(s.users, s.before?.users)}</td><td class="n">${scoreHtml(s.score)}${scoreDelta(s.score, s.before?.score)}</td></tr>`).join(''))}
       </div>
       <div class="card">
-        <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}${help('elements')}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
+        <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}${help('elements')}</div><div class="meta">${L.visitsN(d.visits)}${countDelta(d.visits, d.visits_before)}</div></div>
           ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
         ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
           <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><span class="named">${named(controlLabel(d.route, e.target), e.target)}</span></td>
-            <td class="n">${num(e.clicks)}</td><td class="n">${num(e.users)}</td>
+            <td class="n">${num(e.clicks)}${d.visits_before ? countDelta(e.clicks, Math.round(e.before * d.visits / d.visits_before)) : ''}</td><td class="n">${num(e.users)}</td>
             <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${num(e.rage + e.dead + e.errors)}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
           : `<p class="meta">${L.noClicks}</p>`}
       </div>
@@ -2238,14 +2275,17 @@ async function people() {
   const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${num(s.visits)}</span>`).join('<br>')
   const group = (title, hint, list, col, name = (k) => esc(k)) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
     ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
-      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${num(g.users)}</td><td class="n">${num(g.visits)}</td><td class="n">${num(g.clicks)}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${num(g.users)}</td><td class="n">${num(g.visits)}${countDelta(g.visits, g.before?.visits)}</td>
+        <td class="n">${num(g.clicks)}</td><td class="n">${scoreHtml(g.score)}${scoreDelta(g.score, g.before?.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+  // Per account lives on Contas, with trend, frustration and failures: here only the way there.
   return `
-    <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account, (k) => esc(accountText(k)))}</section>
+    ${p.roles.length ? group(L.byRole, L.roleHint, p.roles, L.role) : ''}
+    ${p.accounts.length ? `<section class="card pointer"><span class="meta">${AC().inAccounts}</span><a class="button" ${linkAttrs({ tab: 'accounts', params: {} })}>${AC().openAccounts}</a></section>` : ''}
     <section class="card" data-scroll><div class="label">${L.byUser}${help('byUser')}</div><div class="meta">${L.userHint}</div>
       ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
         p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
           <td>${personName(u.key) ? `<span class="nm">${esc(personName(u.key))}</span>` : ''}<code class="${personName(u.key) ? 'tech' : ''}" title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(accountText(u.account))}</td>
-          <td class="n">${num(u.visits)}</td><td class="n">${num(u.clicks)}</td><td class="n">${scoreHtml(u.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
+          <td class="n">${num(u.visits)}${countDelta(u.visits, u.before?.visits)}</td><td class="n">${num(u.clicks)}</td><td class="n">${scoreHtml(u.score)}${scoreDelta(u.score, u.before?.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
 }
 
 // Actions --------------------------------------------------------------------------------------------------
@@ -2378,27 +2418,32 @@ function onEmptyClick(b) {
 // Render ---------------------------------------------------------------------------------------------------
 // Product -----------------------------------------------------------------------------------------------------
 const PR = () => L.prod
+// "Vigiar": opens the feature editor with this button already in it.
+const watchCell = (x) => `<td class="n" data-nocsv><button class="small" data-feat="watch" data-route="${esc(x.route)}" data-target="${esc(x.target)}" title="${esc(PR().watchTip)}">${PR().watch}</button></td>`
 async function product() {
   const p = await read('/api/product')
   if (!p.areas.length) return empty(L.noVisits)
   const pctOf = (x) => `${num(Math.round(x * 1000) / 10)}%`
   return `<section class="card"><div class="label">${PR().areas}${help('areas')}</div><div class="meta">${PR().areasHint}</div>
-      ${table(`<th>${PR().area}</th><th class="n">${L.visits}</th><th class="n">${PR().adoption}</th><th class="n">${PR().score}</th><th class="n">${PR().failures}</th><th>${PR().trend}</th>`,
-        p.areas.map((a, i) => `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
-          <td class="n">${num(a.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
-          <td class="n">${Math.round(a.adoption * 100)}%<div class="bar"><i style="width:${a.adoption * 100}%;background:var(--fill)"></i></div></td>
-          <td class="n">${scoreHtml(a.score)}</td><td class="n">${num(a.failures)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`, 120, 28, a.daily.map((d) => d.day))}</td></tr>
+      ${table(`<th>${PR().area}</th><th class="n">${L.visits}</th><th class="n">${PR().inSessions}</th><th class="n">${PR().score}</th><th class="n">${PR().failures}</th><th>${PR().trend}</th>`,
+        p.areas.map((a, i) => { const b = a.before
+          // Failures compared per visit: the number before, as if it had today's visits.
+          const failsBefore = b?.visits ? Math.round(b.failures * a.visits / b.visits) : null
+          return `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
+          <td class="n">${num(a.visits)}${countDelta(a.visits, b?.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
+          <td class="n">${pctOf(a.session_share)}<div class="bar"><i style="width:${a.session_share * 100}%;background:var(--fill)"></i></div><div class="meta">${PR().nPeople(a.users)}</div></td>
+          <td class="n">${scoreHtml(a.score)}${scoreDelta(a.score, b?.score)}</td><td class="n">${num(a.failures)}${countDelta(a.failures, failsBefore)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`, 120, 28, a.daily.map((d) => d.day))}</td></tr>
           <tr class="detail" data-of="a${i}" hidden><td colspan="6"><ul class="counts">${a.screens.map((r) => `<li><a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })}>${esc(screenText(r.route) || r.route)}</a>
-            <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>`).join(''))}
+            <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>` }).join(''))}
     </section>
     <section class="card"><div class="label">${PR().low}${help('low')}</div><div class="meta">${PR().lowHint(2)}</div>
-      ${p.low_use.length ? table(`<th>${L.element}</th><th class="n">${PR().seen}</th><th class="n">${PR().clicked}</th>`,
-        p.low_use.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td class="n">${num(x.sessions)}</td><td class="n">${num(x.clicked)} <span class="meta">${pctOf(x.share)}</span></td></tr>`).join(''))
+      ${p.low_use.length ? table(`<th>${L.element}</th><th class="n">${PR().seen}</th><th class="n">${PR().clicked}</th><th data-nocsv><span class="sr">${PR().watch}</span></th>`,
+        p.low_use.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td class="n">${num(x.sessions)}</td><td class="n">${num(x.clicked)} <span class="meta">${pctOf(x.share)}</span></td>${watchCell(x)}</tr>`).join(''))
         : `<p class="meta">${PR().none}</p>`}</section>
     <section class="card"><div class="label">${PR().news}${help('news')}</div><div class="meta">${PR().newsHint}</div>
-      ${p.new.length ? table(`<th>${L.element}</th><th>${PR().since}</th><th class="n">${PR().seen}</th><th class="n">${PR().used}</th>`,
+      ${p.new.length ? table(`<th>${L.element}</th><th>${PR().since}</th><th class="n">${PR().seen}</th><th class="n">${PR().used}</th><th data-nocsv><span class="sr">${PR().watch}</span></th>`,
         p.new.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td>${esc(when(x.first_seen))}</td><td class="n">${num(x.sessions)}</td>
-          <td class="n">${pctOf(x.share)}<div class="bar"><i style="width:${x.share * 100}%;background:var(--fill)"></i></div></td></tr>`).join(''))
+          <td class="n">${pctOf(x.share)}<div class="bar"><i style="width:${x.share * 100}%;background:var(--fill)"></i></div></td>${watchCell(x)}</tr>`).join(''))
         : `<p class="meta">${PR().noNews}</p>`}</section>`
 }
 
@@ -2435,12 +2480,12 @@ async function features() {
   }
   if (!r.features.length) return head + empty(FT().none)
   return head + `<div class="fgrid">${r.features.map((ft) => `<section class="card feature">
-      <div class="head"><div class="fname">${esc(ft.name)}</div><span class="pill ${band(ft.score)}">${FT().score} ${ft.score}</span></div>
+      <div class="head"><div class="fname">${esc(ft.name)}</div><span><span class="pill ${band(ft.score)}">${FT().score} ${ft.score}</span>${scoreDelta(ft.score, ft.before_detail?.score)}</span></div>
       <div class="row"><div><div class="big">${num(ft.uses)}</div><div class="meta">${FT().uses} ${change(ft.uses, ft.before)}</div></div>
         ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`, 120, 28, ft.daily.map((d) => d.day))}</div>
-      <div class="adopt"><div class="meta">${FT().adoption} ${Math.round(ft.adoption * 100)}% · ${FT().adoptionHint(r.active_users)}</div>
-        <div class="bar"><i style="width:${ft.adoption * 100}%;background:var(--fill)"></i></div></div>
-      <div class="meta">${num(ft.users)} ${FT().people.toLowerCase()} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}</div>
+      <div class="adopt"><div class="meta">${FT().inSessions}${help('adoption')} ${Math.round(ft.session_share * 100)}% ${FT().sessionsOf()}</div>
+        <div class="bar"><i style="width:${ft.session_share * 100}%;background:var(--fill)"></i></div></div>
+      <div class="meta">${FT().peopleOf(ft.users, r.active_users)}${countDelta(ft.users, ft.before_detail?.users)} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures)}</div>
       <div class="actions-row"><button class="primary small" data-feat="open" data-id="${esc(ft.id)}">${FT().analyse}</button>
         <button class="small" data-feat="edit" data-id="${esc(ft.id)}">${FT().edit}</button></div>
     </section>`).join('')}</div>`
@@ -2456,9 +2501,9 @@ async function featureDetail(ft, r) {
         <button class="small" data-feat="remove" data-id="${esc(ft.id)}">${FT().remove}</button></div></div></section>
     <section class="numbers">
       <div class="card"><div class="label">${FT().uses}</div><div class="big">${num(ft.uses)}${change(ft.uses, ft.before)}</div></div>
-      <div class="card"><div class="label">${FT().adoption}${help('adoption')}</div><div class="big">${Math.round(ft.adoption * 100)}%</div><div class="meta">${FT().adoptionHint(r.active_users)}</div></div>
-      <div class="card"><div class="label">${FT().people}</div><div class="big">${num(ft.users)}</div><div class="meta">${num(ft.accounts)} ${FT().accounts.toLowerCase()}</div></div>
-      <div class="card"><div class="label">${FT().score}${help('featureScore')}</div><div class="big ${band(ft.score)}">${ft.score}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}</div></div>
+      <div class="card"><div class="label">${FT().inSessions}${help('adoption')}</div><div class="big">${Math.round(ft.session_share * 100)}%</div><div class="meta">${FT().sessionsOf()}</div></div>
+      <div class="card"><div class="label">${FT().people}</div><div class="big">${num(ft.users)}${countDelta(ft.users, ft.before_detail?.users)}</div><div class="meta">${FT().peopleOf(ft.users, r.active_users)} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()}</div></div>
+      <div class="card"><div class="label">${FT().score}${help('featureScore')}</div><div class="big ${band(ft.score)}">${ft.score}${scoreDelta(ft.score, ft.before_detail?.score)}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures)}</div></div>
     </section>
     ${barsChart(FT().usesByDay, ft.daily, (d) => d.n, (d) => FT().dayTip(d.day, d.n))}
     <section class="card"><div class="label">${FT().byAccount}${help('byAccount')}</div><div class="meta">${FT().byAccountHint}</div>
@@ -2493,12 +2538,24 @@ async function featureEditor() {
 async function onFeatureClick(e) {
   if (e.target.closest('[data-copy]')) return // copying a row's summary does not open the account
   if (e.target.closest('[data-acc-down]')) { state.accDown = !state.accDown; return render() }
+  const sortBy = e.target.closest('[data-acc-sort]')
+  if (sortBy) { state.accSort = sortBy.dataset.accSort; keep('accSort', state.accSort); return render() }
+  const ac = e.target.closest('[data-acc-copy]')
+  if (ac) { // the row's summary, copied without opening the account; a check says it worked
+    navigator.clipboard?.writeText(ac.dataset.accCopy).then(() => { ac.classList.add('done'); ac.title = L.copied; setTimeout(() => { ac.classList.remove('done'); ac.title = AC().copySummary }, 1500) })
+    return
+  }
   const b = e.target.closest('[data-feat]')
   const row = e.target.closest('tr[data-account]')
   if (row) { $('#account').value = row.dataset.account; keep('account', row.dataset.account); return go('accounts', {}) }
   if (!b) return
   const what = b.dataset.feat, ed = state.featureEdit
   if (what === 'new') { state.featureEdit = { rules: [] }; return render() }
+  if (what === 'watch') { // from Produto: the editor opens with this button as the feature's first part
+    const { route, target } = b.dataset
+    state.featureEdit = { name: controlLabel(route, target), rules: [{ kind: 'control', key: route + '\t' + target }], kind: 'control' }
+    return state.tab === 'features' ? render() : go('features', {})
+  }
   if (what === 'edit') { const ft = NM().features.find((x) => x.id === b.dataset.id); state.featureEdit = { ...ft, rules: [...ft.rules] }; return render() }
   if (what === 'open') { $('#feature').value = b.dataset.id; keep('feature', b.dataset.id); return render() }
   if (what === 'all') { $('#feature').value = ''; keep('feature', ''); return render() }
@@ -2538,17 +2595,28 @@ const pctText = (now, before) => !before ? (now ? AC().fromZero : '=') : Math.ro
 const accDelta = (now, before, mv) => { if (before === null || before === undefined) return ''
   const p = pctText(now, before), cls = mv === 'down' ? 'bad' : mv === 'up' ? 'ok' : 'meta'
   return `<span class="delta ${cls}" title="${esc(FT().before(num(before)))}">${typeof p === 'number' ? `${p > 0 ? '▲ +' : '▼ −'}${Math.abs(p)}%` : p === '=' ? '=' : '▲ ' + p}</span>` }
-// What customer success pastes in a ticket or a chat: who, the trend, the numbers before → now, the features that fell.
+// What customer success pastes in a ticket or a chat: who, the trend, how much it suffers, the numbers before → now, the features that fell.
 function accountSummary(a, e) {
   const line = (label, now, before) => `${label}: ${before === null || before === undefined ? num(now) : `${num(before)} → ${num(now)}`}${before ? (typeof pctText(now, before) === 'number' ? ` (${pctText(now, before) > 0 ? '+' : '−'}${Math.abs(pctText(now, before))}%)` : '') : ''}`
   const fell = a.features.filter((x) => x.move === 'down').map((x) => `- ${(e.features.find((f) => f.id === x.id) ?? {}).name ?? x.id}: ${num(x.before)} → ${num(x.now)}`)
   return [`${AC().account}: ${accountText(a.account)}`,
     `${AC().trendCol}: ${a.trend ? AC().trend[a.trend] : '—'} (${a.before ? AC().period(e.days) : AC().noCompare})`,
+    `${AC().score}: ${a.before ? `${a.before.score} → ` : ''}${a.now.score} (${say(a.now.score)})`,
+    line(AC().failures, a.now.failures, a.before?.failures),
     line(AC().usersDay, a.now.users_day, a.before?.users_day), line(AC().sessionsDay, a.now.sessions_day, a.before?.sessions_day),
     line(AC().people, a.now.users, a.before?.users),
     ...(fell.length ? [`${AC().fellFeatures}:`, ...fell] : []),
     `${L.demand.evidence}: ${location.origin + location.pathname + hashFor('accounts', { account: a.account })}`].join('\n')
 }
+// Business name first, the id muted under it; without a name, the id alone.
+const accCell = (id) => { const n = NM().accounts?.[id]
+  return n ? `<span class="acc-cell"><span class="nm acc-name" title="${esc(n)}">${esc(n)}</span> <code class="tech" title="${esc(id)}">${esc(id)}</code></span>`
+    : `<span class="acc-cell"><code class="acc-name" title="${esc(id)}">${esc(id)}</code></span>` }
+// "Worst first": 25 points per number that dropped, plus the frustration, how much it rose and the failures per 100 visits.
+const downsOf = (a) => Object.values(a.moves ?? {}).filter((m) => m === 'down').length + a.features.filter((f) => f.move === 'down').length
+const painOf = (a) => downsOf(a) * 25 + a.now.score + Math.max(0, a.now.score - (a.before?.score ?? a.now.score)) + (a.now.visits ? a.now.failures / a.now.visits * 100 : 0)
+const COPY_ICON = '<svg class="copy-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+  + '<svg class="ok-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>'
 
 async function accounts() {
   const e = await read('/api/engagement')
@@ -2557,33 +2625,58 @@ async function accounts() {
   if (!e.accounts.length) return empty(AC().none)
   const feats = e.features
   const down = e.accounts.filter((a) => a.trend === 'down').length
-  const rows = state.accDown ? e.accounts.filter((a) => a.trend === 'down') : e.accounts
+  const sort = state.accSort ?? recall('accSort') ?? 'trend'
+  const rows = (state.accDown ? e.accounts.filter((a) => a.trend === 'down') : [...e.accounts])
+  if (sort === 'worst') rows.sort((a, b) => painOf(b) - painOf(a))
   return `<section class="card"><div class="label">${AC().title}${help('accounts')}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
     ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
-    ${e.comparable ? `<div class="chips"><button data-acc-down aria-pressed="${!!state.accDown}" ${down || state.accDown ? '' : 'disabled'}>${AC().onlyDown(down)}</button></div>` : ''}
-    ${rows.length ? table(`<th>${AC().account}</th><th>${AC().trendCol}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}<th><span class="sr">${AC().copySummary}</span></th>`,
+    <div class="chips">${e.comparable ? `<button data-acc-down aria-pressed="${!!state.accDown}" ${down || state.accDown ? '' : 'disabled'}>${AC().onlyDown(down)}</button>` : ''}
+      <span class="sep">${AC().sort}</span>${['trend', 'worst'].map((k) => `<button data-acc-sort="${k}" aria-pressed="${sort === k}">${k === 'trend' ? AC().byTrend : AC().worst}</button>`).join('')}</div>
+    ${rows.length ? table(`<th>${AC().account}</th><th>${AC().trendCol}</th><th class="n">${AC().score}</th><th class="n">${AC().failures}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}<th class="act" data-nocsv><span class="sr">${AC().copySummary}</span></th>`,
       rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
-        <td><span class="nm acc-name" title="${esc(accountText(a.account))}">${esc(accountText(a.account))}</span></td>
+        <td>${accCell(a.account)}</td>
         <td>${trendChip(a.trend)}</td>
+        <td class="n">${scoreHtml(a.now.score)}${scoreDelta(a.now.score, a.before?.score)}</td>
+        <td class="n">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures)}</td>
         <td class="n">${num(a.now.users_day)}${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</td>
         <td class="n">${num(a.now.sessions_day)}${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</td>
         <td class="n">${num(a.now.users)}</td>
         ${a.features.map((f) => `<td class="n">${num(f.now)}${accDelta(f.now, f.before, f.move)}</td>`).join('')}
-        <td><button class="small" data-copy="${esc(accountSummary(a, e))}">${AC().copySummary}</button></td></tr>`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
+        <td class="act" data-nocsv><button class="icon" data-acc-copy="${esc(accountSummary(a, e))}" title="${esc(AC().copySummary)}" aria-label="${esc(AC().copyOf(accountText(a.account)))}">${COPY_ICON}</button></td></tr>`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
 }
 
-function accountDetail(e, id) {
+// What hurts this account: its worst screens (and the element that irritates there) and the failures that hit it most.
+// Every read here already carries the account filter, and so do the links.
+async function accountPain() {
+  const [s, f] = await Promise.all([read('/api/summary'), read('/api/failures')])
+  const screens = s.routes.filter((r) => r.visits && r.score).slice(0, 5)
+  const fails = f.failures.slice(0, 5)
+  const hot = (r) => { const t = r.targets[0]; return t ? `<span class="why">${esc(AC().hot(`${L.names[t.type] ?? t.type} — ${controlLabel(r.key, t.target) || t.target}`, t.n))}</span>` : '' }
+  return `<section class="card"><div class="label">${AC().pain}${help('accountPain')}</div><div class="meta">${AC().painHint}</div>
+    <div class="pain"><div><div class="label">${AC().painScreens}</div>
+      ${screens.length ? `<ul class="counts">${screens.map((r) => `<li><span><a ${linkAttrs({ tab: 'frustration', params: { route: r.key } })}>${esc(screenText(r.key) || r.key)}</a>${hot(r)}</span>
+        <span>${scoreHtml(r.score)}${scoreDelta(r.score, r.before?.score)}</span></li>`).join('')}</ul>` : `<p class="meta">${AC().noPain}</p>`}</div>
+    <div><div class="label">${AC().painFailures}</div>
+      ${fails.length ? `<ul class="counts">${fails.map((x) => `<li><span><a ${linkAttrs({ tab: 'failures', params: { signal: x.type, detail: x.detail } })}>${esc(L.names[x.type] ?? x.type)}</a>
+        <code title="${esc(x.detail)}">${esc(x.detail)}</code></span><span class="meta">${AC().sessionsN(x.sessions)}</span></li>`).join('')}</ul>` : `<p class="meta">${AC().noFail}</p>`}</div></div></section>`
+}
+
+async function accountDetail(e, id) {
   const a = e.accounts.find((x) => x.account === id)
   const days = e.daily ?? []
+  const name = NM().accounts?.[id]
   const head = `<section class="card"><button class="link" data-feat="no-account">← ${AC().back}</button>
-    <div class="head"><div class="fname big-name">${esc(accountText(id))} ${a ? trendChip(a.trend) : ''}</div>
+    <div class="head"><div><div class="fname big-name">${esc(name || id)} ${a ? trendChip(a.trend) : ''}</div>${name ? `<code class="tech">${esc(id)}</code>` : ''}</div>
       ${a ? `<button class="small" data-copy="${esc(accountSummary(a, e))}">${AC().copySummary}</button>` : ''}</div></section>`
   if (!a) return head + empty(L.noVisits)
   return head + `<section class="numbers">
+      <div class="card"><div class="label">${AC().score}${help('overall')}</div><div class="big ${band(a.now.score)}">${a.now.score}${scoreDelta(a.now.score, a.before?.score)}</div><div class="meta">${say(a.now.score)}</div></div>
+      <div class="card"><div class="label">${AC().failures}</div><div class="big">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures)}</div></div>
       <div class="card"><div class="label">${AC().usersDay}${help('usersDay')}</div><div class="big">${num(a.now.users_day)} ${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)} ${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
     </section>
+    ${await accountPain()}
     ${barsChart(AC().pulse, days, (d) => d.users, (d) => AC().dayTip(d.day, d.users))}
     ${e.features.length ? `<section class="card"><div class="label">${AC().featureUses}</div>
       ${table(`<th>Feature</th><th class="n">${FT().uses}</th><th>${FT().usesByDay}</th>`, e.features.map((f) => { const x = a.features.find((y) => y.id === f.id)
