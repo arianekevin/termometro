@@ -443,6 +443,15 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .fw-main { min-width: 0; } .fw-main .fw-say { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } .fw-main .meta { font-size: 12px; line-height: 16px; }
 #fw-all { margin-top: 8px; } .fw-empty { margin: 8px 0 0; max-width: 72ch; }
 @media (max-width: 640px) { .fw-row { grid-template-columns: minmax(0, 1fr); } .fw-row .todo-acts { justify-content: flex-start; flex-wrap: wrap; } }
+/* Routing, empty states, links (ux2/a) */
+:root { --link: var(--accent); --link-hover: var(--accent-hover); }
+:where(a:not(.button)) { color: var(--link); } :where(a:not(.button):hover) { color: var(--link-hover); }
+.nodata { padding: 24px; } .nodata p { margin: 6px 0 0; color: var(--fg2); max-width: 70ch; }
+.nodata-acts { justify-content: flex-end; margin-top: 16px; }
+.arrived { display: flex; align-items: center; gap: 10px; border-color: var(--ok); background: var(--ok-soft); font-weight: 500; }
+.arrived .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.widened { margin-top: 8px; color: var(--fg2); font-weight: 500; }
+#marks-open:empty::before { content: '…'; }
 </style>
 </head>
 <body>
@@ -812,6 +821,13 @@ const L = PT ? {
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
   originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
   waiting: 'Esperando o primeiro evento…', copy: 'Copiar', copied: 'Copiado',
+  nodata: { title: (d) => d === 1 ? 'Sem dados neste dia' : `Sem dados nestes ${d} dias`, last: (w, a) => `O último evento chegou em ${w} (${a}).`,
+    lastCut: (w, a) => `O último evento com estes filtros chegou em ${w} (${a}).`, lastAny: (a) => `Sem os filtros, o último chegou ${a}.`,
+    noneCut: 'Nenhum evento com estes filtros em todo o histórico guardado.', tooOld: (n) => `É mais antigo que os ${n} dias que o painel mostra.`,
+    mark: (m) => `O marco ${m} está em uso: o que veio antes dele não entra na conta.`, cuts: (f) => `Filtros ativos: ${f}.`,
+    widen: (n) => `Ver ${n} dias`, whole: 'Ver todo o período', clear: 'Limpar filtros', at: (d, t) => `${d} às ${t}`,
+    arrived: (p, t) => `Chegou o primeiro evento de ${p}, às ${t}. O painel já mostra o que chegou; ele se completa conforme o app é usado.`,
+    allChip: 'Marco ignorado: todo o período', allOff: 'Voltar a contar a partir do marco', versionsWide: (n) => `Comparadas em ${n} dias: a versão anterior saiu do período escolhido.` },
 } : {
   signinTitle: 'Sign in to see your projects', google: 'Sign in with Google', password: 'Password', enter: 'Sign in', or: 'or',
   errors: { not_allowed: 'This e-mail has no access. Ask whoever runs this instance.', google: 'Google did not confirm the sign-in. Try again.',
@@ -1016,6 +1032,13 @@ const L = PT ? {
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
   originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
   waiting: 'Waiting for the first event…', copy: 'Copy', copied: 'Copied',
+  nodata: { title: (d) => d === 1 ? 'No data on this day' : `No data in these ${d} days`, last: (w, a) => `The last event arrived on ${w} (${a}).`,
+    lastCut: (w, a) => `The last event matching these filters arrived on ${w} (${a}).`, lastAny: (a) => `Without the filters, the last one arrived ${a}.`,
+    noneCut: 'No event matches these filters in all the kept history.', tooOld: (n) => `That is older than the ${n} days the dashboard shows.`,
+    mark: (m) => `The mark ${m} is in use: what came before it is left out.`, cuts: (f) => `Active filters: ${f}.`,
+    widen: (n) => `See ${n} days`, whole: 'See the whole period', clear: 'Clear filters', at: (d, t) => `${d} at ${t}`,
+    arrived: (p, t) => `The first event of ${p} arrived at ${t}. The dashboard already shows what came; it fills in as the app is used.`,
+    allChip: 'Mark ignored: the whole period', allOff: 'Count from the mark again', versionsWide: (n) => `Compared over ${n} days: the previous version is out of the chosen period.` },
 }
 
 const $ = (s) => document.querySelector(s)
@@ -1031,7 +1054,8 @@ const ago = (at) => {
 }
 const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
 const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
-const empty = (msg) => `<div class="card empty">${msg}</div>`
+// "No visits in this period" anywhere becomes the empty state that says why and offers the way out (see emptyState).
+const empty = (msg) => msg === L.noVisits && state.status?.events ? emptyState() : `<div class="card empty">${msg}</div>`
 
 // Names people use, from /api/names: the business name leads, the technical key always comes with it.
 const NM = () => state.names ?? { screens: {}, controls: {}, actions: {} }
@@ -1078,6 +1102,11 @@ const state = { me: null, tab: 'overview', user: '', all: '', cat: '', route: ''
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
 const FILTERS = ['project', 'days', 'version', 'account', 'role', 'feature']
 const PARAMS = ['user', 'all', 'cat', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
+// What each tab reads from the address besides the filters, the person (user) and the whole period (all): a tab switch
+// carries only these, so a screen picked on one tab does not ride along in the next one's link.
+const TAB_PARAMS = { frustration: ['route', 'cat'], failures: ['signal', 'detail'], usage: ['route'], journeys: ['route', 'funnel'],
+  map: ['route'], actions: ['action'], versions: ['a', 'b'] }
+const tabParams = (tab, from = state) => Object.fromEntries(PARAMS.map((k) => [k, k === 'user' || k === 'all' || (TAB_PARAMS[tab] ?? []).includes(k) ? from[k] : '']))
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
   state.tab = TABS[tab] ? tab : 'overview'
@@ -1086,12 +1115,13 @@ function readHash() {
 }
 function hashFor(tab, params = {}) {
   const p = new URLSearchParams()
-  for (const k of FILTERS) { const v = k in params ? params[k] : $('#' + k)?.value; if (v && !(k === 'days' && v === '7')) p.set(k, v) }
+  // The period always goes along: it is remembered per browser, and a link opened elsewhere must show the same numbers.
+  for (const k of FILTERS) { const v = k in params ? params[k] : $('#' + k)?.value; if (v) p.set(k, v) }
   for (const k of PARAMS) { const v = k in params ? params[k] : k === 'user' || k === 'all' ? state[k] : ''; if (v) p.set(k, v) }
   return '#' + tab + (p.toString() ? '?' + p : '')
 }
 function writeHash() {
-  const h = hashFor(state.tab, Object.fromEntries(PARAMS.map((k) => [k, state[k]])))
+  const h = hashFor(state.tab, tabParams(state.tab))
   state.hash = new URLSearchParams(h.split('?')[1] || '')
   if (location.hash !== h) history.replaceState(null, '', h)
 }
@@ -1151,7 +1181,8 @@ function shell() {
     <div class="sr-only" id="live" role="status" aria-live="polite"></div>
     <main id="content">${skeleton()}</main>`
   const project = state.hash.get('project') ?? recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
-  const days = state.hash.get('days') ?? recall('days'); if ([...$('#days').options].some((o) => o.value === days)) $('#days').value = days
+  // A link without the period is an old one, from when 7 days went unsaid; a bare #tab keeps the remembered period.
+  const days = state.hash.get('days') ?? (state.hash.toString() ? '7' : recall('days')); if ([...$('#days').options].some((o) => o.value === days)) $('#days').value = days
   $('#project').addEventListener('change', async () => {
     keep('project', $('#project').value); for (const k of PARAMS) state[k] = ''
     state.hash = new URLSearchParams(); await loadFilters(); render()
@@ -1159,7 +1190,7 @@ function shell() {
   for (const id of ['days', 'version', 'account', 'role', 'feature']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
   $('nav.tabs').addEventListener('click', (e) => {
     const a = e.target.closest('a[data-tab]'); if (!a) return
-    e.preventDefault(); go(a.dataset.tab, { route: state.route, a: state.a, b: state.b, funnel: state.funnel })
+    e.preventDefault(); go(a.dataset.tab, tabParams(a.dataset.tab))
   })
   wireBar()
   wireSearch()
@@ -1195,6 +1226,7 @@ function markChip() {
   // Short date on the chip (the year only when it is not this one), the full one in the tooltip.
   const day = p?.mark && new Date(p.mark).getFullYear() === new Date().getFullYear()
     ? new Date(p.mark).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit' }) : p?.mark && dateOf(p.mark)
+  if (p?.mark && state.all) { b.innerHTML = `<span class="ell">${esc(`${M.button}: ${M.whole}`)}</span>`; b.title = L.nodata.allChip; b.classList.remove('on'); return }
   const text = p?.mark ? M.since(`${day}${active?.name ? ' · ' + active.name : ''}`) : `${M.button}: ${M.whole}`
   b.innerHTML = `<span class="ell">${esc(text)}</span>`; b.title = p?.mark ? M.since(`${dateOf(p.mark)}${active?.name ? ' · ' + active.name : ''}`) : text
   b.classList.toggle('on', !!p?.mark)
@@ -1267,6 +1299,7 @@ function filterBar() {
   const chips = ['account', 'version', 'role', 'feature'].filter((id) => $('#' + id)?.value).map((id) => {
     const t = `${label[id]}: ${optText(id)}`
     return `<span class="chip" title="${esc(t)}"><span class="ell">${esc(t)}</span><button data-clear="${id}" aria-label="${esc(BAR().remove(label[id]))}">×</button></span>` })
+  if (state.all && projectNow()?.mark) chips.push(`<span class="chip"><span class="ell">${esc(L.nodata.allChip)}</span><button data-clear="all" aria-label="${esc(L.nodata.allOff)}" title="${esc(L.nodata.allOff)}">×</button></span>`)
   if (state.user) chips.push(`<span class="chip">${personName(state.user) ? esc(personName(state.user)) : `${L.user} <code>${esc(short(state.user))}</code>`}<button id="remove-user" data-clear="user" aria-label="${L.removeUser}">×</button></span>`)
   const box = $('#active-filters'); if (!box) return
   box.innerHTML = chips.join('') + (chips.length > 1 ? `<button class="link" data-clear="*">${BAR().clear}</button>` : '')
@@ -1303,7 +1336,7 @@ function wireBar() {
     const c = e.target.closest('[data-clear]')
     if (c) {
       const ids = c.dataset.clear === '*' ? ['version', 'account', 'role', 'feature', 'user'] : [c.dataset.clear]
-      for (const id of ids) if (id === 'user') state.user = ''; else { $('#' + id).value = ''; keep(id, '') }
+      for (const id of ids) if (id === 'user' || id === 'all') state[id] = ''; else { $('#' + id).value = ''; keep(id, '') }
       return render()
     }
     if (e.target.closest('#filters-done')) return closeFilters(true)
@@ -2040,7 +2073,7 @@ function watchHeader() {
   set(); new ResizeObserver(set).observe(h)
 }
 document.addEventListener('click', (e) => {
-  if (e.target.closest?.('[data-fail-back]')) return go('failures', {})
+  if (e.target.closest?.('[data-fail-back]')) return go('failures', { days: $('#days').value })
   const row = e.target.closest?.('#content tr.row[data-signal]') // remember where the row was, to come back to it
   if (row) state.failBack = { signal: row.dataset.signal, detail: row.dataset.detail, top: row.getBoundingClientRect().top }
 }, true)
@@ -2230,7 +2263,12 @@ async function actions() {
 
 // Versions -------------------------------------------------------------------------------------------------
 async function versions() {
-  const c = await read('/api/compare', { a: state.a, b: state.b }) // the header's version filter does not apply here
+  let c = await read('/api/compare', { a: state.a, b: state.b }), wide = 0 // the header's version filter does not apply here
+  // One version in the period, the one before still kept: compare over the window that holds both, and say so.
+  if (c.versions.length < 2 && c.previous && widenTo(c.previous.days) > +$('#days').value) {
+    const n = widenTo(c.previous.days), w = await read('/api/compare', { a: state.a, b: state.b, days: n })
+    if (w.versions.length >= 2) { c = w; wide = n }
+  }
   if (c.versions.length < 2) {
     // One version in the period: offer to widen it to where the one before still is.
     const R = L.rel, prev = c.previous, n = prev && widenTo(prev.days)
@@ -2248,6 +2286,7 @@ async function versions() {
   return `
     <section class="card"><div class="head"><div class="field" style="flex-wrap:wrap">${pick('cmp-b', c.b)}<span class="meta">${L.compareWith}</span>${pick('cmp-a', c.a)}</div>
       ${markVersionButton(c.b, o.b.first_at, true)}</div>
+      ${wide ? `<div class="meta widened">${esc(L.nodata.versionsWide(wide))}</div>` : ''}
       <div class="meta" style="margin-top:8px">${L.compareHint}</div></section>
     <section class="numbers">
       <div class="card"><div class="label">${R.scorePer}${help('release')}</div><div class="big">${scoreHtml(o.a.score)} → ${scoreHtml(o.b.score)}</div>
@@ -2289,7 +2328,51 @@ function setup(project) {
 let waitTimer = 0
 async function hasEvents() {
   const status = await read('/api/status')
+  state.status = status
   return status.events > 0
+}
+
+// An empty view: the period, the mark or the filters left nothing out of what the project did receive. Says which,
+// when the last event came, and offers the one step that brings data back (filled, at the right end).
+const NO_PERIOD_TABS = ['dictionary', 'features'] // they work without data in the period: names and the feature editor
+const DAY_MS = 864e5
+function emptyState() {
+  const s = state.status ?? {}, E = L.nodata, days = +$('#days').value, p = projectNow(), now = Date.now()
+  const label = { version: L.version, account: L.account, role: L.role, feature: L.feature }
+  const cuts = ['account', 'version', 'role', 'feature'].filter((id) => $('#' + id)?.value).map((id) => `${label[id]}: ${optText(id)}`)
+  if (state.user) cuts.push(`${L.user}: ${personName(state.user) || short(state.user)}`)
+  const mark = p?.mark && !state.all && p.mark > now - days * DAY_MS ? p.mark : 0
+  const markName = mark ? `«${[(p.marks ?? []).find((m) => m.at === mark)?.name, dateOf(mark)].filter(Boolean).join(' · ')}»` : ''
+  const stamp = (at) => E.at(dateOf(at), new Date(at).toLocaleTimeString(PT ? 'pt-BR' : 'en', { hour: '2-digit', minute: '2-digit' }))
+  const last = s.last_match, max = Math.max(...[...$('#days').options].map((o) => +o.value))
+  const lines = [], acts = []
+  let main = ''
+  if (!last) lines.push(E.noneCut)
+  else {
+    lines.push((cuts.length ? E.lastCut : E.last)(stamp(last), ago(last)))
+    const need = Math.ceil((now - last) / DAY_MS + 0.01), n = widenTo(need)
+    if (mark && last < mark) main = `<button class="primary" data-empty="all" data-days="${need > days && need <= max ? n : ''}">${E.whole}</button>`
+    else if (need > max) lines.push(E.tooOld(max))
+    else if (n > days) main = `<button class="primary" data-empty="days" data-days="${n}">${E.widen(n)}</button>`
+  }
+  if (cuts.length && s.last_at && s.last_at !== last) lines.push(E.lastAny(ago(s.last_at)))
+  if (mark) { lines.push(E.mark(esc(markName))); if (!main) acts.push(`<button data-empty="all">${E.whole}</button>`) }
+  if (cuts.length) {
+    lines.push(E.cuts(esc(cuts.join(' · '))))
+    if (!main && !last) main = `<button class="primary" data-empty="clear">${E.clear}</button>`; else acts.push(`<button data-empty="clear">${E.clear}</button>`)
+  }
+  return `<section class="card nodata" role="status"><div class="label">${E.title(days)}</div>
+    ${lines.map((x) => `<p>${x}</p>`).join('')}
+    ${acts.length || main ? `<div class="actions-row nodata-acts">${acts.join('')}${main}</div>` : ''}</section>`
+}
+function onEmptyClick(b) {
+  if (b.dataset.empty === 'clear') {
+    for (const id of ['version', 'account', 'role', 'feature']) { $('#' + id).value = ''; keep(id, '') }
+    state.user = ''
+  }
+  if (b.dataset.empty === 'all') state.all = '1'
+  if (b.dataset.days) { $('#days').value = b.dataset.days; keep('days', b.dataset.days) }
+  render()
 }
 
 // Render ---------------------------------------------------------------------------------------------------
@@ -2581,13 +2664,17 @@ async function render() {
 }
 async function draw(seq) {
   const project = state.me.projects.find((p) => p.name === $('#project').value)
+  markTab()
+  filterBar()
+  markChip()
   try {
     if (!(await hasEvents())) {
       if (seq !== renderSeq) return
       $('#content').innerHTML = setup(project)
-      // Poll until the first event lands, then show the dashboard and its filters.
+      writeHash()
+      // Poll until the first event lands, then show the dashboard and its filters, and say it arrived.
       const wait = async () => {
-        if (await hasEvents().catch(() => false)) { await loadFilters(); return render() }
+        if (await hasEvents().catch(() => false)) { state.arrived = { project: project.name, at: state.status.first_at }; await loadFilters(); return render() }
         waitTimer = setTimeout(wait, 3000)
       }
       waitTimer = setTimeout(wait, 3000)
@@ -2596,13 +2683,13 @@ async function draw(seq) {
   } catch (error) {
     if (error.message === 'signed out') return
   }
-  markTab()
-  filterBar()
-  markChip()
   try {
-    const html = await TABS[state.tab]()
+    const html = state.status?.in_view === false && !NO_PERIOD_TABS.includes(state.tab) ? emptyState() : await TABS[state.tab]()
     if (seq !== renderSeq) return // a newer tab or filter was picked meanwhile: that one draws
-    $('#content').innerHTML = html
+    const came = state.arrived?.project === project.name ? state.arrived : null
+    $('#content').innerHTML = (came ? `<div class="card arrived" role="status"><span class="dot" aria-hidden="true"></span>${esc(L.nodata.arrived(project.name,
+      new Date(came.at).toLocaleTimeString(PT ? 'pt-BR' : 'en', { hour: '2-digit', minute: '2-digit', second: '2-digit' })))}</div>` : '') + html
+    state.arrived = null
     describeTips()
     $('#open-map')?.addEventListener('click', () => openMap(state.route))
     document.querySelectorAll('[data-open-map]').forEach((b) => b.addEventListener('click', () => openMap(state.route, b.dataset.openMap)))
@@ -2617,6 +2704,8 @@ async function draw(seq) {
 }
 
 function onContentClick(e) {
+  const none = e.target.closest('[data-empty]')
+  if (none) return onEmptyClick(none)
   const copy = e.target.closest('[data-copy]')
   if (copy) {
     const was = copy.textContent
@@ -2656,7 +2745,7 @@ addEventListener('hashchange', async () => {
   readHash()
   const want = state.hash.get('project')
   if (want && [...$('#project').options].some((o) => o.value === want)) $('#project').value = want
-  $('#days').value = state.hash.get('days') || '7'
+  $('#days').value = state.hash.get('days') || (state.hash.toString() ? '7' : $('#days').value)
   if ($('#project').value !== project) await loadFilters()
   for (const k of ['version', 'account', 'role', 'feature']) {
     const v = state.hash.get(k) || ''

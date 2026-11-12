@@ -853,6 +853,25 @@ class Server(unittest.TestCase):
         self.assertGreater(status["last_at"], 0)
         self.assertEqual(call(self.base, "/api/status?project=shop")[0], 401)
 
+    def test_status_tells_why_a_view_is_empty(self):
+        self.assertNotIn("in_view", self.read("/api/status?project=shop&days=7"))  # nothing ever: the setup screen
+        self.send([{"type": "page", "route": "/old"}], version="1.0")
+        self.age(10)
+        s = self.read("/api/status?project=shop&days=7")
+        self.assertFalse(s["in_view"])  # the period is empty...
+        self.assertEqual(s["last_match"], s["last_at"])  # ...and says when the last event came
+        self.assertTrue(self.read("/api/status?project=shop&days=30")["in_view"])
+        self.assertIsNone(self.read("/api/status?project=shop&days=30&version=9.9")["last_match"])  # no such cut at all
+        self.send([{"type": "page", "route": "/new"}], version="2.0")
+        self.assertTrue(self.read("/api/status?project=shop&days=7")["in_view"])
+        self.assertFalse(self.read("/api/status?project=shop&days=7&version=1.0")["in_view"])
+        now = int(time.time() * 1000)
+        call(self.base, "/api/mark?project=shop", {"action": "create", "name": "Depois", "at": now}, cookie=self.cookie)
+        s = self.read("/api/status?project=shop&days=30&version=1.0")
+        self.assertFalse(s["in_view"])  # hidden by the mark, not by the period...
+        self.assertLess(s["last_match"], now)  # ...which the last match before it shows
+        self.assertTrue(self.read("/api/status?project=shop&days=30&version=1.0&all=1")["in_view"])
+
     def test_google_is_off_without_a_client(self):
         self.assertEqual(call(self.base, "/auth/google")[0], 404)
 

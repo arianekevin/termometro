@@ -27,6 +27,7 @@ and the API:
   GET  /api/dictionary everything that can be named, with its automatic name, its given name and its use
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
+                       with days and the cuts: does that view hold anything, and the last event matching the cuts
   POST /api/map-token  a one-hour token to open the heat map        │
   GET  /api/ways       the way to each control and action: screens gone through before, against the usual
   GET  /api/patterns   click patterns: the field clicked first on arrival, the click that follows another, typing
@@ -509,6 +510,16 @@ class Filter:
             self.sql += " AND " + sql
             self.args += args
         self.q = q
+
+
+def view_status(con, q: dict) -> dict:
+    """Whether the asked view (period, mark and cuts) holds anything, and when the last event matching the cuts arrived
+    in all that is kept, mark or not: what an empty screen needs to say how to get to some data."""
+    f = Filter(q)
+    wide = Filter({**q, "all": "1", "days": str(CONFIG.retention_days)})
+    has = con.execute(f"SELECT 1 FROM events WHERE {f.sql} LIMIT 1", f.args).fetchone() is not None
+    last = con.execute(f"SELECT MAX(at) FROM events WHERE {wide.sql}", wide.args).fetchone()[0]
+    return {"in_view": has, "last_match": last}
 
 
 def frustration_by(con, f: Filter, key: str) -> list[dict]:
@@ -2414,7 +2425,10 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/status":
                 first, last, total = con.execute(
                     "SELECT MIN(at), MAX(at), COUNT(*) FROM events WHERE project = ?", (q.get("project", ""),)).fetchone()
-                return self.json(200, {"events": total, "first_at": first, "last_at": last}, headers)
+                out = {"events": total, "first_at": first, "last_at": last}
+                if total and "days" in q:  # an empty view: is it the period, the mark or the cuts? (see view_status)
+                    out.update(view_status(con, q))
+                return self.json(200, out, headers)
             if url.path == "/api/report" and q.get("format") == "md":
                 return self.send(200, report_markdown(report(con, Filter(q))).encode(), "text/markdown; charset=utf-8", headers)
             self.json(200, READS[url.path](con, Filter(q)), headers)
