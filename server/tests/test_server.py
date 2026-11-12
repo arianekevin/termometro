@@ -222,6 +222,9 @@ class Server(unittest.TestCase):
         self.assertEqual(n["controls"], {"/config/usuarios\tbutton#new": "Novo usuário", "/config/usuarios\ta#help": "Ajuda"})
         self.assertEqual(n["actions"], {"POST /api/users": "Salvar"})
         self.assertEqual(call(self.base, "/api/names?project=shop")[0], 401)
+        found = self.read("/api/search?project=shop&days=1&q=" + urllib.parse.quote("usuár"))["results"]  # by the names people use
+        self.assertEqual({(r["kind"], r["label"]) for r in found}, {("screen", "/config/usuarios")})
+        self.assertIn(("action", "POST /api/users"), {(r["kind"], r["label"]) for r in self.read("/api/search?project=shop&days=1&q=salvar")["results"]})
 
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},

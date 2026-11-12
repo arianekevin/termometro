@@ -134,6 +134,11 @@ button.small { height: 28px; font-size: 12px; }
 .insights .text { flex: 1; min-width: 0; }
 .insights a { white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
 .insights a:hover { text-decoration: underline; }
+.nm { display: block; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
+code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); overflow-wrap: anywhere; }
+.steps code.tech { display: inline; margin: 0 0 0 6px; }
+.tech code { font-size: 11px; color: var(--faint); background: none; padding: 0; }
+.named { display: inline-block; vertical-align: top; }
 .verdict { display: flex; gap: 14px; align-items: center; border-left: 4px solid var(--ok); }
 .verdict.warn { border-left-color: var(--warn); } .verdict.bad { border-left-color: var(--bad); }
 .verdict .dot { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-weight: 700; background: var(--ok-soft); color: var(--ok); }
@@ -232,7 +237,7 @@ const L = PT ? {
   short: { version_worse: (i) => `${i.route} piorou na ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} piorou (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} com nota ${i.now}`, failure_new: (i) => `falha nova em ${i.route} (${i.n}×)`, failure_recurring: (i) => `falha recorrente em ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritação', ideas: 'Sugestões', better: 'Melhorou' },
-  noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
+  record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
   bands: { ok: 'tranquilo (até 19)', warn: 'atenção (20–49)', bad: 'muita frustração (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
   heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, pior a nota daquele dia. Clique na tela para ver os detalhes.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: nota ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Nota do dia',
@@ -244,10 +249,10 @@ const L = PT ? {
     screen_better: (i) => `<b>${i.route}</b> melhorou: nota ${i.before} → ${i.now} em ${i.visits} visitas.`,
     failure_new: (i, s) => `Falha nova em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
     failure_recurring: (i, s) => `Falha recorrente em <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× em ${i.sessions} ${i.sessions === 1 ? 'sessão' : 'sessões'}.`,
-    action_laborious: (i) => `<code>${i.action}</code> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
-    reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> em <b>' + i.route + '</b>'} é muito usado (${i.uses}×) e fica longe: ${i.clicks} cliques e ${i.screens} ${i.screens === 1 ? 'tela' : 'telas'} até chegar.`,
-    pair_linked: (i) => `Depois de <code>${i.a}</code>, ${Math.round(i.share * 100)}% das vezes vem <code>${i.b}</code> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
-    element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} cliques sem resposta`].filter(Boolean).join(' e ')}.`,
+    action_laborious: (i) => `<b>${i.action}</b> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
+    reach_far: (i) => `${i.kind_of === 'action' ? '<b>' + i.key + '</b>' : '<b>' + i.key + '</b> em <b>' + i.route + '</b>'} é muito usado (${i.uses}×) e fica longe: ${i.clicks} cliques e ${i.screens} ${i.screens === 1 ? 'tela' : 'telas'} até chegar.`,
+    pair_linked: (i) => `Depois de <b>${i.a}</b>, ${Math.round(i.share * 100)}% das vezes vem <b>${i.b}</b> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
+    element_irritating: (i) => `<b>${i.target}</b> em <b>${i.route}</b> irrita: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} cliques sem resposta`].filter(Boolean).join(' e ')}.`,
   },
   help: { rage: '3 cliques no mesmo ponto em 1 s', dead: 'Clique num botão ou link que não mudou nada em 1 s', js_error: 'Erro de JavaScript não tratado', http_5xx: 'Requisição com erro 5xx ou falha de rede', http_4xx: 'Requisição recusada com 4xx (401 não conta)', abandon: 'Começou a preencher um formulário e saiu sem salvar', bounce: 'Voltou em menos de 4 s', slow: 'Requisição que levou 3 s ou mais com a tela à frente' },
   csv: 'CSV', csvTip: 'Baixar esta tabela em CSV',
@@ -324,7 +329,7 @@ const L = PT ? {
   short: { version_worse: (i) => `${i.route} got worse in ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} got worse (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} at score ${i.now}`, failure_new: (i) => `new failure on ${i.route} (${i.n}×)`, failure_recurring: (i) => `recurring failure on ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritation', ideas: 'Suggestions', better: 'Improved' },
-  noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
+  record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
   bands: { ok: 'calm (up to 19)', warn: 'attention (20–49)', bad: 'very frustrating (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
   heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the worse that day\'s score. Click a screen for the details.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Score of the day',
@@ -336,10 +341,10 @@ const L = PT ? {
     screen_better: (i) => `<b>${i.route}</b> improved: score ${i.before} → ${i.now} over ${i.visits} visits.`,
     failure_new: (i, s) => `New failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
     failure_recurring: (i, s) => `Recurring failure on <b>${i.route}</b> — ${s}: <code>${i.detail}</code>, ${i.n}× in ${i.sessions} ${i.sessions === 1 ? 'session' : 'sessions'}.`,
-    action_laborious: (i) => `<code>${i.action}</code> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
-    reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> on <b>' + i.route + '</b>'} is used a lot (${i.uses}×) and sits far away: ${i.clicks} clicks and ${i.screens} ${i.screens === 1 ? 'screen' : 'screens'} to get there.`,
-    pair_linked: (i) => `After <code>${i.a}</code>, ${Math.round(i.share * 100)}% of the time comes <code>${i.b}</code> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
-    element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} dead clicks`].filter(Boolean).join(' and ')}.`,
+    action_laborious: (i) => `<b>${i.action}</b> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
+    reach_far: (i) => `${i.kind_of === 'action' ? '<b>' + i.key + '</b>' : '<b>' + i.key + '</b> on <b>' + i.route + '</b>'} is used a lot (${i.uses}×) and sits far away: ${i.clicks} clicks and ${i.screens} ${i.screens === 1 ? 'screen' : 'screens'} to get there.`,
+    pair_linked: (i) => `After <b>${i.a}</b>, ${Math.round(i.share * 100)}% of the time comes <b>${i.b}</b> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
+    element_irritating: (i) => `<b>${i.target}</b> on <b>${i.route}</b> irritates: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} dead clicks`].filter(Boolean).join(' and ')}.`,
   },
   help: { rage: '3 clicks on the same spot within 1 s', dead: 'A click on a button or link that changed nothing within 1 s', js_error: 'An uncaught JavaScript error', http_5xx: 'A request answered with 5xx, or a network failure', http_4xx: 'A request refused with 4xx (401 left out)', abandon: 'Started filling a form and left without saving', bounce: 'Went back within 4 s', slow: 'A request that took 3 s or more while on screen' },
   csv: 'CSV', csvTip: 'Download this table as CSV',
@@ -386,6 +391,38 @@ const ago = (at) => {
 const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
 const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
 const empty = (msg) => `<div class="card empty">${msg}</div>`
+
+// Names people use, from /api/names: the business name leads, the technical key always comes with it.
+const NM = () => state.names ?? { screens: {}, controls: {}, actions: {} }
+function screenText(route) {
+  if (!route) return ''
+  const n = NM().screens[route]
+  if (n) return n
+  const m = route.match(/^(.*?)\/:id(\/.*)?$/) // a record's page: named after the list it belongs to
+  const parent = m && NM().screens[m[1] || '/']
+  return parent ? `${parent} › ${L.record}${m[2] ? ' › ' + m[2].slice(1) : ''}` : ''
+}
+const controlLabel = (route, target) => NM().controls[route + '\t' + target] ?? ''
+const controlText = (route, target) => { const l = controlLabel(route, target); return l ? `${screenText(route) || route} › ${l}` : '' }
+const actionText = (detail) => NM().actions[detail] ?? ''
+const named = (name, tech) => name ? `<span class="nm">${esc(name)}</span><code class="tech">${esc(tech)}</code>` : `<code>${esc(tech)}</code>`
+const scr = (route) => named(screenText(route), route)
+const ctl = (route, target) => named(controlText(route, target), target)
+const act = (detail) => named(actionText(detail), detail)
+// An insight's facts with the business names in place of the keys (escaped for HTML unless raw), and its keys apart.
+function nameFields(i, raw = false) {
+  const e = raw ? (x) => x : esc
+  const pick = (name, key) => e(name || key)
+  const out = Object.fromEntries(Object.entries(i).map(([k, v]) => [k, typeof v === 'string' ? e(v) : v]))
+  if (i.route) out.route = pick(screenText(i.route), i.route)
+  if (i.target) out.target = pick(controlLabel(i.route, i.target), raw ? i.target : L.unnamed)
+  if (i.action) out.action = pick(actionText(i.action), i.action)
+  if (i.key) out.key = pick(i.kind_of === 'action' ? actionText(i.key) : controlLabel(i.route, i.key), i.key)
+  if (i.kind === 'pair_linked') { out.a = pick(actionText(i.a), i.a); out.b = pick(actionText(i.b), i.b) }
+  return out
+}
+const techOf = (i) => [...new Set([i.route, i.target, i.action, i.key, i.kind === 'pair_linked' && i.a, i.kind === 'pair_linked' && i.b].filter(Boolean))]
+  .map((x) => `<code>${esc(x)}</code>`).join(' · ')
 const signals = (s) => {
   const items = Object.entries(s).sort((a, b) => b[1] - a[1])
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
@@ -511,6 +548,7 @@ async function loadFilters() {
     $('#' + id).value = values.includes(current) ? current : ''
   }
   fill('version', f.versions, L.allf); fill('account', f.accounts, L.all); fill('role', f.roles, L.all)
+  state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json().catch(() => null)
 }
 
 function query(extra = {}) {
@@ -541,8 +579,9 @@ function wireSearch() {
     const groups = {}
     for (const r of results) (groups[r.kind] ??= []).push(r)
     box.innerHTML = results.length ? Object.entries(groups).map(([kind, list]) => `<div class="group label">${L.kinds[kind]}</div>` + list.map((r) =>
-      `<a ${linkAttrs(r.link)}><code>${esc(r.type ? (L.names[r.type] ?? r.type) + ': ' + r.label : r.label)}</code>
-        <span class="meta">${r.route && r.kind !== 'screen' ? esc(r.route) + ' · ' : ''}${r.n}</span></a>`).join('')).join('')
+      `<a ${linkAttrs(r.link)}><span>${r.type ? `<code>${esc((L.names[r.type] ?? r.type) + ': ' + r.label)}</code>`
+          : named(r.kind === 'screen' ? screenText(r.label) : r.kind === 'element' ? controlText(r.route, r.label) : r.kind === 'action' ? actionText(r.label) : '', r.label)}</span>
+        <span class="meta">${r.route && r.kind !== 'screen' && r.kind !== 'element' ? esc(screenText(r.route) || r.route) + ' · ' : ''}${r.n}</span></a>`).join('')).join('')
       : `<div class="empty">${L.noResults}</div>`
     box.hidden = false; input.setAttribute('aria-expanded', 'true')
   }
@@ -611,9 +650,9 @@ function heatMap(o) {
       <div class="legend"><span class="meta">${L.heatScale}</span>${HEAT.slice().reverse().map(([v, k]) => `<span><i class="sw h${k}"></i>${v}${k === 5 ? '+' : ''}</span>`).join('')}</div></div>
     <div class="heat" style="--n:${days.length}">
       <div></div><div class="vers">${days.map((d) => `<span>${at.has(d) && d !== first ? esc(o.deploys.find((x) => x.day === d).version) : ''}</span>`).join('')}</div>
-      ${o.screens.map((r) => `<a class="hl" ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(r.route)}</a>
+      ${o.screens.map((r) => `<a class="hl" ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(screenText(r.route) || r.route)}</a>
         <div class="cells">${days.map((d) => { const x = r.days[d]; const k = x ? HEAT.find(([v]) => x.score >= v)[1] : 0
-          return `<i class="h${k}${at.has(d) && d !== first ? ' dep' : ''}" tabindex="0" data-tip="${esc(L.heatTip(r.route, d, x))}"></i>` }).join('')}</div>`).join('')}
+          return `<i class="h${k}${at.has(d) && d !== first ? ' dep' : ''}" tabindex="0" data-tip="${esc(L.heatTip(screenText(r.route) || r.route, d, x))}"></i>` }).join('')}</div>`).join('')}
     </div></section>`
 }
 
@@ -637,14 +676,11 @@ async function overview() {
     <div class="row"><div class="big ${cls}">${value}${delta}</div>${spark(series(key), `${label} ${L.perDay}: ${Math.min(...series(key))}–${Math.max(...series(key))}`)}</div>
     <div class="meta">${foot}</div></div>`
 
-  const sentence = (i) => {
-    const safe = Object.fromEntries(Object.entries(i).map(([k, v]) => [k, typeof v === 'string' ? esc(v) : v]))
-    return L.insight[i.kind](safe, esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? ''))
-  }
+  const sentence = (i) => L.insight[i.kind](nameFields(i), esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? ''))
   const bad = o.insights.filter((i) => i.severity === 'bad'), warn = o.insights.filter((i) => i.severity === 'warn')
   const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
   const headline = level === 'bad' ? L.verdict.bad(bad.length) : level === 'warn' ? L.verdict.warn(warn.length) : L.verdict.ok
-  const shortOf = (i) => (L.short[i.kind] ?? (() => ''))(i)
+  const shortOf = (i) => (L.short[i.kind] ?? (() => ''))(nameFields(i, true))
   const top = (level === 'bad' ? bad : warn).filter((i) => L.short[i.kind]).slice(0, 4)
   const icon = { bad: '!', warn: '•', ok: '✓' }[level]
   const verdict = `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${icon}</span><div>
@@ -663,7 +699,7 @@ async function overview() {
   const groups = Object.keys(GROUPS).filter((g) => grouped[g])
   const insights = o.insights.length ? `<div class="groups">${groups.map((g) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}</div>
       <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
-        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
+        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
     : ''
 
   return `
@@ -705,8 +741,8 @@ async function frustration() {
   if (!o.visits && !r.routes.length) return empty(L.noVisits)
   const worst = r.routes.find((x) => x.visits)
   const detail = (x) => {
-    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — <code>${esc(a.target)}</code> ${a.n}×</li>`).join('')}</ul>` : ''
-    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} <code>${esc(f.after)}</code>` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
+    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${a.n}×</li>`).join('')}</ul>` : ''
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
       <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`
   }
@@ -714,14 +750,14 @@ async function frustration() {
     <section class="numbers">
       <div class="card"><div class="label">${L.overall}</div><div class="big ${band(o.score)}">${o.score}</div><span class="pill ${band(o.score)}">${say(o.score)}</span></div>
       <div class="card"><div class="label">${L.visits}</div><div class="big">${o.visits}</div><div class="meta">${L.sessions(o.sessions)}</div></div>
-      <div class="card"><div class="label">${L.worst}</div><div class="route" style="margin-top:8px">${worst ? esc(worst.key) : '—'}</div>
+      <div class="card"><div class="label">${L.worst}</div><div class="route" style="margin-top:8px">${worst ? scr(worst.key) : '—'}</div>
         <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}</div></div>
     </section>
     <section class="card">
       <div class="label">${L.screensByFrustration}</div><div class="meta">${L.openRow}</div>
       ${table(`<th>${L.screen}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.routes.map((x, i) => `
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
-          <td><div class="route">${esc(x.key)}</div></td>
+          <td><div class="route">${scr(x.key)}</div></td>
           <td class="n">${scoreHtml(x.score)}<div class="bar"><i style="width:${x.score}%;background:var(--${band(x.score)})"></i></div></td>
           <td class="n">${x.visits}</td><td>${signals(x.signals)}</td></tr>
         <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="4">${detail(x)}</td></tr>`).join(''))}
@@ -745,7 +781,13 @@ const offset = (ms) => {
 const stepText = (s) => (F().step[s.type] ?? ((x) => `${L.names[x.type] ?? x.type}: ${x.detail}`))(s)
 const isFailure = (s) => ['js_error', 'http_5xx', 'http_4xx', 'slow'].includes(s.type)
 const stepHtml = (s, zero, here) => `<li class="${here ? 'here' : isFailure(s) || s.type === 'rage' || s.type === 'dead' ? 'sig' : ''}">
-  <span class="t">${offset(s.at - zero)}</span><span>${esc(stepText(s))}${s.route && s.type !== 'page' ? ` <span class="meta">${esc(s.route)}</span>` : ''}</span></li>`
+  <span class="t">${offset(s.at - zero)}</span><span>${esc(stepText(namedStep(s)))} <code class="tech">${esc([s.type === 'page' ? '' : s.route, s.target].filter(Boolean).join(' · ') || s.route)}</code></span></li>`
+// A step told with names: "Opened Users", "Clicked Users › New user", "Saved Save".
+function namedStep(s) {
+  const page = screenText(s.route) || s.route
+  return { ...s, route: page, target: s.target ? (controlLabel(s.route, s.target) ? `${page} › ${controlLabel(s.route, s.target)}` : s.target) : s.target,
+    detail: s.type === 'action' && actionText(s.detail) ? `${actionText(s.detail)} (${s.detail})` : s.detail }
+}
 const counts = (title, list, name = (k) => k) => `<div><div class="label">${title}</div>${list.length
   ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${x.n}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 const sameStep = (a, b) => a.at === b.at && a.type === b.type && a.detail === b.detail
@@ -778,8 +820,8 @@ async function failures() {
         <div class="title"><code>${esc(d.detail)}</code></div>
         <div class="meta">${esc(F().occurrences(d))} · ${F().since} ${esc(d.first_version)} (${when(d.first_at)}) · ${F().last} ${ago(d.last_at)}</div></div>
         <div class="field"><button data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)" ${linkAttrs({ tab: 'failures', params: {} })}>${F().close}</a></div></div>
-      <div class="facts">${counts(F().where, d.routes)}${counts(F().versions, d.versions)}${counts(F().agents, d.agents)}
-        ${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking) : ''}</div>
+      <div class="facts">${counts(F().where, d.routes, (k) => screenText(k) || k)}${counts(F().versions, d.versions)}${counts(F().agents, d.agents)}
+        ${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking, (k) => controlLabel(d.routes[0]?.key, k) || k) : ''}</div>
       <div class="label" style="margin-top:16px">${F().stack}</div>
       ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${x.n}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
       <div class="label" style="margin-top:16px">${F().trails}</div><div class="meta">${F().trailsHint(15, 3)}</div>
@@ -793,7 +835,7 @@ async function failures() {
     ${table(`<th>${F().failure}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th>`,
       list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
         <td><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
-          <div class="meta">${esc(f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
+          <div class="meta">${esc(screenText(f.route) || f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
         <td class="n">${f.sessions}</td><td class="n">${f.users}</td><td class="n">${f.n}</td>
         <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td></tr>`).join(''))}</section>`
 }
@@ -828,7 +870,9 @@ async function showSession(button) {
 // Journeys -------------------------------------------------------------------------------------------------
 const J = () => L.journey
 const funnelSteps = () => { try { const v = JSON.parse(state.funnel || '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
-const stepLabel = (step) => { const [kind, ...rest] = step.split(':'); return `${J().stepKind[kind] ?? kind}: ${rest.join(':')}` }
+const stepLabel = (step) => { const [kind, ...rest] = step.split(':'); const v = rest.join(':')
+  const name = kind === 'page' ? screenText(v) : kind === 'action' ? actionText(v) : ''
+  return `${J().stepKind[kind] ?? kind}: ${name ? `${name} (${v})` : v}` }
 
 async function journeys() {
   const j = await read('/api/journeys')
@@ -839,9 +883,10 @@ async function journeys() {
   const sc = j.screens.find((x) => x.route === state.route)
   const pct = (x) => Math.round(x * 100)
   const flowList = (list, empty) => list.length ? `<ul class="counts">${list.map((x) => `<li>${x.route === '(exit)' ? `<span class="meta">${J().exit}</span>`
-    : `<a href="#" data-flow="${esc(x.route)}">${esc(x.route)}</a>`}<b>${pct(x.share)}%</b></li>`).join('')}</ul>` : `<p class="meta">${empty}</p>`
+    : `<a href="#" data-flow="${esc(x.route)}" title="${esc(x.route)}">${esc(screenText(x.route) || x.route)}</a>`}<b>${pct(x.share)}%</b></li>`).join('')}</ul>` : `<p class="meta">${empty}</p>`
   const reach = [...j.reach].sort((a, b) => b.uses - a.uses).slice(0, 50)
-  const options = (kind, values) => values.map((v) => `<option value="${esc(kind + ':' + v)}">${esc(v)}</option>`).join('')
+  const nameOf = (kind, v) => (kind === 'page' ? screenText(v) : kind === 'action' ? actionText(v) : '') || v
+  const options = (kind, values) => values.map((v) => `<option value="${esc(kind + ':' + v)}">${esc(nameOf(kind, v))}</option>`).join('')
   const actionsSeen = [...new Set(j.reach.filter((r) => r.kind === 'action').map((r) => r.key))]
   const elementsSeen = [...new Set(j.reach.filter((r) => r.kind === 'element').map((r) => r.key))].slice(0, 60)
   const far = j.reach.filter((r) => r.far).slice(0, 10)
@@ -851,20 +896,20 @@ async function journeys() {
       <details style="margin-top:12px"><summary>${J().allReach(j.reach.length)}</summary>${reachTable(reach)}</details>
     </section>`
   const reachTable = (rows) => table(`<th>${J().item}</th><th>${L.screen}</th><th class="n">${J().uses}</th><th class="n">${L.users}</th><th class="n">${J().clicksTo}</th><th class="n">${J().screensTo}</th>`,
-        rows.map((r) => `<tr><td><span class="meta">${J()[r.kind]}</span> ${r.far ? `<span class="pill idea">${J().far}</span>` : ''}<br><code>${esc(r.key)}</code></td>
-          <td>${esc(r.route)}</td><td class="n">${r.uses}</td><td class="n">${r.users}</td>
+        rows.map((r) => `<tr><td><span class="meta">${J()[r.kind]}</span> ${r.far ? `<span class="pill idea">${J().far}</span>` : ''}<br>${r.kind === 'action' ? act(r.key) : ctl(r.route, r.key)}</td>
+          <td>${scr(r.route)}</td><td class="n">${r.uses}</td><td class="n">${r.users}</td>
           <td class="n"><b class="${r.clicks_median >= 5 ? 'warn' : ''}">${r.clicks_median}</b></td><td class="n"><b class="${r.screens_median >= 2 ? 'warn' : ''}">${r.screens_median}</b></td></tr>`).join(''))
   return reachCard() + `
     <section class="card"><div class="label">${J().pairs}</div><div class="meta">${J().pairsHint}</div>
-      ${j.pairs.length ? `<ul class="insights">${j.pairs.slice(0, 15).map((p) => { const e = { ...p, a: esc(p.a), b: esc(p.b), clicks: p.clicks_median, screens: p.screens_median }
-        return `<li>${p.linked ? `<span class="pill idea">${J().linked}</span>` : ''}<div class="text">${J().pair(e)}<div class="meta">${J().pairMeta(e)}</div></div></li>` }).join('')}</ul>`
+      ${j.pairs.length ? `<ul class="insights">${j.pairs.slice(0, 15).map((p) => { const e = { ...p, a: esc(actionText(p.a) || p.a), b: esc(actionText(p.b) || p.b), clicks: p.clicks_median, screens: p.screens_median }
+        return `<li>${p.linked ? `<span class="pill idea">${J().linked}</span>` : ''}<div class="text">${J().pair(e)}<div class="meta">${J().pairMeta(e)}</div><div class="tech"><code>${esc(p.a)}</code> → <code>${esc(p.b)}</code></div></div></li>` }).join('')}</ul>`
         : `<p class="meta">${J().noPairs}</p>`}
     </section>
     <section class="card"><div class="head"><div><div class="label">${J().flow}</div><div class="meta">${J().flowHint}</div></div>
-        <select id="flow-screen" aria-label="${L.screen}">${j.screens.map((x) => `<option ${x.route === state.route ? 'selected' : ''}>${esc(x.route)}</option>`).join('')}</select></div>
+        <select id="flow-screen" aria-label="${L.screen}">${j.screens.map((x) => `<option value="${esc(x.route)}" ${x.route === state.route ? 'selected' : ''}>${esc(screenText(x.route) ? `${screenText(x.route)} (${x.route})` : x.route)}</option>`).join('')}</select></div>
       <div class="flow">
         <div><div class="label">${J().from}</div>${flowList(sc.from, J().start)}</div>
-        <div class="here"><div class="route">${esc(sc.route)}</div><div class="meta">${L.visitsN(sc.visits)} · ${J().timeOn(sc.seconds_median)}</div></div>
+        <div class="here"><div class="route">${scr(sc.route)}</div><div class="meta">${L.visitsN(sc.visits)} · ${J().timeOn(sc.seconds_median)}</div></div>
         <div><div class="label">${J().to}</div>${flowList(sc.to, '—')}</div>
       </div>
     </section>
@@ -898,21 +943,21 @@ async function usage() {
         <div class="label">${L.screensByUse}</div><div class="meta">${L.pickScreen}</div>
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
-            <td><div class="route">${esc(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
+            <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
             <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
       </div>
       <div class="card">
-        <div class="head"><div><div class="label">${esc(L.elementsOf(d.route))}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
+        <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
           ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
         ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
-          <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><code>${esc(e.target)}</code></td>
+          <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><span class="named">${named(controlLabel(d.route, e.target), e.target)}</span></td>
             <td class="n">${e.clicks}</td><td class="n">${e.users}</td>
             <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${e.rage + e.dead + e.errors}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
           : `<p class="meta">${L.noClicks}</p>`}
       </div>
     </section>
-    <section class="card"><div class="label">${esc(L.neverIn(d.route))}</div><div class="meta">${L.neverHint}</div>
-      ${d.never_clicked.length ? `<ul>${d.never_clicked.map((a) => `<li><code>${esc(a)}</code></li>`).join('')}</ul>` : `<p class="meta">${L.allClicked}</p>`}</section>`
+    <section class="card"><div class="label">${esc(L.neverIn(screenText(d.route) || d.route))}</div><div class="meta">${L.neverHint}</div>
+      ${d.never_clicked.length ? `<ul>${d.never_clicked.map((a) => `<li>${named(controlLabel(d.route, a), a)}</li>`).join('')}</ul>` : `<p class="meta">${L.allClicked}</p>`}</section>`
 }
 
 async function openMap() {
@@ -928,7 +973,7 @@ async function openMap() {
 async function people() {
   const p = await read('/api/people')
   if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
-  const top = (ss) => ss.map((s) => `${esc(s.route)} <span class="meta">${s.visits}</span>`).join('<br>')
+  const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${s.visits}</span>`).join('<br>')
   const group = (title, hint, list, col) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
     ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
       list.map((g) => `<tr><td><b>${esc(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
@@ -948,7 +993,7 @@ async function actions() {
   const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
   return `<section class="card"><div class="label">${L.effort}</div><div class="meta">${L.effortHint}</div>
     ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
-      actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td><code>${esc(a.action)}</code></td><td class="n">${a.times}</td><td class="n">${a.users}</td>
+      actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td>${act(a.action)}</td><td class="n">${a.times}</td><td class="n">${a.users}</td>
         <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td><td class="n">${a.clicks_p90}</td>
         <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
 }
@@ -974,16 +1019,16 @@ async function versions() {
     </section>
     <section class="card"><div class="label">${L.screensCompared}</div>
       ${table(`<th>${L.screen}</th><th class="n">${esc(c.a)}</th><th class="n">${esc(c.b)}</th><th class="n">${L.change}</th><th class="n">${L.visits} ${esc(c.b)}</th><th>${L.signals} ${esc(c.b)}</th>`,
-        c.routes.map((r) => `<tr><td><div class="route">${esc(r.route)}</div></td>
+        c.routes.map((r) => `<tr><td><div class="route">${scr(r.route)}</div></td>
           <td class="n">${r.a ? scoreHtml(r.a.score) : '<span class="meta">—</span>'}</td><td class="n">${r.b ? scoreHtml(r.b.score) : '<span class="meta">—</span>'}</td>
           <td class="n">${r.delta === null ? `<span class="meta">${esc(L.onlyIn(r.b ? c.b : c.a))}</span>` : delta(r.delta)}</td>
           <td class="n">${r.b?.visits ?? 0}</td><td>${r.b ? signals(r.b.signals) : ''}</td></tr>`).join(''))}</section>
     ${c.actions.length ? `<section class="card"><div class="label">${L.actionsCompared}</div>
       ${table(`<th>${L.action}</th><th class="n">${L.clicks}</th><th class="n">${L.timeMed}</th><th class="n">${L.times} ${esc(c.b)}</th>`,
-        c.actions.map((x) => `<tr><td><code>${esc(x.action)}</code></td><td class="n">${pair(x.a?.clicks_median, x.b?.clicks_median)}</td>
+        c.actions.map((x) => `<tr><td>${act(x.action)}</td><td class="n">${pair(x.a?.clicks_median, x.b?.clicks_median)}</td>
           <td class="n">${pair(x.a?.seconds_median, x.b?.seconds_median, ' s')}</td><td class="n">${x.b?.times ?? 0}</td></tr>`).join(''))}</section>` : ''}
     <section class="card"><div class="label">${L.newFailures}</div>
-      ${c.new_failures.length ? `<ul>${c.new_failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code> <span class="meta">${esc(f.route)}</span> — ${f.n}×</li>`).join('')}</ul>`
+      ${c.new_failures.length ? `<ul>${c.new_failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code> <span class="meta">${esc(screenText(f.route) || f.route)}</span> — ${f.n}×</li>`).join('')}</ul>`
         : `<p class="meta">${L.noNewFailures}</p>`}</section>`
 }
 

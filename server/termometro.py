@@ -658,13 +658,14 @@ def search(con, f: Filter) -> dict:
     if len(text) < 2:
         return {"q": text, "results": []}
     has = "instr(lower({}), ?) > 0"
+    either = "(instr(lower({}), ?) > 0 OR instr(lower(label), ?) > 0)"  # the key or the name people use
     out = []
-    for route, n in con.execute(f"""SELECT route, SUM(type = 'page') FROM events WHERE {f.sql} AND {has.format('route')}
-            GROUP BY route ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+    for route, n in con.execute(f"""SELECT route, SUM(type = 'page') FROM events WHERE {f.sql} AND {either.format('route')}
+            GROUP BY route ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text, text]):
         out.append({"kind": "screen", "label": route, "n": n, "link": {"tab": "frustration", "params": {"route": route}}})
     for target, route, n in con.execute(f"""SELECT target, route, COUNT(*) FROM events
-            WHERE {f.sql} AND type IN ('click', 'rage', 'dead') AND {has.format('target')}
-            GROUP BY target, route ORDER BY 3 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+            WHERE {f.sql} AND type IN ('click', 'rage', 'dead') AND {either.format('target')}
+            GROUP BY target, route ORDER BY 3 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text, text]):
         out.append({"kind": "element", "label": target, "route": route, "n": n, "link": {"tab": "usage", "params": {"route": route}}})
     for kind, detail, route, n in con.execute(f"""SELECT type, detail, MIN(route), COUNT(*) FROM events
             WHERE {f.sql} AND type IN {FAILURES} AND {has.format('detail')}
@@ -672,7 +673,7 @@ def search(con, f: Filter) -> dict:
         out.append({"kind": "failure", "type": kind, "label": detail, "route": route, "n": n,
                     "link": {"tab": "failures", "params": {"signal": kind, "detail": detail}}})
     for detail, n in con.execute(f"""SELECT detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'action'
-            AND {has.format('detail')} GROUP BY detail ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
+            AND {either.format('detail')} GROUP BY detail ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text, text]):
         out.append({"kind": "action", "label": detail, "n": n, "link": {"tab": "actions", "params": {"action": detail}}})
     for column, kind, param in (("user_id", "user", "user"), ("account", "account", "account")):
         for value, n in con.execute(f"""SELECT {column}, SUM(type = 'page') FROM events WHERE {f.sql} AND {column} != ''
