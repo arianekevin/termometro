@@ -78,9 +78,9 @@
   --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
 }
 /* Colour-blind mode: low / moderate / high become blue / neutral / orange (no red against green); labels stay. */
-:root[data-cvd="on"] { --ok: #2a78d6; --ok-soft: #e6f0fb; --warn: #8c8579; --warn-soft: #f1efea; --bad: #c2410c; --bad-soft: #fde8dc; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"])[data-cvd="on"] { --ok: #3987e5; --ok-soft: #142338; --warn: #8a8478; --warn-soft: #24211c; --bad: #d95926; --bad-soft: #3d2215; } }
-:root[data-theme="dark"][data-cvd="on"] { --ok: #3987e5; --ok-soft: #142338; --warn: #8a8478; --warn-soft: #24211c; --bad: #d95926; --bad-soft: #3d2215; }
+:root[data-cvd="on"] { --ok: #1f68c0; --ok-soft: #e6f0fb; --warn: #6f695e; --warn-soft: #f1efea; --bad: #b23a0b; --bad-soft: #fde8dc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"])[data-cvd="on"] { --ok: #5c9cec; --ok-soft: #142338; --warn: #a39d91; --warn-soft: #24211c; --bad: #ec7442; --bad-soft: #3d2215; } }
+:root[data-theme="dark"][data-cvd="on"] { --ok: #5c9cec; --ok-soft: #142338; --warn: #a39d91; --warn-soft: #24211c; --bad: #ec7442; --bad-soft: #3d2215; }
 /* Bigger text: the whole dashboard, charts included, scales; the tooltip follows. */
 :root[data-text="large"] #app { zoom: 1.15; } :root[data-text="larger"] #app { zoom: 1.3; }
 :root[data-text="large"] .tip { font-size: 14px; line-height: 19px; } :root[data-text="larger"] .tip { font-size: 16px; line-height: 22px; }
