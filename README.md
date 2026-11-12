@@ -20,7 +20,10 @@ collects what users type or see, and it runs on your own server.
   or merge them), where people come from and go to on each screen, and funnels you build from screens, actions and buttons.
 - **Usage:** most and least used screens, and the elements nobody clicks.
 - **People:** usage by role, account and user — ids only.
-- **Heat map** over your own app, opened from the dashboard.
+- **Screen map:** each screen drawn in the dashboard from where its buttons, links and regions sit (no content),
+  with three lenses: Problems (what irritates, as a share of its clicks), Use (clicks) and Routes (where people go
+  next, with back-and-forth pairs marked). Click an element for its numbers and steps. The same heat and routes open
+  over your own app too.
 - **By version:** did the last deploy make things better or worse? Screen by screen, action by action, and the
   failures only the new version has — and a Slack or Google Chat message when it got worse.
 - **Each failure dated:** in which version it started and when it was last seen, so you know whether the fix worked.
@@ -43,7 +46,8 @@ bank data or anything under LGPD/GDPR. Termometro keeps only the shape of the in
 | the app's own words on a control ("New user") and the screen's name ("Users"), up to 40 characters | text inside tables, lists of records and fields, a record page's title, anything under `data-termometro-private` |
 | the ids you choose to give (account, user, role) | recordings, screenshots |
 | optionally, the user's name (`identity.name`), kept apart and never in what an AI reads; `"people_names": false` on the project drops it | |
-| browser and system family (`Chrome 130 · macOS`), kind of screen (phone, tablet, desktop) | exact versions, screen size, IP |
+| browser and system family (`Chrome 130 · macOS`), kind of screen (phone, tablet, desktop) | exact versions, IP |
+| once per screen and window size (wide or narrow): the box of each visible control and of the page's regions (main, nav, header…) in whole pixels, and the window's and page's size — for the screen map | what is inside the boxes: no text beyond the labels above, no screenshots |
 | where an error happened in your code (`loadRows @ /assets/index.js:1:4567`) | the page's query string or data |
 
 E-mails, uuids, numbers with 3+ digits and quoted text are scrubbed in the browser before anything is sent.

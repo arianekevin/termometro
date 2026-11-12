@@ -20,7 +20,10 @@ não coleta o que o usuário digita ou vê e roda no seu próprio servidor.
   cada tela, e funis montados com telas, ações e botões.
 - **Uso:** telas mais e menos usadas, e os elementos que ninguém clica.
 - **Pessoas:** uso por papel, conta e usuário — só ids.
-- **Mapa de calor** sobre o seu próprio app, aberto pelo painel.
+- **Mapa da tela:** cada tela desenhada no painel pelas posições dos botões, links e regiões (sem conteúdo), com três
+  lentes: Problemas (o que irrita, pela parte dos cliques), Uso (cliques) e Rotas (para onde as pessoas vão depois,
+  com o vai e volta marcado). Clique num elemento para ver os números e os passos dele. O mesmo calor e as rotas
+  também abrem sobre o seu próprio app.
 - **Por versão:** o último deploy melhorou ou piorou? Tela a tela, ação a ação, e as falhas que só a versão nova
   tem — com mensagem no Slack ou no Google Chat quando piorou.
 - **Cada falha datada:** em que versão começou e quando apareceu pela última vez, para saber se a correção funcionou.
@@ -43,7 +46,8 @@ dado bancário ou qualquer coisa sob a LGPD. O Termometro guarda só a forma da 
 | as palavras do próprio app num controle ("Novo usuário") e o nome da tela ("Usuários"), até 40 caracteres | texto de tabelas, listas de registros e campos, título da página de um registro, tudo dentro de `data-termometro-private` |
 | os ids que você escolher mandar (conta, usuário, papel) | gravações, prints |
 | se quiser, o nome do usuário (`identity.name`), guardado à parte e nunca no que uma IA lê; `"people_names": false` no projeto descarta | |
-| família do navegador e do sistema (`Chrome 130 · macOS`), tipo de tela (celular, tablet, computador) | versões exatas, tamanho da tela, IP |
+| família do navegador e do sistema (`Chrome 130 · macOS`), tipo de tela (celular, tablet, computador) | versões exatas, IP |
+| uma vez por tela e tamanho de janela (larga ou estreita): a caixa de cada controle visível e das regiões da página (conteúdo, menu, cabeçalho…) em pixels inteiros, e o tamanho da janela e da página — para o mapa da tela | o que há dentro das caixas: nenhum texto além dos rótulos acima, nenhum print |
 | onde o erro aconteceu no seu código (`loadRows @ /assets/index.js:1:4567`) | a query string ou os dados da página |
 
 E-mails, uuids, números com 3 dígitos ou mais e texto entre aspas são limpos no navegador antes de sair.
