@@ -89,7 +89,7 @@ VERSION = "0.2.3"
 # measure usage and effort and weigh nothing; "inventory" lists what can be clicked on a screen.
 WEIGHTS = {"rage": 3, "dead": 2, "js_error": 5, "http_5xx": 5, "http_4xx": 2, "abandon": 2, "bounce": 1, "slow": 1}
 FAILURES = "('js_error', 'http_5xx', 'http_4xx', 'slow')"
-TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory", "track", "retry", "near_miss", "typed", "enter"}
+TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory", "track", "retry", "near_miss", "typed", "enter", "away"}
 FACTOR, CAP = 20, 100
 
 MAX_BODY = 256 * 1024
@@ -807,6 +807,12 @@ def overview(con, f: Filter) -> dict:
             kind_of=w["kind"], route=w["route"], key=w["key"], uses=w["uses"], via=x["route"], share=x["share"], normal=x["normal"],
             browsed=x["browsed"])
     pat = patterns(con, f)
+    for x in [x for x in pat["forms"] if x["detours"] >= DETOUR_MIN and x["share"] >= DETOUR_SHARE and x["via"]][:2]:
+        add("form_detour", "idea", 84 + x["share"] * 10, {"tab": "journeys", "params": {}}, route=x["route"], target=x["form"],
+            started=x["started"], detours=x["detours"], share=x["share"], via=x["via"][0]["route"], via_share=x["via"][0]["share"])
+    for x in [x for x in pat["forms"] if x["away"] >= DETOUR_MIN and x["away_share"] >= DETOUR_SHARE][:2]:
+        add("form_away", "idea", 83 + x["away_share"] * 10, {"tab": "journeys", "params": {}}, route=x["route"], target=x["form"],
+            started=x["started"], away=x["away"], share=x["away_share"], seconds=x["away_seconds"])
     for x in pat["focus"][:3]:
         add("focus_candidate", "idea", 75 + x["share"] * 10, {"tab": "journeys", "params": {}}, **x)
     for x in [x for x in pat["follows"] if x["to_field"]][:2] + [x for x in pat["follows"] if not x["to_field"]][:1]:
@@ -1023,6 +1029,9 @@ PATTERN_MIN = 20        # visits to a screen, or clicks on a control, before a p
 PATTERN_SHARE = 0.6     # how often something must happen to be a pattern
 FOLLOW_MS = 10_000      # a click this soon after another follows it
 TYPED_MS = 30_000       # a click this soon after typing in a field is what came after the typing
+DETOUR_MS = 15 * 60_000  # back on an unfinished form's screen within this: a detour to fetch something, not a new start
+DETOUR_SHARE = 0.1       # of the tasks started on a screen: leaving for other screens, or the browser, this often...
+DETOUR_MIN = 10          # ...and at least this many times, is a pattern
 
 
 def is_field(selector: str) -> bool:
@@ -1042,15 +1051,51 @@ def patterns(con, f: Filter) -> dict:
     typed: dict = {}
     session = route_now = None
     first_done, last_click, pending = True, None, None
-    for sid, kind, route, target, at in con.execute(f"""SELECT session, type, route, target, at FROM events WHERE {f.sql}
-            AND type IN ('page', 'click', 'typed', 'enter') ORDER BY session, at, id""", f.args):
+    # Something started on a screen (clicked or typed, not saved yet), left for other screens or the browser, and finished
+    # on coming back: per screen, how often it happened, where people went, and how long they were away from the browser.
+    forms: dict = {}        # screen -> started, detours, where to, away
+    detour = None           # an unfinished task left for other screens: (route, form, at, screens visited)
+    started_here = False
+    busy = False            # clicked or typed on this screen since arriving or since the last save
+    abandoned = None        # the form the collector said was left unsaved (it says so just before the next page)
+    for sid, kind, route, target, at, ms in con.execute(f"""SELECT session, type, route, target, at, duration_ms FROM events
+            WHERE {f.sql} AND type IN ('page', 'click', 'typed', 'enter', 'abandon', 'action', 'away') ORDER BY session, at, id""", f.args):
         if sid != session:
-            session, route_now, first_done, last_click, pending = sid, None, True, None, None
+            session, route_now, first_done, last_click, pending, detour, started_here = sid, None, True, None, None, None, False
+            busy, abandoned = False, None
         if kind == "page":
+            if detour and at - detour[2] > DETOUR_MS:
+                detour = None  # too long ago: not a trip to fetch something
+            if busy and route_now and route != route_now and not detour:
+                form = abandoned[1] if abandoned and abandoned[0] == route_now else ""
+                detour = (route_now, form, at, [])  # left something unfinished
+            abandoned = None
             visits[route] = visits.get(route, 0) + 1
-            route_now, first_done, last_click, pending = route, False, None, None
+            route_now, first_done, last_click, pending, started_here, busy = route, False, None, None, False, False
+            if detour and route != detour[0]:
+                detour[3].append(route)
+            continue
+        if kind == "abandon":
+            abandoned = (route, target)
+            continue
+        if kind == "away":
+            fm = forms.setdefault(route, {"form": target, "started": 0, "detours": 0, "via": {}, "away": []})
+            fm["away"].append(ms or 0)
+            continue
+        if kind == "action":
+            if detour and route == detour[0] and detour[3]:  # back where it started, and saved: a detour
+                fm = forms.setdefault(route, {"form": detour[1], "started": 0, "detours": 0, "via": {}, "away": []})
+                fm["form"] = fm["form"] or detour[1]
+                fm["detours"] += 1
+                for r in dict.fromkeys(detour[3]):
+                    fm["via"][r] = fm["via"].get(r, 0) + 1
+            detour, busy = None, False
             continue
         key = (route, target)
+        if kind in ("typed", "click") and not started_here:
+            started_here = True
+            forms.setdefault(route, {"form": "", "started": 0, "detours": 0, "via": {}, "away": []})["started"] += 1
+        busy = True
         if kind == "typed":
             t = typed.setdefault(key, {"n": 0, "enter": 0, "next": {}})
             t["n"] += 1
@@ -1103,7 +1148,18 @@ def patterns(con, f: Filter) -> dict:
     focus.sort(key=lambda x: -x["visits"] * x["share"])
     after.sort(key=lambda x: -x["times"] * x["share"])
     no_enter.sort(key=lambda x: -x["typed"])
-    return {"focus": focus[:20], "follows": after[:30], "no_enter": no_enter[:20], "retry": counted("retry"),
+    detours = []
+    for route, fm in forms.items():
+        n = fm["started"]
+        if n < PATTERN_MIN / 2:
+            continue
+        via_top = sorted(fm["via"].items(), key=lambda kv: -kv[1])[:3]
+        detours.append({"route": route, "form": fm["form"], "started": n, "detours": fm["detours"], "share": round(fm["detours"] / n, 2),
+                        "via": [{"route": r, "share": round(c / fm["detours"], 2)} for r, c in via_top],
+                        "away": len(fm["away"]), "away_share": round(len(fm["away"]) / n, 2),
+                        "away_seconds": round(median(fm["away"]) / 1000) if fm["away"] else 0})
+    detours.sort(key=lambda x: -(x["detours"] + x["away"]))
+    return {"focus": focus[:20], "follows": after[:30], "no_enter": no_enter[:20], "forms": detours[:20], "retry": counted("retry"),
             "near_miss": counted("near_miss")}
 
 

@@ -604,6 +604,19 @@ describe('termometro', () => {
     expect(JSON.stringify(sent)).not.toContain('Maria')
   })
 
+  it('sees someone leave the browser in the middle of a form and come back', async () => {
+    start().page('/tickets/new')
+    document.body.innerHTML = '<form id="ticket"><input id="subject"></form>'
+    const visible = (v: 'hidden' | 'visible') => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: v }); document.dispatchEvent(new Event('visibilitychange')) }
+    document.querySelector('#subject')!.dispatchEvent(new Event('input', { bubbles: true }))
+    visible('hidden'); await vi.advanceTimersByTimeAsync(40_000); visible('visible')
+    visible('hidden'); await vi.advanceTimersByTimeAsync(1_000); visible('visible') // a glance: not counted
+    const [a, ...rest] = (await events()).filter((e) => e.type === 'away')
+    expect(rest).toEqual([])
+    expect(a).toMatchObject({ route: '/tickets/new', target: 'form#ticket' })
+    expect(a!.duration_ms).toBeGreaterThanOrEqual(40_000)
+  })
+
   it('tracks a business event by name only', async () => {
     const t = start()
     t.page('/import')

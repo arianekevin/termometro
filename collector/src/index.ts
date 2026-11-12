@@ -18,7 +18,8 @@
  * Patterns, outside the frustration level: retry (the same control clicked again 0.4–5 s after a click that changed
  * nothing: the first one did not take), near_miss (a click on nothing clickable within 10 px of a control: target
  * the control it nearly hit), typed (once per field per visit: someone typed there — never what) and enter (Enter
- * pressed in a field).
+ * pressed in a field) and away (left the browser in the middle of something on the screen — clicked or typed, not saved yet — and
+ * came back: its duration).
  * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen per
  * session) and action (a write the backend accepted, with the clicks and time it took since the previous one).
  *
@@ -89,7 +90,7 @@ export interface Termometro {
 }
 
 type EventType = 'page' | 'rage' | 'dead' | 'js_error' | 'http_4xx' | 'http_5xx' | 'abandon' | 'bounce' | 'slow' |
-  'click' | 'action' | 'inventory' | 'track' | 'retry' | 'near_miss' | 'typed' | 'enter'
+  'click' | 'action' | 'inventory' | 'track' | 'retry' | 'near_miss' | 'typed' | 'enter' | 'away'
 interface TrackedEvent {
   type: EventType
   route: string
@@ -114,6 +115,7 @@ interface Queued { event: TrackedEvent; who: Who }
 const RAGE_CLICKS = 3
 const RAGE_WINDOW_MS = 1000
 const RAGE_RADIUS_PX = 30
+const AWAY_MIN_MS = 3000 // shorter than this is a glance, not a trip elsewhere
 const RAGE_WAIT_MS = 1000 // an answer this slow during a burst reads as "waiting"
 const DEAD_WAIT_MS = 1000
 const BOUNCE_MS = 4000
@@ -658,7 +660,19 @@ export function start(options: Options): Termometro {
   const timer = setInterval(() => flush(), options.flushIntervalMs ?? 10_000)
   undo.push(() => clearInterval(timer))
   undo.push(() => clearTimeout(inventoryTimer))
-  listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') flush(true) })
+  // Left the browser (another tab or program) in the middle of something — a form, a filter, a dialog: anything clicked
+  // or typed on this screen and not saved yet — and came back: how long. Fetching something elsewhere?
+  let away: { form: string; route: string; t: number } | null = null
+  listen(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      away = filling || hereClicks > 0 ? { form: filling ?? '', route: currentRoute, t: Date.now() } : null
+      flush(true)
+    } else if (away) {
+      const ms = Date.now() - away.t
+      if (away.route === currentRoute && ms >= AWAY_MIN_MS) record({ type: 'away', route: currentRoute, target: away.form, duration_ms: ms })
+      away = null
+    }
+  })
   listen(window, 'pagehide', () => { leaveForm(); flush(true) })
 
   // Heat map: the dashboard opens the app with a one-hour token, kept for the tab until the map is closed.

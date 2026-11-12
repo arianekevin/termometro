@@ -326,6 +326,7 @@ const HELP_PT = {
   accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
   kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
+  detours: ['O que é', 'Tarefas começadas numa tela (clicou ou digitou, sem salvar) em que a pessoa sai e volta para concluir: para outra tela do sistema, ou para fora do navegador. Vale para formulário, filtro, modal, configuração — qualquer coisa. Nada do que foi digitado é coletado.', 'Saída frequente para a mesma tela é informação que falta aqui: trazer, buscar ou preencher automaticamente. Saída do navegador é informação que vem de fora: integração ou importação.'],
   ways: ['O que é', 'Por quais telas as pessoas passam, desde a última coisa que salvaram, antes de usar cada botão ou ação, comparado com o normal do app. A tela inicial e os menus estão no caminho de tudo, por isso só se destaca a tela que aparece bem mais do que o normal.', 'Uma tela que aparece no caminho muito mais do que o normal, e onde a pessoa clicou por lá, é onde ela procura aquilo primeiro: um atalho ali, ou mudar o recurso de lugar.'],
   patterns: ['O que é', 'O que as pessoas fazem sempre do mesmo jeito: o campo em que clicam primeiro ao abrir uma tela, o clique que quase sempre vem depois de outro, o botão que clicam depois de digitar em vez de usar Enter, o botão que precisou de dois cliques e o clique que quase acertou um botão. Só clique de pessoa conta; nada do que é digitado sai do navegador.', 'Cada padrão é um atrito pequeno e repetido: foco automático, Enter que funciona, área de clique maior. Somados, viram minutos por dia de quem usa muito.'],
   areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a adoção entre as pessoas ativas, a frustração e as falhas de cada uma. A área de cada tela se ajusta no Dicionário.', 'Área com muita adoção e frustração alta é onde o time mais incomoda gente. Área com pouca adoção pode ser nicho ou algo difícil de achar.'],
@@ -358,6 +359,7 @@ const HELP_EN = {
   accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
   kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
+  detours: ['What it is', 'Tasks started on a screen (clicked or typed, not saved) that people leave and come back to finish: for another screen of the system, or outside the browser. Forms, filters, dialogs, settings — anything. Nothing typed is collected.', 'A frequent trip to the same screen is information missing here: bring it, search it or fill it in. Leaving the browser is information from outside: integration or import.'],
   ways: ['What it is', 'Which screens people go through, since the last thing they saved, before using each button or action, against the app\'s usual. Home and menus are on the way to everything, so only a screen that shows up far more than usual stands out.', 'A screen that is on the way far more than usual, where people clicked around, is where they look for that thing first: a shortcut there, or moving the feature.'],
   patterns: ['What it is', 'What people always do the same way: the field they click first on opening a screen, the click that nearly always follows another, the button they click after typing instead of pressing Enter, the button that needed two clicks and the click that nearly hit a button. Only a person\'s clicks count; nothing typed leaves the browser.', 'Each pattern is a small, repeated friction: auto focus, Enter that works, a bigger click area. Added up, they are minutes a day for heavy users.'],
   areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, adoption among the people active, frustration and failures. Each screen\'s area is set in the Dictionary.', 'An area with wide adoption and high frustration is where the product bothers the most people. Low adoption may be a niche or something hard to find.'],
@@ -466,6 +468,8 @@ const L = PT ? {
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
     effort: 'Esforço', effortUnit: (n) => `${num(n)} ${n === 1 ? 'clique' : 'cliques'} por ação`, effortWhat: 'cliques até concluir uma ação, no caso típico',
     effortSplit: (path, here) => `${num(path)} até a tela + ${num(here)} nela`, effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}`, why: 'por quê' },
+  detour: { title: 'Tarefas interrompidas', hint: 'Começaram algo na tela, saíram para buscar alguma coisa e voltaram para concluir.', started: 'Começaram',
+    left: 'Saíram para outra tela e voltaram', to: 'para', away: 'Saíram do navegador e voltaram', for: (s) => `uns ${s} s fora`, none: 'Nenhuma tarefa interrompida com frequência neste período.' },
   ways: { title: 'Caminho até', hint: 'Por onde as pessoas passam antes de usar cada coisa. Os que parecem procurados em outro lugar vêm primeiro.', item: 'Botão ou ação',
     before: 'Passaram antes por', looks: 'procuram aqui?', usual: (n) => `normal ${n}%`, none: 'Ainda não há uso suficiente para ver caminhos.' },
   pat: { title: 'Padrões de clique', hint: 'O que as pessoas fazem sempre do mesmo jeito, e que dá para poupar.', focus: 'Campo clicado primeiro ao abrir a tela',
@@ -496,6 +500,8 @@ const L = PT ? {
       account_fading: ['Conta esfriando', 'Contato do CS para entender o motivo antes que vire cancelamento.', (i) => `Pessoas por dia voltam para perto de ${i.before}.`],
       account_feature_drop: ['Conta usando menos uma feature', 'Contato do CS para entender o motivo; ver se algo mudou na feature para essa conta.', (i) => `Os usos voltam para perto de ${i.before} no período.`],
       screen_better: ['Tela melhorou', 'Registrar o que funcionou.', () => '—'],
+      form_detour: ['Tarefa interrompida para buscar informação', 'Trazer para esta tela o que as pessoas vão buscar na outra: um campo de busca, preencher com o que já existe, ou mostrar a informação ao lado.', () => 'A ida e volta para a outra tela no meio da tarefa cai pela metade.'],
+      form_away: ['Tarefa interrompida fora do sistema', 'Descobrir o que as pessoas vão buscar fora (outro sistema, planilha, e-mail) e trazer por integração, importação ou preenchimento automático.', () => 'As saídas do navegador no meio da tarefa caem pela metade.'],
       looked_elsewhere: ['Procuram no lugar errado', 'Pôr um atalho ou o próprio recurso na tela onde as pessoas procuram primeiro, ou deixar claro lá onde ele fica.', () => 'A passagem por aquela tela antes de usar o recurso volta ao normal.'],
       focus_candidate: ['Campo que pede foco', 'Abrir a tela com esse campo já focado.', () => 'O primeiro clique ao abrir a tela deixa de ser no campo.'],
       click_follows: ['Clique que sempre vem depois', 'Se o segundo é um campo, abrir com ele focado; se é um botão, aproximar ou juntar os dois passos.', () => 'A sequência deixa de precisar do segundo clique.'],
@@ -538,6 +544,8 @@ const L = PT ? {
   heatTip: (r, d, x) => x ? `${r} · ${d}: frustração ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Frustração do dia',
   forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
+    form_detour: (i) => `Em <b>${i.route}</b>, ${Math.round(i.share * 100)}% de quem começa algo sai para <b>${i.via}</b> e volta para concluir: dá para trazer para cá o que as pessoas vão buscar lá (buscar ou preencher aqui mesmo).`,
+    form_away: (i) => `Em <b>${i.route}</b>, ${Math.round(i.share * 100)}% de quem começa algo sai do navegador no meio, por uns ${i.seconds} s, e volta: buscando informação em outro sistema?`,
     looked_elsewhere: (i) => `Antes de usar <b>${i.key}</b> em <b>${i.route}</b>, ${Math.round(i.share * 100)}% passam por <b>${i.via}</b> (o normal é ${Math.round(i.normal * 100)}%): procuram isso lá primeiro?`,
     focus_candidate: (i) => `Ao abrir <b>${i.route}</b>, ${Math.round(i.share * 100)}% das visitas clicam primeiro em <b>${i.target}</b>: esse campo pode já abrir focado.`,
     click_follows: (i) => `Depois de clicar em <b>${i.target}</b>, ${Math.round(i.share * 100)}% clicam em <b>${i.next_target}</b>${i.to_field ? ': o campo pode já vir focado' : ': aproximar ou juntar?'}.`,
@@ -630,6 +638,8 @@ const L = PT ? {
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
     effort: 'Effort', effortUnit: (n) => `${num(n)} ${n === 1 ? 'click' : 'clicks'} per action`, effortWhat: 'clicks to get an action done, in the typical case',
     effortSplit: (path, here) => `${num(path)} on the way + ${num(here)} on the screen`, effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}`, why: 'why' },
+  detour: { title: 'Interrupted tasks', hint: 'They started something on the screen, left to fetch something and came back to finish.', started: 'Started',
+    left: 'Left for another screen and came back', to: 'to', away: 'Left the browser and came back', for: (s) => `about ${s} s away`, none: 'No task interrupted often in this period.' },
   ways: { title: 'The way to', hint: 'Where people go before using each thing. The ones that seem looked for elsewhere come first.', item: 'Button or action',
     before: 'Went through first', looks: 'looked for here?', usual: (n) => `usually ${n}%`, none: 'Not enough use yet to see the ways.' },
   pat: { title: 'Click patterns', hint: 'What people always do the same way, and could be spared.', focus: 'Field clicked first on opening the screen',
@@ -660,6 +670,8 @@ const L = PT ? {
       account_fading: ['Account cooling down', 'A call from customer success to learn why before it turns into a cancellation.', (i) => `People a day go back near ${i.before}.`],
       account_feature_drop: ['Account using a feature less', 'A call from customer success to learn why; check whether something changed in the feature for this account.', (i) => `Uses go back near ${i.before} in the period.`],
       screen_better: ['Screen improved', 'Write down what worked.', () => '—'],
+      form_detour: ['A task interrupted to fetch information', 'Bring here what people fetch on the other screen: a search, filling in what already exists, or showing it alongside.', () => 'Trips to the other screen in the middle of the task drop by half.'],
+      form_away: ['A task interrupted outside the system', 'Find out what people fetch outside (another system, a spreadsheet, e-mail) and bring it in by integration, import or autofill.', () => 'Leaving the browser in the middle of the task drops by half.'],
       looked_elsewhere: ['Looked for in the wrong place', 'Put a shortcut, or the thing itself, on the screen where people look first, or make clear there where it is.', () => 'Going through that screen before using it drops back to usual.'],
       focus_candidate: ['A field asking for focus', 'Open the screen with that field focused.', () => 'The first click on the screen is no longer on that field.'],
       click_follows: ['A click that always follows', 'If the second is a field, open with it focused; if a button, bring the two steps closer or merge them.', () => 'The sequence no longer needs the second click.'],
@@ -702,6 +714,8 @@ const L = PT ? {
   heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Frustration of the day',
   forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
+    form_detour: (i) => `On <b>${i.route}</b>, ${Math.round(i.share * 100)}% of those who start something leave for <b>${i.via}</b> and come back to finish: what they fetch there could be brought here (look it up or fill it in right here).`,
+    form_away: (i) => `On <b>${i.route}</b>, ${Math.round(i.share * 100)}% of those who start something leave the browser midway, for about ${i.seconds} s, and come back: fetching information from another system?`,
     looked_elsewhere: (i) => `Before using <b>${i.key}</b> on <b>${i.route}</b>, ${Math.round(i.share * 100)}% go through <b>${i.via}</b> (usually ${Math.round(i.normal * 100)}%): do they look for it there first?`,
     focus_candidate: (i) => `On opening <b>${i.route}</b>, ${Math.round(i.share * 100)}% of visits first click <b>${i.target}</b>: that field could open focused.`,
     click_follows: (i) => `After clicking <b>${i.target}</b>, ${Math.round(i.share * 100)}% click <b>${i.next_target}</b>${i.to_field ? ': that field could come focused' : ': bring closer or merge?'}.`,
@@ -1052,7 +1066,7 @@ function kindsCard(o) {
 
 // Overview -------------------------------------------------------------------------------------------------
 const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['version_worse', 'screen_worse', 'screen_frustrating', 'element_irritating', 'action_laborious', 'retry_needed', 'near_miss'],
-  engagement: ['account_fading', 'account_feature_drop'], ideas: ['reach_far', 'pair_linked', 'looked_elsewhere', 'focus_candidate', 'click_follows', 'search_no_enter'], better: ['screen_better'] }
+  engagement: ['account_fading', 'account_feature_drop'], ideas: ['reach_far', 'pair_linked', 'form_detour', 'form_away', 'looked_elsewhere', 'focus_candidate', 'click_follows', 'search_no_enter'], better: ['screen_better'] }
 const groupOf = (kind) => Object.keys(GROUPS).find((g) => GROUPS[g].includes(kind)) ?? 'ideas'
 const num = (n) => Number(n).toLocaleString(PT ? 'pt-BR' : 'en')
 
@@ -1418,7 +1432,14 @@ async function journeys() {
       <td><ul class="counts">${w.via.slice(0, 3).map((x) => { const odd = w.looked_elsewhere.some((y) => y.route === x.route)
         return `<li><span>${esc(screenText(x.route) || x.route)}${odd ? ` <span class="pill idea">${W.looks}</span>` : ''}</span><span><b>${Math.round(x.share * 100)}%</b> <span class="meta">${W.usual(Math.round(x.normal * 100))}</span></span></li>` }).join('')}</ul></td></tr>`).join(''))
       : `<p class="meta">${W.none}</p>`}</section>`
-  return patCard + wayCard + reachCard() + `
+  const T = L.detour
+  const detourCard = `<section class="card"><div class="label">${T.title}${help('detours')}</div><div class="meta">${T.hint}</div>
+    ${pat.forms.length ? table(`<th>${L.screen}</th><th class="n">${T.started}</th><th>${T.left}</th><th>${T.away}</th>`, pat.forms.map((x) => `<tr>
+      <td>${scr(x.route)}</td><td class="n">${num(x.started)}</td>
+      <td>${x.detours ? `<b>${Math.round(x.share * 100)}%</b> <span class="meta">(${num(x.detours)})</span><div class="meta">${T.to} ${x.via.map((v) => `${esc(screenText(v.route) || v.route)} ${Math.round(v.share * 100)}%`).join(' · ')}</div>` : '—'}</td>
+      <td>${x.away ? `<b>${Math.round(x.away_share * 100)}%</b> <span class="meta">(${num(x.away)})</span><div class="meta">${T.for(x.away_seconds)}</div>` : '—'}</td></tr>`).join(''))
+      : `<p class="meta">${T.none}</p>`}</section>`
+  return patCard + detourCard + wayCard + reachCard() + `
     <section class="card"><div class="label">${J().pairs}${help('pairs')}</div><div class="meta">${J().pairsHint}</div>
       ${j.pairs.length ? `<ul class="insights">${j.pairs.slice(0, 15).map((p) => { const e = { ...p, a: esc(actionText(p.a) || p.a), b: esc(actionText(p.b) || p.b), clicks: p.clicks_median, screens: p.screens_median }
         return `<li>${p.linked ? `<span class="pill idea">${J().linked}</span>` : ''}<div class="text">${J().pair(e)}<div class="meta">${J().pairMeta(e)}</div><div class="tech"><code>${esc(p.a)}</code> → <code>${esc(p.b)}</code></div></div></li>` }).join('')}</ul>`

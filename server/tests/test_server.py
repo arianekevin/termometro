@@ -405,6 +405,25 @@ class Server(unittest.TestCase):
         kinds = [i for i in self.read("/api/overview?project=shop&days=1")["insights"] if i["kind"] == "looked_elsewhere"]
         self.assertEqual((kinds[0]["key"], kinds[0]["via"]), ("button#export", "/reports"))
 
+    def test_something_left_unfinished_to_fetch_elsewhere_and_finished_on_coming_back(self):
+        page = lambda r: {"type": "page", "route": r}
+        for i in range(24):
+            evs = [page("/tickets/new"), {"type": "typed", "route": "/tickets/new", "target": "input#subject"}]
+            if i < 12:  # leaves to look up the customer, comes back and saves
+                evs += [{"type": "abandon", "route": "/tickets/new", "target": "form#ticket"}, page("/customers"),
+                        {"type": "click", "route": "/customers", "target": "a#row"}, page("/tickets/new")]
+            if i in (6, 7, 8):  # leaves the browser for a while
+                evs += [{"type": "away", "route": "/tickets/new", "target": "form#ticket", "duration_ms": 40000}]
+            evs += [{"type": "action", "route": "/tickets/new", "detail": "POST /api/tickets", "clicks": 3}]
+            self.send(evs, session=f"t{i}")
+        [fm] = [x for x in self.read("/api/patterns?project=shop&days=1")["forms"] if x["route"] == "/tickets/new"]
+        self.assertEqual((fm["started"], fm["detours"], fm["share"], fm["form"]), (24, 12, 0.5, "form#ticket"))
+        self.assertEqual(fm["via"], [{"route": "/customers", "share": 1.0}])
+        self.assertEqual((fm["away"], fm["away_share"], fm["away_seconds"]), (3, 0.12, 40))
+        kinds = {i["kind"] for i in self.read("/api/overview?project=shop&days=1")["insights"]}
+        self.assertIn("form_detour", kinds)
+        self.assertNotIn("form_away", kinds)  # 3 times is under the minimum of 10
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
