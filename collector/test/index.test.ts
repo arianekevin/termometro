@@ -489,6 +489,17 @@ describe('termometro', () => {
     expect([first.user, first.events[0]!.type]).toEqual(['u-7', 'page'])
   })
 
+  it('sends the user name only when the app gives it', async () => {
+    const t = start(true, () => ({ account: 1, user: 'u-1', name: 'Maria Souza' }))
+    t.page('/a')
+    await events()
+    expect(sent[0]).toMatchObject({ user: 'u-1', user_name: 'Maria Souza' })
+    termometro?.stop(); sent = []
+    start(true, () => ({ account: 1, user: 'u-2' })).page('/b')
+    await events()
+    expect(sent[0]).not.toHaveProperty('user_name')
+  })
+
   it('takes who is using it from identify() when there is no identity function', async () => {
     const t = start()
     t.identify({ account: 9, user: 'u-2', role: 'admin' })

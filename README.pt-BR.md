@@ -41,6 +41,7 @@ dado bancário ou qualquer coisa sob a LGPD. O Termometro guarda só a forma da 
 | um seletor curto (`button#salvar`) | nomes, e-mails |
 | as palavras do próprio app num controle ("Novo usuário") e o nome da tela ("Usuários"), até 40 caracteres | texto de tabelas, listas de registros e campos, título da página de um registro, tudo dentro de `data-termometro-private` |
 | os ids que você escolher mandar (conta, usuário, papel) | gravações, prints |
+| se quiser, o nome do usuário (`identity.name`), guardado à parte e nunca no que uma IA lê; `"people_names": false` no projeto descarta | |
 | família do navegador e do sistema (`Chrome 130 · macOS`), tipo de tela (celular, tablet, computador) | versões exatas, tamanho da tela, IP |
 | onde o erro aconteceu no seu código (`loadRows @ /assets/index.js:1:4567`) | a query string ou os dados da página |
 

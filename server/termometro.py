@@ -46,7 +46,8 @@ Configuration (environment) — at least one way in, Google or a password, unles
   TERMOMETRO_ALLOWED_EMAILS, TERMOMETRO_ALLOWED_DOMAINS           who may sign in with Google (comma separated)
   TERMOMETRO_PUBLIC_URL  where this server is reached, e.g. https://termometro.example.com (Google redirects back there)
   TERMOMETRO_PASSWORD   a single password for the dashboard
-  TERMOMETRO_PROJECTS   JSON list: [{"name", "key", "origins": [...], "url"}]; or TERMOMETRO_CONFIG, a file with it
+  TERMOMETRO_PROJECTS   JSON list: [{"name", "key", "origins": [...], "url", "people_names"}]; or TERMOMETRO_CONFIG, a file with it.
+                        "people_names": false drops the people's names an app sends (ids only); default true
   TERMOMETRO_DB         SQLite file (default ./data/termometro.db)
   TERMOMETRO_HOST, TERMOMETRO_PORT          (default 0.0.0.0:8080)
   TERMOMETRO_RETENTION_DAYS                 events with user ids live this long (default 90), then become id-less totals
@@ -137,7 +138,9 @@ class Config:
             if not p.get("name") or not p.get("key"):
                 raise ValueError("every project needs a name and a key")
             self.projects[p["key"]] = {"name": str(p["name"]), "origins": list(p.get("origins", [])), "url": p.get("url", ""),
-                                       "webhook": p.get("webhook", "") or self.webhook}
+                                       "webhook": p.get("webhook", "") or self.webhook,
+                                       # People's names, when the app sends them: off here and the server drops them.
+                                       "people_names": p.get("people_names", True) is not False}
         self.by_name = {p["name"]: p for p in self.projects.values()}
 
     @property
@@ -186,6 +189,9 @@ def connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS features (
             project TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, rules TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, id));
+        CREATE TABLE IF NOT EXISTS people (
+            project TEXT NOT NULL, user_id TEXT NOT NULL, name TEXT NOT NULL, last_seen INTEGER NOT NULL,
+            PRIMARY KEY (project, user_id));
         CREATE TABLE IF NOT EXISTS dictionary (
             project TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, kind, key));
@@ -957,6 +963,14 @@ def search(con, f: Filter) -> dict:
                 AND {has.format(column)} GROUP BY {column} ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
             out.append({"kind": kind, "label": value, "n": n, "link": {"tab": "people" if kind == "user" else "overview",
                                                                       "params": {param: value}}})
+    # People and accounts by the names this server keeps for them (the app's people names, the dictionary's accounts).
+    found = {(r["kind"], r["label"]) for r in out}
+    for kind, sql, param in (("user", "SELECT user_id FROM people WHERE project = ? AND instr(lower(name), ?) > 0", "user"),
+                             ("account", "SELECT key FROM dictionary WHERE project = ? AND kind = 'account' AND instr(lower(name), ?) > 0", "account")):
+        for (value,) in con.execute(sql + f" LIMIT {SEARCH_LIMIT}", (f.q.get("project", ""), text)):
+            if (kind, value) not in found:
+                out.append({"kind": kind, "label": value, "n": 0, "link": {"tab": "people" if kind == "user" else "accounts",
+                                                                          "params": {param: value}}})
     return {"q": text, "results": out}
 
 
@@ -1331,6 +1345,7 @@ def names(con, project: str) -> dict:
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
         AND label != '' GROUP BY detail, label""", (project,)))
     out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {}, "areas": {},
+           "people": dict(con.execute("SELECT user_id, name FROM people WHERE project = ?", (project,))),
            "features": [{"id": x["id"], "name": x["name"], "rules": x["rules"]} for x in FEATURES.get(project, {}).values()],
            "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions)}}
     # What the product team wrote in the dictionary wins over what the collector saw.
@@ -1379,6 +1394,12 @@ def name_thing(con, project: str, kind: str, key: str, name: str) -> None:
         con.execute("DELETE FROM dictionary WHERE project = ? AND kind = ? AND key = ?", (project, kind, key))
 
 
+def name_of_person(batch: dict, project: dict) -> tuple[str, str] | None:
+    user = text(batch.get("user"), "user")
+    name = " ".join(str(batch.get("user_name") or "").split())[:MAX_NAME]
+    return (user, name) if user and name and project["people_names"] else None
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -1396,6 +1417,7 @@ def apply_retention(con, now: float | None = None) -> int:
         ON CONFLICT (day, project, version, route, type) DO UPDATE SET n = n + excluded.n""", (cutoff,))
     removed = con.execute("DELETE FROM events WHERE at < ?", (cutoff,)).rowcount
     con.execute("DELETE FROM elements WHERE last_seen < ?", (cutoff,))
+    con.execute("DELETE FROM people WHERE last_seen < ?", (cutoff,))  # a name leaves with the person's last event
     return removed
 
 
@@ -1699,7 +1721,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(400, {"error": str(error)})
         if not within_limit("ingest:" + self.ip(), len(rows) + (1 if elements else 0), MAX_PER_MINUTE):
             return self.json(429, {"error": "rate limit"}, headers)
+        # A person's name, if the app sends it and the project keeps names: apart from the events, by id, for the
+        # dashboard only (never in the report or the MCP server an AI reads).
+        person = name_of_person(batch, project)
         with connect() as con:
+            if person:
+                con.execute("INSERT INTO people (project, user_id, name, last_seen) VALUES (?, ?, ?, ?) ON CONFLICT (project, user_id) "
+                            "DO UPDATE SET name = excluded.name, last_seen = excluded.last_seen", (name, *person, int(time.time() * 1000)))
             con.executemany(INSERT_EVENT, rows)
             con.executemany("INSERT INTO elements (project, route, target, last_seen, label, first_seen) VALUES (?, ?, ?, ?, ?, ?) "
                             "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen, "

@@ -27,6 +27,9 @@ export interface Identity {
   user?: string | number | null
   /** The user's role, to compare groups without looking at anyone. */
   role?: string | null
+  /** Optional: the user's name, shown on the dashboard next to the id. Kept apart from the events, dropped with the
+   *  retention, never in what an AI reads; a server whose project has "people_names": false throws it away. */
+  name?: string | null
 }
 
 export interface Options {
@@ -95,7 +98,7 @@ interface TrackedEvent {
   /** js_error only: where in the code, as `function @ /path/file.js:line:col` lines — never the page's query or data. */
   stack?: string
 }
-interface Who { account: string; user: string; role: string }
+interface Who { account: string; user: string; role: string; user_name?: string }
 interface Queued { event: TrackedEvent; who: Who }
 
 const RAGE_CLICKS = 3
@@ -311,7 +314,8 @@ export function start(options: Options): Termometro {
       if (options.identity) id = options.identity()
     } catch { /* the app's store is not ready: anonymous */ }
     const text = (v: unknown) => (v === null || v === undefined ? '' : String(v))
-    return { account: text(id?.account), user: text(id?.user), role: text(id?.role) }
+    const name = text(id?.name).trim().slice(0, 80)
+    return { account: text(id?.account), user: text(id?.user), role: text(id?.role), ...(name ? { user_name: name } : {}) }
   }
 
   const record = (event: TrackedEvent): TrackedEvent | undefined => {

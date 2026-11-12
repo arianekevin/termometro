@@ -314,6 +314,21 @@ class Server(unittest.TestCase):
         [x] = self.read("/api/product?project=shop&days=7")["new"]
         self.assertEqual((x["target"], x["sessions"], x["share"]), ("button#export", 1, 1.0))
 
+    def test_a_persons_name_is_kept_apart_and_only_where_the_project_allows_it(self):
+        self.send([{"type": "page", "route": "/a"}], user="u1", user_name="  Maria   Souza ")
+        self.send([{"type": "page", "route": "/a"}], key="tk_blog", origin=None, user="u2", user_name="João")
+        self.assertEqual(self.read("/api/names?project=shop")["people"], {"u1": "Maria Souza"})
+        self.assertIn(("user", "u1"), {(r["kind"], r["label"]) for r in self.read("/api/search?project=shop&days=1&q=souza")["results"]})
+        t.CONFIG.projects[KEY]["people_names"] = False  # as "people_names": false in TERMOMETRO_PROJECTS
+        self.send([{"type": "page", "route": "/a"}], user="u3", user_name="Ana")
+        self.assertNotIn("u3", self.read("/api/names?project=shop")["people"])
+        report = json.dumps(self.read("/api/report?project=shop&days=1"))
+        self.assertNotIn("Maria", report)  # names never go to the document an AI reads
+        with t.connect() as con:
+            con.execute("UPDATE people SET last_seen = 0")
+            t.apply_retention(con)
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM people").fetchone()[0], 0)
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
