@@ -291,6 +291,29 @@ class Server(unittest.TestCase):
         kinds = [i["kind"] for i in self.read("/api/overview?project=shop&days=20")["insights"]]
         self.assertIn("account_feature_drop", kinds)
 
+    def test_product_health_groups_screens_into_areas_and_finds_little_used_and_new_buttons(self):
+        inv = {"type": "inventory", "route": "/config/users", "targets": ["button#new", "button#export"]}
+        for i in range(30):
+            self.send([{"type": "page", "route": "/config/users"}, inv] + ([{"type": "click", "route": "/config/users", "target": "button#new"}] if i % 2 else []),
+                      session=f"s{i}", user=f"u{i}")
+        self.send([{"type": "page", "route": "/config/roles"}, {"type": "page", "route": "/home"}], session="x", user="u1")
+        name = lambda kind, key, v: call(self.base, "/api/names?project=shop", {"kind": kind, "key": key, "name": v}, cookie=self.cookie)
+        name("area", "/home", "Painel")
+        p = self.read("/api/product?project=shop&days=7")
+        areas = {a["area"]: a for a in p["areas"]}
+        self.assertEqual(set(areas), {"Config", "Painel"})
+        self.assertEqual([s["route"] for s in areas["Config"]["screens"]], ["/config/users", "/config/roles"])
+        self.assertEqual((areas["Config"]["visits"], areas["Config"]["users"]), (31, 30))
+        self.assertEqual([(x["target"], x["sessions"], x["clicked"]) for x in p["low_use"]], [("button#export", 30, 0)])
+        self.assertEqual(p["new"], [])  # everything is new on the first day: nothing is called new
+        with t.connect() as con:  # a button that showed up two days after the project started
+            con.execute("UPDATE events SET at = at - 3 * 86400000")
+            con.execute("UPDATE elements SET first_seen = first_seen - 3 * 86400000")
+            con.execute("UPDATE elements SET first_seen = ? WHERE target = 'button#export'", (int(time.time() * 1000) - 86400000,))
+        self.send([{"type": "page", "route": "/config/users"}, {"type": "click", "route": "/config/users", "target": "button#export"}], session="late")
+        [x] = self.read("/api/product?project=shop&days=7")["new"]
+        self.assertEqual((x["target"], x["sessions"], x["share"]), ("button#export", 1, 1.0))
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

@@ -28,6 +28,7 @@ and the API:
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
+  GET  /api/product    per product area: share of visits, adoption, score, failures; little-used buttons; what is new
   GET  /api/features   each watched feature: uses against before, people, accounts, adoption, frustration, per day
   GET  /api/engagement per account: people and sessions a day, uses of each feature, now against before, drops first
                        (with ?account=, also that account's day by day)
@@ -192,7 +193,8 @@ def connect() -> sqlite3.Connection:
             project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, version, key));
     """)
-    for table, columns in (("events", NEW_COLUMNS), ("elements", {"label": "TEXT NOT NULL DEFAULT ''"})):
+    for table, columns in (("events", NEW_COLUMNS), ("elements", {"label": "TEXT NOT NULL DEFAULT ''",
+                                                                  "first_seen": "INTEGER NOT NULL DEFAULT 0"})):
         have = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
         for column, kind in columns.items():
             if column not in have:
@@ -851,6 +853,79 @@ def features_report(con, f: Filter) -> dict:
     return {"days": f.days, "active_users": active, "features": out}
 
 
+def area_of(route: str, n: dict) -> str:
+    """A screen's product area: the one the dictionary gives, else its first path part, by that part's screen name."""
+    if route in n["areas"]:
+        return n["areas"][route]
+    first = "/" + route.strip("/").split("/")[0] if route.strip("/") else "/"
+    return n["screens"].get(first) or (first.strip("/").replace("-", " ").capitalize() or n["screens"].get("/", "/"))
+
+
+LOW_USE_SESSIONS = 30  # sessions that saw a screen before its little-used buttons say anything
+LOW_USE_SHARE = 0.02   # clicked in fewer than 2% of the sessions that saw it
+
+
+def product(con, f: Filter) -> dict:
+    """The health of what was built, for the product team: per area (screens grouped), its share of the visits,
+    adoption among the people active, score, failures and visits per day; the buttons many see and almost nobody
+    clicks; and what appeared in the period, with how much of it is being used."""
+    project = f.q.get("project", "")
+    n = names(con, project)
+    active = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql}", f.args).fetchone()[0]
+    total = 0
+    routes = {}
+    for route, visits, sessions, points, fails in con.execute(f"""SELECT route, SUM(type = 'page'),
+            COUNT(DISTINCT CASE WHEN type = 'page' THEN session END), COALESCE(SUM({WEIGHT_CASE}), 0), SUM(type IN {FAILURES})
+            FROM events WHERE {f.sql} GROUP BY route""", f.args):
+        routes[route] = {"route": route, "visits": visits, "sessions": sessions, "score": score(points, visits), "failures": fails,
+                         "points": points}
+        total += visits
+    areas: dict[str, dict] = {}
+    for r in routes.values():
+        a = areas.setdefault(area_of(r["route"], n), {"area": "", "screens": [], "visits": 0, "points": 0, "failures": 0})
+        a["area"] = area_of(r["route"], n)
+        a["screens"].append(r)
+        for k in ("visits", "points", "failures"):
+            a[k] += r[k]
+    out_areas = []
+    for a in areas.values():
+        keys = [r["route"] for r in a["screens"]]
+        marks = ",".join("?" * len(keys))
+        users = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql} AND route IN ({marks})",
+                            f.args + keys).fetchone()[0]
+        daily_v = [{"day": d, "n": v} for d, v in con.execute(f"""SELECT date(at / 1000, 'unixepoch') d, SUM(type = 'page') FROM events
+            WHERE {f.sql} AND route IN ({marks}) GROUP BY d ORDER BY d""", f.args + keys)]
+        a["screens"].sort(key=lambda r: -r["visits"])
+        out_areas.append({"area": a["area"], "screens": [{k: r[k] for k in ("route", "visits", "score", "failures")} for r in a["screens"]],
+                          "visits": a["visits"], "share": round(a["visits"] / total, 3) if total else 0, "users": users,
+                          "adoption": round(users / active, 2) if active else 0, "score": score(a["points"], a["visits"]),
+                          "failures": a["failures"], "daily": daily_v})
+    out_areas.sort(key=lambda a: -a["visits"])
+
+    # Per element: the sessions that saw its screen while it existed, and the ones that clicked it.
+    clicked = {(r, t): c for r, t, c in con.execute(f"""SELECT route, target, COUNT(DISTINCT session) FROM events
+        WHERE {f.sql} AND type = 'click' GROUP BY route, target""", f.args)}
+    first_event = con.execute("SELECT MIN(at) FROM events WHERE project = ? AND at >= ?", (project, f.mark)).fetchone()[0] or 0
+    low, new = [], []
+    for route, target, first_seen, label in con.execute("""SELECT route, target, first_seen, label FROM elements
+            WHERE project = ? AND last_seen >= ?""", (project, f.since)):
+        seen = routes.get(route, {}).get("sessions", 0)
+        c = clicked.get((route, target), 0)
+        # Something that appeared during the period (and not on the project's first day, when everything is new).
+        if first_seen and first_seen >= f.since and first_seen > first_event + 86400000:
+            since = con.execute(f"""SELECT COUNT(DISTINCT session) FROM events WHERE {f.sql} AND route = ? AND type = 'page' AND at >= ?""",
+                                f.args + [route, first_seen]).fetchone()[0]
+            used = con.execute(f"""SELECT COUNT(DISTINCT session) FROM events WHERE {f.sql} AND route = ? AND target = ?
+                AND type = 'click' AND at >= ?""", f.args + [route, target, first_seen]).fetchone()[0]
+            new.append({"route": route, "target": target, "first_seen": first_seen, "sessions": since,
+                        "share": round(used / since, 3) if since else 0})
+        elif seen >= LOW_USE_SESSIONS and c / seen < LOW_USE_SHARE:
+            low.append({"route": route, "target": target, "sessions": seen, "clicked": c, "share": round(c / seen, 3)})
+    low.sort(key=lambda x: -x["sessions"])
+    new.sort(key=lambda x: -x["first_seen"])
+    return {"days": f.days, "active_users": active, "areas": out_areas, "low_use": low[:200], "new": new[:100]}
+
+
 SEARCH_LIMIT = 8
 
 
@@ -1255,7 +1330,7 @@ def names(con, project: str) -> dict:
         controls.setdefault(route + "\t" + target, label)
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
         AND label != '' GROUP BY detail, label""", (project,)))
-    out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {},
+    out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {}, "areas": {},
            "features": [{"id": x["id"], "name": x["name"], "rules": x["rules"]} for x in FEATURES.get(project, {}).values()],
            "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions)}}
     # What the product team wrote in the dictionary wins over what the collector saw.
@@ -1287,7 +1362,7 @@ def dictionary(con, project: str) -> dict:
     return {"screens": screens, "controls": controls, "actions": actions, "accounts": accounts}
 
 
-DICTIONARY = {"screen": "screens", "control": "controls", "action": "actions", "account": "accounts"}
+DICTIONARY = {"screen": "screens", "control": "controls", "action": "actions", "account": "accounts", "area": "areas"}
 MAX_NAME = 80
 
 
@@ -1428,7 +1503,7 @@ def engagement_read(con, f: Filter) -> dict:
     return out
 
 
-READS = {"/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
+READS = {"/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
          "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
          "/api/report": report}
@@ -1626,9 +1701,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(429, {"error": "rate limit"}, headers)
         with connect() as con:
             con.executemany(INSERT_EVENT, rows)
-            con.executemany("INSERT INTO elements (project, route, target, last_seen, label) VALUES (?, ?, ?, ?, ?) "
+            con.executemany("INSERT INTO elements (project, route, target, last_seen, label, first_seen) VALUES (?, ?, ?, ?, ?, ?) "
                             "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen, "
-                            "label = CASE WHEN excluded.label != '' THEN excluded.label ELSE elements.label END", elements)
+                            "label = CASE WHEN excluded.label != '' THEN excluded.label ELSE elements.label END",
+                            [e + (e[3],) for e in elements])  # first_seen: kept from the first insert
         self.send(204, headers=headers)
 
     def login(self):

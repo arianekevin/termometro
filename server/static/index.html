@@ -238,6 +238,9 @@ const HELP_PT = {
   byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
   accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
+  areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a adoção entre as pessoas ativas, a nota e as falhas de cada uma. A área de cada tela se ajusta no Dicionário.', 'Área com muita adoção e nota alta é onde o time mais incomoda gente. Área com pouca adoção pode ser nicho ou algo difícil de achar.'],
+  low: ['O que é', 'Botões que muitas sessões viram e quase ninguém clicou.', 'Construído e pouco usado: candidato a sair, mudar de lugar ou ser explicado. Confira se não é de uso raro por natureza.'],
+  news: ['O que é', 'O que apareceu pela primeira vez no período, e a parte das sessões que viram e usaram.', 'Novidade com uso baixo depois de alguns dias pede divulgação, ajuste ou revisão do valor.'],
   dictionary: ['O que é', 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra.', 'Dê nome primeiro aos ícones sem rótulo e às telas de detalhe: são os que aparecem crus no painel.'],
 }
 const HELP_EN = {
@@ -264,6 +267,9 @@ const HELP_EN = {
   byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
   accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
+  areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, adoption among the people active, score and failures. Each screen\'s area is set in the Dictionary.', 'An area with wide adoption and a high score is where the product bothers the most people. Low adoption may be a niche or something hard to find.'],
+  low: ['What it is', 'Buttons many sessions saw and almost nobody clicked.', 'Built and little used: a candidate to remove, move or explain. Check it is not rare by nature.'],
+  news: ['What it is', 'What showed up for the first time in the period, and the share of the sessions that saw it and used it.', 'Something new still little used after a few days needs announcing, adjusting or a second look at its value.'],
   dictionary: ['What it is', 'The name people use for each screen, button, action and account. Empty uses the name the app shows.', 'Name first the icons without a label and the detail screens: they are the ones shown raw on the dashboard.'],
 }
 const lookTitle = () => (PT ? 'O que olhar' : 'What to look at')
@@ -319,7 +325,11 @@ const L = PT ? {
     addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
     reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
   },
-  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
+  tabs: { overview: 'Início', product: 'Produto', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
+  prod: { areas: 'Áreas do produto', areasHint: 'Telas agrupadas por área. Clique numa área para ver as telas dela.', area: 'Área', screens: 'Telas', share: 'das visitas',
+    adoption: 'Adoção', score: 'Nota', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
+    seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
+    nScreens: (n) => `${n} ${n === 1 ? 'tela' : 'telas'}`, since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
   feature: 'Feature',
   feat: { title: 'Features vigiadas', hint: 'O que importa para o negócio, acompanhado de perto: uso, quem usa, adoção, frustração e falhas. Analise uma para filtrar o painel inteiro por ela.',
     none: 'Nenhuma feature vigiada ainda. Crie a primeira: dê um nome e diga quais telas, botões ou ações formam a feature.', create: 'Nova feature', edit: 'Editar', remove: 'Remover',
@@ -431,7 +441,11 @@ const L = PT ? {
     addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
     reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
   },
-  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
+  tabs: { overview: 'Overview', product: 'Product', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
+  prod: { areas: 'Product areas', areasHint: 'Screens grouped by area. Click an area to see its screens.', area: 'Area', screens: 'Screens', share: 'of the visits',
+    adoption: 'Adoption', score: 'Score', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
+    seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
+    nScreens: (n) => `${n} ${n === 1 ? 'screen' : 'screens'}`, since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
   feature: 'Feature',
   feat: { title: 'Watched features', hint: 'What matters to the business, watched closely: use, who uses it, adoption, frustration and failures. Analyse one to narrow the whole dashboard to it.',
     none: 'No watched feature yet. Create the first: give it a name and say which screens, buttons or actions make it up.', create: 'New feature', edit: 'Edit', remove: 'Remove',
@@ -1245,6 +1259,32 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
+// Product -----------------------------------------------------------------------------------------------------
+const PR = () => L.prod
+async function product() {
+  const p = await read('/api/product')
+  if (!p.areas.length) return empty(L.noVisits)
+  const pctOf = (x) => `${num(Math.round(x * 1000) / 10)}%`
+  return `<section class="card"><div class="label">${PR().areas}${help('areas')}</div><div class="meta">${PR().areasHint}</div>
+      ${table(`<th>${PR().area}</th><th class="n">${L.visits}</th><th class="n">${PR().adoption}</th><th class="n">${PR().score}</th><th class="n">${PR().failures}</th><th>${PR().trend}</th>`,
+        p.areas.map((a, i) => `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
+          <td class="n">${num(a.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
+          <td class="n">${Math.round(a.adoption * 100)}%<div class="bar"><i style="width:${a.adoption * 100}%;background:var(--accent)"></i></div></td>
+          <td class="n">${scoreHtml(a.score)}</td><td class="n">${num(a.failures)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`)}</td></tr>
+          <tr class="detail" data-of="a${i}" hidden><td colspan="6"><ul class="counts">${a.screens.map((r) => `<li><a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })}>${esc(screenText(r.route) || r.route)}</a>
+            <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>`).join(''))}
+    </section>
+    <section class="card"><div class="label">${PR().low}${help('low')}</div><div class="meta">${PR().lowHint(2)}</div>
+      ${p.low_use.length ? table(`<th>${L.element}</th><th class="n">${PR().seen}</th><th class="n">${PR().clicked}</th>`,
+        p.low_use.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td class="n">${num(x.sessions)}</td><td class="n">${num(x.clicked)} <span class="meta">${pctOf(x.share)}</span></td></tr>`).join(''))
+        : `<p class="meta">${PR().none}</p>`}</section>
+    <section class="card"><div class="label">${PR().news}${help('news')}</div><div class="meta">${PR().newsHint}</div>
+      ${p.new.length ? table(`<th>${L.element}</th><th>${PR().since}</th><th class="n">${PR().seen}</th><th class="n">${PR().used}</th>`,
+        p.new.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td>${esc(when(x.first_seen))}</td><td class="n">${num(x.sessions)}</td>
+          <td class="n">${pctOf(x.share)}<div class="bar"><i style="width:${x.share * 100}%;background:var(--accent)"></i></div></td></tr>`).join(''))
+        : `<p class="meta">${PR().noNews}</p>`}</section>`
+}
+
 // Features & accounts --------------------------------------------------------------------------------------------
 const FT = () => L.feat, AC = () => L.acc
 // Columns of a magnitude per day, in the accent colour, with a tooltip per day.
@@ -1426,7 +1466,9 @@ function dictBody() {
           ${extraCell(x)}<td class="n">${num(x.used)}</td></tr>`).join('')) : `<p class="meta">${D().none}</p>`}
       </section>`
   }
-  return section('screen', D().screens, d.screens, (x) => `<code>${esc(x.key)}</code>`)
+  const areaOf = (route) => (NM().areas ?? {})[route] ?? ''
+  return section('screen', D().screens, d.screens, (x) => `<code>${esc(x.key)}</code>`, `<th>${PR().area}</th>`,
+      (x) => `<td><input class="dict-name" data-kind="area" data-key="${esc(x.key)}" value="${esc(areaOf(x.key))}" placeholder="${PR().areaPh}" aria-label="${PR().area}"></td>`)
     + section('control', D().controls, d.controls, (x) => `<span class="nm">${esc(screenText(x.route) || x.route)}</span><code class="tech">${esc(x.target)}</code>`)
     + section('action', D().actions, d.actions, (x) => `<code>${esc(x.key)}</code>`)
     + section('account', D().accounts, d.accounts, (x) => `<code>${esc(x.key)}</code>`, `<th class="n">${D().users}</th>`, (x) => `<td class="n">${x.users}</td>`)
@@ -1436,14 +1478,14 @@ async function saveName(input) {
     body: JSON.stringify({ kind: input.dataset.kind, key: input.dataset.key, name: input.value }) })
   if (res.status === 401) return boot()
   if (!res.ok) return
-  const item = Object.values(state.dict).flat().find((x) => x.key === input.dataset.key)
+  const item = input.dataset.kind === 'area' ? null : Object.values(state.dict).flat().find((x) => x.key === input.dataset.key)
   if (item) item.name = input.value.trim()
   state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json()
   await loadFilters(true)
   input.classList.add('saved'); setTimeout(() => input.classList.remove('saved'), 1200)
 }
 
-const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions, features, accounts, dictionary }
+const TABS = { overview, product, frustration, failures, usage, journeys, people, actions, versions, features, accounts, dictionary }
 
 async function render() {
   clearTimeout(waitTimer)
