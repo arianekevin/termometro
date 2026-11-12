@@ -269,8 +269,15 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; margin-top: 12px; }
 @media (max-width: 960px) { .mapwrap { grid-template-columns: minmax(0, 1fr); } }
 .mapfig { min-width: 0; margin: 0; }
-.mapsvg { display: block; width: 100%; height: auto; margin: 0 auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; }
-.mapsvg .lm { fill: var(--sunken); stroke: var(--line); vector-effect: non-scaling-stroke; }
+.mapsvg { display: block; width: 100%; height: auto; margin: 0 auto; background: var(--sunken); border: 1px solid var(--line-strong); border-radius: 8px; }
+.mapsvg .lm { fill: none; stroke: none; vector-effect: non-scaling-stroke; }
+.mapsvg .lm.header, .mapsvg .lm.aside, .mapsvg .lm.footer { fill: var(--surface); fill-opacity: .55; stroke: var(--line); }
+.mapsvg .lm.card { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1px; }
+.mapsvg .lt { fill: var(--fg); font-weight: 600; }
+.mapsvg .me[class] text.flabel { fill: var(--fg2); font-weight: 500; }
+.mapsvg .me { color: var(--fg2); }
+.mapsvg .glyph { fill: none; stroke: currentColor; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.mapsvg .pill.name rect { fill: none; stroke: none; } .mapsvg .pill.name text { fill: var(--fg2); font-weight: 500; }
 .mapsvg .me { cursor: pointer; outline: none; }
 .mapsvg .me rect.hit { fill: transparent; stroke: none; }
 .mapsvg .me rect.box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
@@ -278,13 +285,13 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mapsvg .me.never rect.box { fill: none; stroke: var(--faint); stroke-dasharray: 5 4; }
 .mapsvg .me.never text { fill: var(--faint); }
 .mapsvg .me.dim { opacity: .35; }
-.mapsvg .me.u1 rect.box { fill: var(--mu1); stroke: var(--mu1); } .mapsvg .me.u1 text { fill: var(--mu-ink1); }
-.mapsvg .me.u2 rect.box { fill: var(--mu2); stroke: var(--mu2); } .mapsvg .me.u2 text { fill: var(--mu-ink2); }
-.mapsvg .me.u3 rect.box { fill: var(--mu3); stroke: var(--mu3); } .mapsvg .me.u3 text { fill: var(--mu-ink3); }
-.mapsvg .me.u4 rect.box { fill: var(--mu4); stroke: var(--mu4); } .mapsvg .me.u4 text { fill: var(--mu-ink4); }
-.mapsvg .me.s1 rect.box { fill: var(--ms1); stroke: var(--ms1); } .mapsvg .me.s1 text { fill: var(--ms-ink1); }
-.mapsvg .me.s2 rect.box { fill: var(--ms2); stroke: var(--ms2); } .mapsvg .me.s2 text { fill: var(--ms-ink2); }
-.mapsvg .me.s3 rect.box { fill: var(--ms3); stroke: var(--ms3); } .mapsvg .me.s3 text { fill: var(--ms-ink3); }
+.mapsvg .me.u1 rect.box { fill: var(--mu1); stroke: var(--mu1); } .mapsvg .me.u1 text { fill: var(--mu-ink1); } .mapsvg .me.u1 { color: var(--mu-ink1); }
+.mapsvg .me.u2 rect.box { fill: var(--mu2); stroke: var(--mu2); } .mapsvg .me.u2 text { fill: var(--mu-ink2); } .mapsvg .me.u2 { color: var(--mu-ink2); }
+.mapsvg .me.u3 rect.box { fill: var(--mu3); stroke: var(--mu3); } .mapsvg .me.u3 text { fill: var(--mu-ink3); } .mapsvg .me.u3 { color: var(--mu-ink3); }
+.mapsvg .me.u4 rect.box { fill: var(--mu4); stroke: var(--mu4); } .mapsvg .me.u4 text { fill: var(--mu-ink4); } .mapsvg .me.u4 { color: var(--mu-ink4); }
+.mapsvg .me.s1 rect.box { fill: var(--ms1); stroke: var(--ms1); } .mapsvg .me.s1 text { fill: var(--ms-ink1); } .mapsvg .me.s1 { color: var(--ms-ink1); }
+.mapsvg .me.s2 rect.box { fill: var(--ms2); stroke: var(--ms2); } .mapsvg .me.s2 text { fill: var(--ms-ink2); } .mapsvg .me.s2 { color: var(--ms-ink2); }
+.mapsvg .me.s3 rect.box { fill: var(--ms3); stroke: var(--ms3); } .mapsvg .me.s3 text { fill: var(--ms-ink3); } .mapsvg .me.s3 { color: var(--ms-ink3); }
 .mapsvg .me:hover rect.box, .mapsvg .me:focus-visible rect.box { stroke: var(--accent); stroke-width: 2px; }
 .mapsvg .me.sel rect.box { stroke: var(--accent); stroke-width: 3px; }
 /* Arrows and words on the drawing never take a click or a hover from the elements under them. */
@@ -2893,16 +2900,19 @@ function mapBody() {
 
 // The drawing. Text, pills and arrowheads keep their size on screen: k is page pixels per screen pixel at the drawn width.
 function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
-  const lay = m.lay, k = state.mapK?.[lay.viewport + lay.vw] ?? Math.max(1, lay.dw / Math.max(280, ($('#content')?.clientWidth ?? 1000) - 380))
-  const bottom = Math.max(lay.vh, ...Object.values(lay.boxes).map((b) => b[1] + b[3] + 16))
-  const W = lay.dw, H = Math.min(lay.dh, bottom)
-  const fs = 12 * k, pad = 6 * k
-  const fit = (text, w) => { const n = Math.floor((w - 2 * pad) / (fs * 0.58)); return n < 3 ? '' : text.length > n ? text.slice(0, n - 1) + '…' : text }
+  const lay = m.lay, [X0, Y0, W, H] = mapFrame(lay), B = [X0, Y0, X0 + W, Y0 + H]
+  const k = state.mapK?.[lay.viewport + lay.vw] ?? Math.max(1, W / Math.max(280, ($('#content')?.clientWidth ?? 1000) - 380))
+  const pad = 6 * k
+  // Regions: the page's frame as faint blocks; forms, dialogs and side cards as cards; the title's box gets the screen's name.
+  const title = screenText(m.route)
   const lm = (lay.landmarks ?? []).map((l) => { const [x, y, w, h] = l.box
-    return `<rect class="lm" x="${x}" y="${y}" width="${w}" height="${h}" rx="${6 * k}"/>` }).join('')
+    if (l.kind === 'title') { const px = Math.min(20, h / k * 0.8), line = mapFit(title, w / k, [px, px - 2, px - 4], 1)
+      return line ? `<text class="lt" x="${x}" y="${y + h / 2 + px * k * 0.36}" font-size="${line.px * k}">${esc(line.lines[0])}</text>` : '' }
+    const card = l.kind === 'form' || l.kind === 'dialog' || (l.kind === 'aside' && x > 0)
+    return `<rect class="lm ${card ? 'card' : l.kind}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${(card ? 12 : 4) * k}"/>` }).join('')
   const touched = new Set(sel ? [sel, ...steps.map((p) => p.to), ...m.byT[sel].in.filter((p) => p.share >= STEP_SHARE).map((p) => p.from)] : [])
   const step = (x) => !x.clicks ? 0 : Math.min(4, Math.ceil(x.clicks / maxClicks * 4))
-  const pills = [], taken = Object.values(lay.boxes).map((b) => [...b])
+  const pills = [], taken = [...Object.values(lay.boxes), ...(lay.landmarks ?? []).filter((l) => l.kind === 'title' && title).map((l) => l.box)].map((b) => [...b])
   const tipOf = (x) => [unnamed(x.target) + (m.nameOf(x.target) ? '' : ` (${x.target})`), MP().clicks(x.clicks),
     x.bad ? `${MP().irritates(mapPct(x.rate))}${mapWhy(x) ? ` (${mapWhy(x)})` : ''}` : '',
     x.out[0] ? MP().afterX(`${unnamed(x.out[0].to)} ${mapPct(x.out[0].share)}%`) : ''].filter(Boolean).join(' · ')
@@ -2910,15 +2920,30 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     const [bx, by, bw, bh] = lay.boxes[x.target]
     const cls = lens === 'problems' ? (x.sev ? 's' + x.sev : '') : lens === 'usage' ? (step(x) ? 'u' + step(x) : 'never') : ''
     const dim = lens === 'routes' && sel && !touched.has(x.target)
-    const label = bh >= 15 * k ? fit(unnamed(x.target), bw) : ''
+    // A field is named above its box; a button inside it, smaller or on two lines when it must; an icon gets a glyph and its name
+    // beside it when there is room.
+    const name = unnamed(x.target), field = mapIsField(x.target), icon = !field && bw <= 48 && bh <= 48
+    let text = ''
+    if (field) { const line = mapFit(name, bw / k, [11, 10], 1)
+      if (line && by - 6 * k > 0) taken.push([bx, by - 18 * k, bw, 18 * k])
+      if (line && by - 6 * k > 0) text = `<text class="flabel" x="${bx + 2 * k}" y="${by - 6 * k}" font-size="${11 * k}">${esc(line.lines[0])}</text>` }
+    else if (icon) {
+      const r = Math.min(bw, bh) * 0.22, cx = bx + bw / 2, cy = by + bh / 2
+      text = `<circle class="glyph" cx="${cx}" cy="${cy}" r="${r}"/><circle class="glyph" cx="${cx}" cy="${cy}" r="${r * 0.35}"/>`
+      if (lens === 'routes') { const line = mapFit(name, 140, [11], 1); if (line) pills.push(mapPill(lay.boxes[x.target], line.lines[0], k, B, 'name', taken, true)) }
+    } else {
+      const fit = mapFit(name, (bw - 2 * pad) / k, [13, 12, 11, 10, 9], Math.max(1, Math.min(2, Math.floor(bh / k / 12))))
+      if (fit) { const lh = fit.px * 1.15 * k, y0 = by + bh / 2 - (fit.lines.length - 1) * lh / 2 + fit.px * k * 0.36
+        text = fit.lines.map((t, i) => `<text x="${bx + pad}" y="${y0 + i * lh}" font-size="${fit.px * k}">${esc(t)}</text>`).join('') }
+    }
     // The number in words above the element: how much it irritates, or how much it is clicked.
-    if (lens === 'problems' && x.sev) pills.push(mapPill(lay.boxes[x.target], MP().irritates(mapPct(x.rate)), k, [W, H], 'bad', taken))
-    if (lens === 'usage' && x.clicks) pills.push(mapPill(lay.boxes[x.target], MP().clicks(x.clicks), k, [W, H], 'ink', taken))
+    if (lens === 'problems' && x.sev) pills.push(mapPill(lay.boxes[x.target], MP().irritates(mapPct(x.rate)), k, B, 'bad', taken))
+    if (lens === 'usage' && x.clicks) pills.push(mapPill(lay.boxes[x.target], MP().clicks(x.clicks), k, B, 'ink', taken))
     const hit = Math.max(0, 8 * k - Math.min(bw, bh) / 2)
     return `<g class="me ${cls}${sel === x.target ? ' sel' : ''}${dim ? ' dim' : ''}" data-map-el="${esc(x.target)}" tabindex="0" role="button" data-tip="${esc(tipOf(x))}" aria-label="${esc(tipOf(x))}">
       <rect class="hit" x="${bx - hit}" y="${by - hit}" width="${bw + 2 * hit}" height="${bh + 2 * hit}"/>
       <rect class="box" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${Math.min(6 * k, bh / 2)}"/>
-      ${label ? `<text x="${bx + pad}" y="${by + bh / 2 + 4 * k}" font-size="${fs}">${esc(label)}</text>` : ''}</g>`
+      ${text}</g>`
   }).join('')
   // A curved arrow from the edge of one element to the edge of the other.
   const curve = (a, b, bend) => {
@@ -2929,36 +2954,75 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
       const t = Math.min(r[2] / 2 / (Math.abs(ux / l) || 1e-9), r[3] / 2 / (Math.abs(uy / l) || 1e-9)) + 4 * k
       return [c[0] + ux / l * Math.min(t, l * 0.9), c[1] + uy / l * Math.min(t, l * 0.9)] }
     const [sx, sy] = edge(a, ca, cx, cy), [ex, ey] = edge(b, cb, cx, cy)
-    return { d: `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`, mx: 0.25 * sx + 0.5 * cx + 0.25 * ex, my: 0.25 * sy + 0.5 * cy + 0.25 * ey }
+    const at = (t) => [(1 - t) ** 2 * sx + 2 * (1 - t) * t * cx + t * t * ex, (1 - t) ** 2 * sy + 2 * (1 - t) * t * cy + t * t * ey]
+    return { d: `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`, at }
   }
   const incoming = lens === 'routes' && sel ? m.byT[sel].in.filter((p) => p.share >= STEP_SHARE && lay.boxes[p.from] && p.from !== sel).map((p) =>
     `<path class="from" d="${curve(lay.boxes[p.from], lay.boxes[sel], 50).d}"/>`).join('') : ''
   const arrows = steps.map((p) => {
     const loop = m.loop(p.from, p.to), c = curve(lay.boxes[p.from], lay.boxes[p.to], 90)
-    pills.push(mapPill([c.mx, c.my, 0, 0], `${mapPct(p.share)}%`, k, [W, H], loop ? 'back' : 'go', null))
+    // The share sits on its arrow: the middle, or a bit before or after where it covers less.
+    pills.push(mapPill([0, 0, 0, 0], `${mapPct(p.share)}%`, k, B, loop ? 'back' : 'go', taken, false, [0.5, 0.4, 0.6, 0.3, 0.7].map(c.at)))
     return `<path class="${loop ? 'back' : 'go'}" d="${c.d}" stroke-width="${2 + p.share * 7}" marker-end="url(#mk-${loop ? 'back' : 'go'})"/>`
   }).join('')
   const mk = (id, cls) => `<marker id="${id}" class="${cls}" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="${12 * k}" markerHeight="${12 * k}" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>`
-  return `<svg class="mapsvg" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
+  return `<svg class="mapsvg" viewBox="${X0} ${Y0} ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
     <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}</defs>${lm}${boxes}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
     <g class="pills" aria-hidden="true">${pills.join('')}</g></svg>`
 }
 
+// What the drawing shows of the page: the controls, cards and title with a margin, not the empty rest of a tall or wide page.
+function mapFrame(lay) {
+  const parts = [...Object.values(lay.boxes), ...(lay.landmarks ?? []).filter((l) => ['form', 'dialog', 'title', 'nav'].includes(l.kind) || (l.kind === 'aside' && l.box[0] > 0)).map((l) => l.box)]
+  const m = 24
+  const x0 = Math.max(0, Math.min(...parts.map((b) => b[0])) - m), y0 = Math.max(0, Math.min(...parts.map((b) => b[1])) - m - 24)
+  const x1 = Math.min(lay.dw, Math.max(...parts.map((b) => b[0] + b[2])) + m), y1 = Math.min(lay.dh, Math.max(...parts.map((b) => b[1] + b[3])) + m + 24)
+  return [x0, y0, Math.max(120, x1 - x0), Math.max(120, y1 - y0)]
+}
+
+// Text measured as the browser draws it, to fit a name in a box: the first size whose lines fit `width` (screen px), on up
+// to `lines` lines broken at spaces; else the smallest size, cut with an ellipsis. Null when not even that fits.
+const mapCtx = document.createElement('canvas').getContext('2d')
+function mapFit(text, width, sizes, lines = 1) {
+  if (!text || width < 14) return null
+  const family = getComputedStyle(document.body).fontFamily
+  const wide = (t, px) => { mapCtx.font = `500 ${px}px ${family}`; return mapCtx.measureText(t).width }
+  for (const px of sizes) {
+    if (wide(text, px) <= width) return { px, lines: [text] }
+    if (lines > 1) {
+      const words = text.split(' '), out = ['']
+      for (const w of words) { const next = out[out.length - 1] ? out[out.length - 1] + ' ' + w : w
+        if (wide(next, px) <= width || !out[out.length - 1]) out[out.length - 1] = next; else out.push(w) }
+      if (out.length <= lines && out.every((l) => wide(l, px) <= width)) return { px, lines: out }
+    }
+  }
+  const px = sizes[sizes.length - 1]
+  let t = text
+  while (t.length > 1 && wide(t + '…', px) > width) t = t.slice(0, -1)
+  return t.length > 1 ? { px, lines: [t + '…'] } : null
+}
+const mapIsField = (target) => /(^|\s|>)(input|textarea|select)([#.\[:]|$)/.test(String(target).split('>').pop().trim())
+
 // Words on the drawing: a percentage centred on an arrow (no `taken`), or a number next to an element — above it, else
 // right, left or below, wherever it covers no other element or word (`taken` collects what is already there).
-function mapPill(box, text, k, [W, H], kind, taken) {
-  const fs = 12 * k, w = text.length * fs * 0.6 + 14 * k, h = 20 * k, g = 3 * k
+function mapPill(box, text, k, [X0, Y0, X1, Y1], kind, taken, besideFirst = false, along = null) {
+  mapCtx.font = `600 12px ${getComputedStyle(document.body).fontFamily}`
+  const fs = 12 * k, w = mapCtx.measureText(text).width * k + 14 * k, h = 20 * k, g = 3 * k
   const [bx, by, bw, bh] = box
   let left = bx + bw / 2 - w / 2, top = by + bh / 2 - h / 2
   if (taken) {
-    const hits = (l, t) => t < 0 || l < 0 || l + w > W || t + h > H || taken.some((r) => r !== box && l < r[0] + r[2] && l + w > r[0] && t < r[1] + r[3] && t + h > r[1] &&
-      !(r[0] === bx && r[1] === by && r[2] === bw && r[3] === bh))
-    const spots = [[bx, by - h - g], [bx + bw + g, by + bh / 2 - h / 2], [bx - w - g, by + bh / 2 - h / 2], [bx, by + bh + g],
+    // How much a spot covers: off the drawing counts as a lot; else the area over other elements and words.
+    const own = (r) => r[0] === bx && r[1] === by && r[2] === bw && r[3] === bh
+    const cover = (l, t) => (t < Y0 || l < X0 || l + w > X1 || t + h > Y1 ? 1e12 : 0) + taken.reduce((a, r) => own(r) ? a
+      : a + Math.max(0, Math.min(l + w, r[0] + r[2]) - Math.max(l, r[0])) * Math.max(0, Math.min(t + h, r[1] + r[3]) - Math.max(t, r[1])), 0)
+    const around = [[bx, by - h - g], [bx + bw + g, by + bh / 2 - h / 2], [bx - w - g, by + bh / 2 - h / 2], [bx, by + bh + g]]
+    if (besideFirst) around.unshift(around.splice(1, 1)[0])
+    const spots = along ? along.map(([x, y]) => [x - w / 2, y - h / 2]) : [...around,
       ...(bw >= 2 * w ? [[bx + bw - w - g, by + bh / 2 - h / 2]] : [])] // a wide row with no room around: inside, at its right end
-    ;[left, top] = spots.find(([l, t]) => !hits(l, t)) ?? spots[0]
+    ;[left, top] = spots.reduce((best, s) => cover(...s) < cover(...best) ? s : best)
     taken.push([left, top, w, h])
   }
-  left = Math.max(0, Math.min(left, W - w)); top = Math.max(0, Math.min(top, H - h))
+  left = Math.max(X0, Math.min(left, X1 - w)); top = Math.max(Y0, Math.min(top, Y1 - h))
   return `<g class="pill ${kind}"><rect x="${left}" y="${top}" width="${w}" height="${h}" rx="${h / 2}"/><text x="${left + 7 * k}" y="${top + 14 * k}" font-size="${fs}">${esc(text)}</text></g>`
 }
 
@@ -3023,7 +3087,7 @@ function redrawMap(focus = null) {
 // Measures the drawing once on the page: text and arrowheads keep their screen size at any width.
 function fitMap() {
   const svg = $('#map-svg svg'), lay = state.mapData?.layout; if (!svg || !lay) return
-  const k = Math.max(1, lay.dw / svg.getBoundingClientRect().width)
+  const k = Math.max(1, mapFrame(lay)[2] / svg.getBoundingClientRect().width)
   ;(state.mapK ??= {})[lay.viewport + lay.vw] = k
   if (Math.abs(k - Number(svg.dataset.k)) / k > 0.04) { $('#map-body').innerHTML = mapBody() }
 }
