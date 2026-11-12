@@ -147,6 +147,18 @@ button.link { border: 0; background: none; padding: 0; height: auto; color: var(
 .addrule { display: flex; gap: 8px; flex-wrap: wrap; } .addrule select#rule-key, .addrule input#rule-key { flex: 1; min-width: 240px; }
 .chart.small { height: 110px; margin-right: 0; } .cols i.acc { background: var(--accent); }
 .error { color: var(--bad); margin: 0; }
+tr.off { display: none; }
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
+.pager button[disabled] { opacity: .45; cursor: default; }
+.sentinel { height: 1px; }
+button.gl { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; margin-left: 6px;
+  border: 1px solid var(--line-strong); border-radius: 50%; background: none; color: var(--faint); font: 600 11px/1 system-ui, sans-serif;
+  vertical-align: middle; text-transform: none; letter-spacing: 0; cursor: pointer; }
+button.gl:hover, button.gl[aria-expanded="true"] { color: var(--fg); border-color: var(--accent); }
+.gl-pop { margin: 8px 0 4px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--sunken); border-radius: 4px;
+  font-size: 13px; line-height: 19px; color: var(--fg); max-width: 640px; }
+.gl-pop p { margin: 0; } .gl-pop p + p { margin-top: 4px; }
+@media (pointer: coarse) { button.gl { width: 26px; height: 26px; font-size: 13px; } }
 .dict-name { width: 100%; min-width: 180px; } .dict-name.saved { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .nm { display: block; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
 code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); overflow-wrap: anywhere; }
@@ -202,6 +214,74 @@ code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace
 <body>
 <div id="app"></div>
 <script>
+const HELP_PT = {
+  overall: ['O que é', 'A frustração média de todas as telas: pontos dos sinais (rage click, clique sem resposta, erro…) divididos pelas visitas, vezes 20, até 100. Até 19 tranquilo, 20–49 atenção, 50+ muita frustração.', 'É média: uma tela ruim some no meio das boas. Para achar onde está o problema, use o veredito e o mapa de telas dia a dia.'],
+  scoreByDay: ['O que é', 'A nota de cada dia, na cor da faixa. Os riscos verticais marcam o dia em que cada versão começou a ser usada.', 'Degrau logo depois de um risco de versão quer dizer que o deploy mudou a experiência. Pico isolado costuma ser incidente.'],
+  heat: ['O que é', 'As telas que mais pesam no período, uma linha por tela e uma célula por dia. Mais escuro, nota pior naquele dia; cinza, ninguém visitou.', 'Procure a linha que escurece a partir de um dia: algo mudou ali. Confira se coincide com o início de uma versão.'],
+  whatToSee: ['O que é', 'O que fugiu do normal, em grupos: Bugs, Irritação, Engajamento, Sugestões e Melhorou, do mais grave para o menos.', 'Comece por Bugs e Engajamento. Sugestões são hipóteses para o produto validar, não ordens.'],
+  screensByFrustration: ['O que é', 'Cada tela com a nota e os sinais que a compõem.', 'Abra a primeira da lista: mostra em qual botão as pessoas se irritam e o que falhou logo depois de clicar.'],
+  byVersion: ['O que é', 'A nota de cada versão do app no período.', 'Versão nova com nota maior que a anterior piorou algo. A aba Versões mostra em qual tela e ação.'],
+  failures: ['O que é', 'Erros de tela, do servidor, pedidos recusados e respostas lentas, agrupados pela mensagem.', 'Priorize pelas sessões atingidas, não pelo número de vezes. "Nova" é a que não existia antes do período.'],
+  screensByUse: ['O que é', 'As telas pela quantidade de visitas, com cliques, pessoas e nota.', 'Tela muito visitada e com nota alta é onde uma melhoria rende mais.'],
+  elements: ['O que é', 'Os botões e links da tela, com cliques, pessoas e problemas (rage, clique sem resposta e falhas logo depois do clique).', 'Muitos problemas num elemento muito usado é prioridade. O mapa de calor mostra onde ele fica na tela.'],
+  never: ['O que é', 'Elementos que apareceram na tela e ninguém clicou no período.', 'Candidatos a sair, mudar de lugar ou ser explicados. Confira antes se não são de uso raro por natureza, como excluir conta.'],
+  reach: ['O que é', 'Quantos cliques e telas as pessoas percorrem, desde a última gravação, até usar cada botão ou ação.', 'Muito usado e longe é candidato a atalho: traga para perto de onde as pessoas já estão.'],
+  pairs: ['O que é', 'Ações que costumam vir uma logo depois da outra, e o esforço entre elas.', 'Par marcado como "juntas" e com muitos cliques no meio sugere juntar as duas numa tela ou num passo só.'],
+  flow: ['O que é', 'Para a tela escolhida: de quais telas as pessoas chegam e para quais vão em seguida, em porcentagem das passagens. "Saíram do app" é onde a sessão terminou.', 'Saída alta numa tela do meio de um fluxo indica abandono. Ida e volta frequente entre duas telas sugere que falta informação numa delas.'],
+  funnel: ['O que é', 'Uma sequência de telas e ações, e quantas sessões chegam a cada passo, na ordem.', 'O passo com a maior perda é onde o fluxo trava. Veja a frustração e as falhas daquela tela.'],
+  byUser: ['O que é', 'Uso e nota por pessoa, só pelo id. Clique numa pessoa para filtrar o painel por ela.', 'Nota alta em poucas pessoas costuma ser treinamento; espalhada por todos, é a tela.'],
+  effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
+  compare: ['O que é', 'Uma versão contra outra: nota por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
+  features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
+  adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
+  featureScore: ['O que é', 'A frustração da feature: sinais nas telas e botões dela, divididos pelos usos.', 'Feature importante com frustração alta é a melhor candidata a revisão de experiência.'],
+  byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
+  accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
+  usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
+  dictionary: ['O que é', 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra.', 'Dê nome primeiro aos ícones sem rótulo e às telas de detalhe: são os que aparecem crus no painel.'],
+}
+const HELP_EN = {
+  overall: ['What it is', 'The average frustration of every screen: signal points (rage click, dead click, error…) divided by visits, times 20, capped at 100. Up to 19 calm, 20–49 attention, 50+ very frustrating.', 'It is an average: one bad screen hides among the good ones. To find where the problem is, use the verdict and the screens-by-day map.'],
+  scoreByDay: ['What it is', 'Each day\'s score, in its band colour. The vertical marks are the days each version started being used.', 'A step right after a version mark means the deploy changed the experience. A lone spike is usually an incident.'],
+  heat: ['What it is', 'The screens that weigh the most, one row per screen and one cell per day. Darker is a worse score that day; grey, nobody visited.', 'Look for the row that darkens from one day on: something changed there. Check whether it matches a version start.'],
+  whatToSee: ['What it is', 'What is out of the ordinary, in groups: Bugs, Irritation, Engagement, Suggestions and Improved, most serious first.', 'Start with Bugs and Engagement. Suggestions are hypotheses for the product team to check, not orders.'],
+  screensByFrustration: ['What it is', 'Each screen with its score and the signals behind it.', 'Open the first one: it shows which button irritates people and what failed right after a click.'],
+  byVersion: ['What it is', 'The score of each app version in the period.', 'A new version with a higher score than the one before made something worse. The Versions tab shows which screen and action.'],
+  failures: ['What it is', 'Screen errors, server errors, refused requests and slow responses, grouped by message.', 'Prioritise by sessions hit, not by count. "New" means it did not exist before the period.'],
+  screensByUse: ['What it is', 'Screens by visits, with clicks, people and score.', 'A much-visited screen with a high score is where an improvement pays the most.'],
+  elements: ['What it is', 'The screen\'s buttons and links, with clicks, people and problems (rage, dead clicks and failures right after the click).', 'Many problems on a much-used element is a priority. The heat map shows where it sits on the screen.'],
+  never: ['What it is', 'Elements that were on screen and nobody clicked in the period.', 'Candidates to remove, move or explain. Check first they are not rare by nature, like deleting an account.'],
+  reach: ['What it is', 'How many clicks and screens people go through, since the last save, to use each button or action.', 'Used a lot and far away is a shortcut candidate: bring it closer to where people already are.'],
+  pairs: ['What it is', 'Actions that usually come one right after the other, and the effort between them.', 'A pair marked "together" with many clicks in between suggests merging them into one screen or step.'],
+  flow: ['What it is', 'For the chosen screen: which screens people come from and which they go to next, as a share of the passages. "Left the app" is where the session ended.', 'A high exit in the middle of a flow points to abandonment. Frequent back and forth between two screens suggests one of them lacks information.'],
+  funnel: ['What it is', 'A sequence of screens and actions, and how many sessions reach each step, in order.', 'The step with the biggest loss is where the flow gets stuck. See that screen\'s frustration and failures.'],
+  byUser: ['What it is', 'Use and score per person, by id only. Click a person to narrow the dashboard to them.', 'A high score in a few people is usually training; spread over everyone, it is the screen.'],
+  effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
+  compare: ['What it is', 'One version against another: score per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
+  features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
+  adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
+  featureScore: ['What it is', 'The feature\'s frustration: signals on its screens and buttons, divided by its uses.', 'An important feature with high frustration is the best candidate for an experience review.'],
+  byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
+  accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
+  usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
+  dictionary: ['What it is', 'The name people use for each screen, button, action and account. Empty uses the name the app shows.', 'Name first the icons without a label and the detail screens: they are the ones shown raw on the dashboard.'],
+}
+const lookTitle = () => (PT ? 'O que olhar' : 'What to look at')
+// A "?" next to a section title: what the section is and what to look for in it, opened right under the title.
+const help = (k) => (PT ? HELP_PT : HELP_EN)[k] ? `<button class="gl" data-help="${k}" aria-expanded="false" aria-label="${PT ? 'O que é isto?' : 'What is this?'}" title="${PT ? 'O que é isto?' : 'What is this?'}">?</button>` : ''
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('button.gl[data-help]')
+  if (!b) return
+  const label = b.closest('.label') ?? b.parentElement
+  const anchor = label.nextElementSibling?.classList.contains('meta') ? label.nextElementSibling : label
+  const open = anchor.nextElementSibling?.classList.contains('gl-pop') ? anchor.nextElementSibling : null
+  if (open) { open.remove(); b.setAttribute('aria-expanded', 'false'); return }
+  const [what, text, look] = (PT ? HELP_PT : HELP_EN)[b.dataset.help]
+  const pop = Object.assign(document.createElement('div'), { className: 'gl-pop', role: 'note' })
+  pop.append(Object.assign(document.createElement('p'), { innerHTML: `<b>${what}:</b> ` }), Object.assign(document.createElement('p'), { innerHTML: `<b>${lookTitle()}:</b> ` }))
+  pop.children[0].append(text); pop.children[1].append(look)
+  anchor.after(pop); b.setAttribute('aria-expanded', 'true')
+})
 const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>'
 const PT = /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
@@ -269,7 +349,7 @@ const L = PT ? {
   short: { version_worse: (i) => `${i.route} piorou na ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} piorou (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} com nota ${i.now}`, failure_new: (i) => `falha nova em ${i.route} (${i.n}×)`, failure_recurring: (i) => `falha recorrente em ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestões', better: 'Melhorou' },
-  record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
+  prev: 'Anterior', next: 'Próxima', range: (a, b, n) => `${a}–${b} de ${n}`, record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
   bands: { ok: 'tranquilo (até 19)', warn: 'atenção (20–49)', bad: 'muita frustração (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
   heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, pior a nota daquele dia. Clique na tela para ver os detalhes.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: nota ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Nota do dia',
@@ -381,7 +461,7 @@ const L = PT ? {
   short: { version_worse: (i) => `${i.route} got worse in ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} got worse (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} at score ${i.now}`, failure_new: (i) => `new failure on ${i.route} (${i.n}×)`, failure_recurring: (i) => `recurring failure on ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestions', better: 'Improved' },
-  record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
+  prev: 'Previous', next: 'Next', range: (a, b, n) => `${a}–${b} of ${n}`, record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
   bands: { ok: 'calm (up to 19)', warn: 'attention (20–49)', bad: 'very frustrating (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
   heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the worse that day\'s score. Click a screen for the details.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Score of the day',
@@ -570,7 +650,7 @@ function shell() {
     if (state.tab === 'features' || state.tab === 'accounts') onFeatureClick(e)
   })
   $('#content').addEventListener('input', (e) => {
-    if (e.target.id === 'dict-filter') { state.dictFilter = e.target.value; $('#dict-body').innerHTML = dictBody() }
+    if (e.target.id === 'dict-filter') { state.dictFilter = e.target.value; $('#dict-body').innerHTML = dictBody(); paginate($('#dict-body')) }
   })
   $('#content').addEventListener('change', (e) => {
     if (e.target.matches('.dict-name')) saveName(e.target)
@@ -696,7 +776,7 @@ function scoreChart(o) {
   const at = Object.fromEntries(days.map((d, i) => [d.day, i]))
   const marks = o.deploys.filter((d) => d.day in at && at[d.day] > 0)
   const col = 100 / n
-  return `<section class="card"><div class="head"><div><div class="label">${L.scoreByDay}</div>
+  return `<section class="card"><div class="head"><div><div class="label">${L.scoreByDay}${help('scoreByDay')}</div>
       <div class="meta">${esc(days[0].day)} → ${esc(days[n - 1].day)} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>
       <div class="legend">${['ok', 'warn', 'bad'].map((b) => `<span><i class="sw ${b}"></i>${L.bands[b]}</span>`).join('')}</div></div>
     <div class="chart">
@@ -714,7 +794,7 @@ function heatMap(o) {
   if (days.length < 3 || !o.screens.length) return ''
   const at = new Set(o.deploys.map((d) => d.day))
   const first = days[0]
-  return `<section class="card"><div class="head"><div><div class="label">${L.heat}</div><div class="meta">${L.heatHint}</div></div>
+  return `<section class="card"><div class="head"><div><div class="label">${L.heat}${help('heat')}</div><div class="meta">${L.heatHint}</div></div>
       <div class="legend"><span class="meta">${L.heatScale}</span>${HEAT.slice().reverse().map(([v, k]) => `<span><i class="sw h${k}"></i>${v}${k === 5 ? '+' : ''}</span>`).join('')}</div></div>
     <div class="heat" style="--n:${days.length}">
       <div></div><div class="vers">${days.map((d) => `<span>${at.has(d) && d !== first ? esc(o.deploys.find((x) => x.day === d).version) : ''}</span>`).join('')}</div>
@@ -740,7 +820,7 @@ async function overview() {
   const points = n.score - b.score
   const vs = !comparable ? L.noCompare : o.days === 1 ? L.vsDay : L.vsBefore(o.days)
   const series = (k) => o.daily.map((d) => d[k])
-  const tile = (label, value, cls, delta, key, foot) => `<div class="card tile"><div class="label">${label}</div>
+  const tile = (label, value, cls, delta, key, foot) => `<div class="card tile"><div class="label">${label}${key === 'score' ? help('overall') : ''}</div>
     <div class="row"><div class="big ${cls}">${value}${delta}</div>${spark(series(key), `${label} ${L.perDay}: ${Math.min(...series(key))}–${Math.max(...series(key))}`)}</div>
     <div class="meta">${foot}</div></div>`
 
@@ -765,7 +845,7 @@ async function overview() {
   const grouped = {}
   for (const i of o.insights) (grouped[groupOf(i.kind)] ??= []).push(i)
   const groups = Object.keys(GROUPS).filter((g) => grouped[g])
-  const insights = o.insights.length ? `<div class="groups">${groups.map((g) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}</div>
+  const insights = o.insights.length ? `<div class="groups">${groups.map((g, n) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}${n ? '' : help('whatToSee')}</div>
       <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
         <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
     : ''
@@ -822,7 +902,7 @@ async function frustration() {
         <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}</div></div>
     </section>
     <section class="card">
-      <div class="label">${L.screensByFrustration}</div><div class="meta">${L.openRow}</div>
+      <div class="label">${L.screensByFrustration}${help('screensByFrustration')}</div><div class="meta">${L.openRow}</div>
       ${table(`<th>${L.screen}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.routes.map((x, i) => `
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${scr(x.key)}</div></td>
@@ -830,7 +910,7 @@ async function frustration() {
           <td class="n">${x.visits}</td><td>${signals(x.signals)}</td></tr>
         <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="4">${detail(x)}</td></tr>`).join(''))}
     </section>
-    ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}</div><div class="meta">${L.versionHint}</div>
+    ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}${help('byVersion')}</div><div class="meta">${L.versionHint}</div>
       ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
         <td class="n">${scoreHtml(v.score)}</td><td class="n">${v.visits}</td><td>${signals(v.signals)}</td></tr>`).join(''))}</section>` : ''}
     <details class="card"><summary>${L.how}</summary>
@@ -899,7 +979,7 @@ async function failures() {
         <ol class="steps">${t.before.map((s) => stepHtml(s, t.at)).join('')}${stepHtml(t.failure, t.at, true)}${t.after.map((s) => stepHtml(s, t.at)).join('')}</ol>
         <button class="small" data-session="${esc(t.session)}">${F().fullSession}</button></details>`).join('')}</div>
     </section>` : ''
-  return `${detail}<section class="card"><div class="label">${F().list}</div><div class="meta">${F().hint}</div>
+  return `${detail}<section class="card"><div class="label">${F().list}${help('failures')}</div><div class="meta">${F().hint}</div>
     ${table(`<th>${F().failure}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th>`,
       list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
         <td><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
@@ -909,6 +989,49 @@ async function failures() {
 }
 
 // Every table can leave as CSV: what is on screen, so the numbers match what was read.
+// Long lists: where the top is what matters, pages of 10 turned by hand; where people browse (data-scroll), 30 more
+// whenever the end comes into view. A row and its detail row move together; the selected row's page opens first.
+const PAGE = 10, CHUNK = 30
+function paginate(root = $('#content')) {
+  root?.querySelectorAll('.table').forEach((wrap) => {
+    const body = wrap.querySelector('tbody')
+    if (!body || wrap.dataset.paged) return
+    const groups = []
+    for (const tr of body.children) if (tr.classList.contains('detail') && groups.length) groups[groups.length - 1].push(tr); else groups.push([tr])
+    const scroll = !!wrap.closest('[data-scroll]'), size = scroll ? CHUNK : PAGE
+    if (groups.length <= size) return
+    wrap.dataset.paged = '1'
+    const show = (from, to) => groups.forEach((g, i) => g.forEach((tr) => tr.classList.toggle('off', i < from || i >= to)))
+    if (scroll) {
+      let shown = size
+      show(0, shown)
+      const end = Object.assign(document.createElement('div'), { className: 'sentinel' })
+      wrap.after(end)
+      const io = new IntersectionObserver((seen) => {
+        if (!seen.some((x) => x.isIntersecting)) return
+        shown += size; show(0, shown)
+        if (shown >= groups.length) { io.disconnect(); end.remove() }
+      }, { rootMargin: '400px' })
+      io.observe(end)
+      return
+    }
+    let page = Math.max(0, Math.floor(groups.findIndex((g) => g[0].classList.contains('sel')) / size))
+    const nav = Object.assign(document.createElement('div'), { className: 'pager' })
+    const draw = () => {
+      show(page * size, page * size + size)
+      nav.innerHTML = `<button class="small" data-p="-1" ${page ? '' : 'disabled'}>← ${L.prev}</button>
+        <span class="meta">${L.range(page * size + 1, Math.min(groups.length, (page + 1) * size), groups.length)}</span>
+        <button class="small" data-p="1" ${(page + 1) * size < groups.length ? '' : 'disabled'}>${L.next} →</button>`
+    }
+    nav.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-p]')
+      if (!b || b.disabled) return
+      page += +b.dataset.p; draw(); wrap.scrollIntoView({ block: 'nearest' })
+    })
+    draw(); wrap.after(nav)
+  })
+}
+
 function addCsvButtons() {
   document.querySelectorAll('#content .card').forEach((card, i) => {
     const t = card.querySelector(':scope > .table table, :scope > details > .table table')
@@ -959,7 +1082,7 @@ async function journeys() {
   const elementsSeen = [...new Set(j.reach.filter((r) => r.kind === 'element').map((r) => r.key))].slice(0, 60)
   const far = j.reach.filter((r) => r.far).slice(0, 10)
   const reachCard = () => `
-    <section class="card"><div class="label">${J().reach}</div><div class="meta">${J().reachHint}</div>
+    <section class="card"><div class="label">${J().reach}${help('reach')}</div><div class="meta">${J().reachHint}</div>
       ${far.length ? reachTable(far) : `<p class="meta">${J().noneFar}</p>`}
       <details style="margin-top:12px"><summary>${J().allReach(j.reach.length)}</summary>${reachTable(reach)}</details>
     </section>`
@@ -968,12 +1091,12 @@ async function journeys() {
           <td>${scr(r.route)}</td><td class="n">${r.uses}</td><td class="n">${r.users}</td>
           <td class="n"><b class="${r.clicks_median >= 5 ? 'warn' : ''}">${r.clicks_median}</b></td><td class="n"><b class="${r.screens_median >= 2 ? 'warn' : ''}">${r.screens_median}</b></td></tr>`).join(''))
   return reachCard() + `
-    <section class="card"><div class="label">${J().pairs}</div><div class="meta">${J().pairsHint}</div>
+    <section class="card"><div class="label">${J().pairs}${help('pairs')}</div><div class="meta">${J().pairsHint}</div>
       ${j.pairs.length ? `<ul class="insights">${j.pairs.slice(0, 15).map((p) => { const e = { ...p, a: esc(actionText(p.a) || p.a), b: esc(actionText(p.b) || p.b), clicks: p.clicks_median, screens: p.screens_median }
         return `<li>${p.linked ? `<span class="pill idea">${J().linked}</span>` : ''}<div class="text">${J().pair(e)}<div class="meta">${J().pairMeta(e)}</div><div class="tech"><code>${esc(p.a)}</code> → <code>${esc(p.b)}</code></div></div></li>` }).join('')}</ul>`
         : `<p class="meta">${J().noPairs}</p>`}
     </section>
-    <section class="card"><div class="head"><div><div class="label">${J().flow}</div><div class="meta">${J().flowHint}</div></div>
+    <section class="card"><div class="head"><div><div class="label">${J().flow}${help('flow')}</div><div class="meta">${J().flowHint}</div></div>
         <select id="flow-screen" aria-label="${L.screen}">${j.screens.map((x) => `<option value="${esc(x.route)}" ${x.route === state.route ? 'selected' : ''}>${esc(screenText(x.route) ? `${screenText(x.route)} (${x.route})` : x.route)}</option>`).join('')}</select></div>
       <div class="flow">
         <div><div class="label">${J().from}</div>${flowList(sc.from, J().start)}</div>
@@ -981,7 +1104,7 @@ async function journeys() {
         <div><div class="label">${J().to}</div>${flowList(sc.to, '—')}</div>
       </div>
     </section>
-    <section class="card"><div class="label">${J().funnel}</div><div class="meta">${J().funnelHint}</div>
+    <section class="card"><div class="label">${J().funnel}${help('funnel')}</div><div class="meta">${J().funnelHint}</div>
       <div class="funnel">${fu.steps.map((x, i) => `<div class="fstep">
           <div class="fhead"><span>${i + 1}. ${esc(stepLabel(x.step))}</span><button class="small" data-funnel-remove="${i}" aria-label="${J().removeStep}">×</button></div>
           <div class="bar big"><i style="width:${pct(x.share)}%;background:var(--accent)"></i></div>
@@ -1008,14 +1131,14 @@ async function usage() {
   return `
     <section class="two">
       <div class="card">
-        <div class="label">${L.screensByUse}</div><div class="meta">${L.pickScreen}</div>
+        <div class="label">${L.screensByUse}${help('screensByUse')}</div><div class="meta">${L.pickScreen}</div>
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
             <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
             <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
       </div>
       <div class="card">
-        <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
+        <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}${help('elements')}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
           ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
         ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
           <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><span class="named">${named(controlLabel(d.route, e.target), e.target)}</span></td>
@@ -1024,7 +1147,7 @@ async function usage() {
           : `<p class="meta">${L.noClicks}</p>`}
       </div>
     </section>
-    <section class="card"><div class="label">${esc(L.neverIn(screenText(d.route) || d.route))}</div><div class="meta">${L.neverHint}</div>
+    <section class="card"><div class="label">${esc(L.neverIn(screenText(d.route) || d.route))}${help('never')}</div><div class="meta">${L.neverHint}</div>
       ${d.never_clicked.length ? `<ul>${d.never_clicked.map((a) => `<li>${named(controlLabel(d.route, a), a)}</li>`).join('')}</ul>` : `<p class="meta">${L.allClicked}</p>`}</section>`
 }
 
@@ -1047,7 +1170,7 @@ async function people() {
       list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
   return `
     <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account, (k) => esc(accountText(k)))}</section>
-    <section class="card"><div class="label">${L.byUser}</div><div class="meta">${L.userHint}</div>
+    <section class="card" data-scroll><div class="label">${L.byUser}${help('byUser')}</div><div class="meta">${L.userHint}</div>
       ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
         p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
           <td><code title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(accountText(u.account))}</td>
@@ -1059,7 +1182,7 @@ async function actions() {
   const { actions } = await read('/api/actions')
   if (!actions.length) return empty(L.noActions)
   const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
-  return `<section class="card"><div class="label">${L.effort}</div><div class="meta">${L.effortHint}</div>
+  return `<section class="card"><div class="label">${L.effort}${help('effort')}</div><div class="meta">${L.effortHint}</div>
     ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
       actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td>${act(a.action)}</td><td class="n">${a.times}</td><td class="n">${a.users}</td>
         <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td><td class="n">${a.clicks_p90}</td>
@@ -1085,7 +1208,7 @@ async function versions() {
       <div class="card"><div class="label">${L.visits}</div><div class="big">${o.a.visits} → ${o.b.visits}</div></div>
       <div class="card"><div class="label">${L.newFailures}</div><div class="big ${c.new_failures.length ? 'bad' : 'ok'}">${c.new_failures.length}</div></div>
     </section>
-    <section class="card"><div class="label">${L.screensCompared}</div>
+    <section class="card"><div class="label">${L.screensCompared}${help('compare')}</div>
       ${table(`<th>${L.screen}</th><th class="n">${esc(c.a)}</th><th class="n">${esc(c.b)}</th><th class="n">${L.change}</th><th class="n">${L.visits} ${esc(c.b)}</th><th>${L.signals} ${esc(c.b)}</th>`,
         c.routes.map((r) => `<tr><td><div class="route">${scr(r.route)}</div></td>
           <td class="n">${r.a ? scoreHtml(r.a.score) : '<span class="meta">—</span>'}</td><td class="n">${r.b ? scoreHtml(r.b.score) : '<span class="meta">—</span>'}</td>
@@ -1147,7 +1270,7 @@ async function features() {
   if (state.featureEdit) return featureEditor()
   const r = await read('/api/features')
   const fid = $('#feature').value
-  const head = `<section class="card"><div class="head"><div><div class="label">${FT().title}</div><div class="meta">${FT().hint}</div></div>
+  const head = `<section class="card"><div class="head"><div><div class="label">${FT().title}${help('features')}</div><div class="meta">${FT().hint}</div></div>
     <button class="primary" data-feat="new">${FT().create}</button></div></section>`
   if (fid) {
     const ft = r.features.find((x) => x.id === fid)
@@ -1176,12 +1299,12 @@ async function featureDetail(ft, r) {
         <button class="small" data-feat="remove" data-id="${esc(ft.id)}">${FT().remove}</button></div></div></section>
     <section class="numbers">
       <div class="card"><div class="label">${FT().uses}</div><div class="big">${num(ft.uses)}${change(ft.uses, ft.before)}</div></div>
-      <div class="card"><div class="label">${FT().adoption}</div><div class="big">${Math.round(ft.adoption * 100)}%</div><div class="meta">${FT().adoptionHint(r.active_users)}</div></div>
+      <div class="card"><div class="label">${FT().adoption}${help('adoption')}</div><div class="big">${Math.round(ft.adoption * 100)}%</div><div class="meta">${FT().adoptionHint(r.active_users)}</div></div>
       <div class="card"><div class="label">${FT().people}</div><div class="big">${num(ft.users)}</div><div class="meta">${num(ft.accounts)} ${FT().accounts.toLowerCase()}</div></div>
-      <div class="card"><div class="label">${FT().score}</div><div class="big ${band(ft.score)}">${ft.score}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}</div></div>
+      <div class="card"><div class="label">${FT().score}${help('featureScore')}</div><div class="big ${band(ft.score)}">${ft.score}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}</div></div>
     </section>
     ${barsChart(FT().usesByDay, ft.daily, (d) => d.n, (d) => FT().dayTip(d.day, d.n))}
-    <section class="card"><div class="label">${FT().byAccount}</div><div class="meta">${FT().byAccountHint}</div>
+    <section class="card"><div class="label">${FT().byAccount}${help('byAccount')}</div><div class="meta">${FT().byAccountHint}</div>
       ${rows.length ? table(`<th>${AC().account}</th><th class="n">${FT().uses}</th><th class="n">${AC().usersDay}</th>`,
         rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0"><td>${esc(accountText(a.account))}${a.drops.some((d) => d.feature === ft.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td>
           <td class="n">${num(a.f.now)}${change(a.f.now, a.f.before)}</td><td class="n">${num(a.now.users_day)}</td></tr>`).join('')) : `<p class="meta">${AC().none}</p>`}
@@ -1254,7 +1377,7 @@ async function accounts() {
   if (id) return accountDetail(e, id)
   if (!e.accounts.length) return empty(AC().none)
   const feats = e.features
-  return `<section class="card"><div class="label">${AC().title}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
+  return `<section class="card"><div class="label">${AC().title}${help('accounts')}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
     ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
     ${table(`<th>${AC().account}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}`,
       e.accounts.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
@@ -1271,7 +1394,7 @@ function accountDetail(e, id) {
   const head = `<section class="card"><button class="link" data-feat="no-account">← ${AC().back}</button><div class="fname big-name">${esc(accountText(id))}</div></section>`
   if (!a) return head + empty(L.noVisits)
   return head + `<section class="numbers">
-      <div class="card"><div class="label">${AC().usersDay}</div><div class="big">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</div></div>
+      <div class="card"><div class="label">${AC().usersDay}${help('usersDay')}</div><div class="big">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)}${a.before ? change(a.now.sessions_day, a.before.sessions_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
     </section>
@@ -1284,11 +1407,10 @@ function accountDetail(e, id) {
 
 // Dictionary ---------------------------------------------------------------------------------------------------
 const D = () => L.dict
-const DICT_SHOW = 60
 async function dictionary() {
   const d = await read('/api/dictionary')
   state.dict = d
-  return `<section class="card"><div class="head"><div><div class="label">${D().title}</div><div class="meta">${D().hint}</div></div>
+  return `<section class="card"><div class="head"><div><div class="label">${D().title}${help('dictionary')}</div><div class="meta">${D().hint}</div></div>
       <input id="dict-filter" type="search" placeholder="${D().filter}" aria-label="${D().filter}" value="${esc(state.dictFilter ?? '')}" style="min-width:260px"></div></section>
     <div id="dict-body">${dictBody()}</div>`
 }
@@ -1297,12 +1419,12 @@ function dictBody() {
   const hit = (x, ...extra) => !f || [x.key, x.auto, x.name, ...extra].some((v) => String(v ?? '').toLowerCase().includes(f))
   const section = (kind, title, list, keyHtml, extraHead = '', extraCell = () => '') => {
     const shown = list.filter((x) => hit(x, kind === 'control' ? screenText(x.route) : ''))
-    return `<section class="card"><div class="label">${title} · ${list.length}</div>
+    return `<section class="card" data-scroll><div class="label">${title} · ${list.length}</div>
       ${shown.length ? table(`<th>${D().key}</th><th>${kind === 'account' ? '' : D().auto}</th><th>${D().name}</th>${extraHead}<th class="n">${D().used}</th>`,
-        shown.slice(0, DICT_SHOW).map((x) => `<tr><td>${keyHtml(x)}</td><td>${esc(x.auto) || '<span class="meta">—</span>'}</td>
+        shown.map((x) => `<tr><td>${keyHtml(x)}</td><td>${esc(x.auto) || '<span class="meta">—</span>'}</td>
           <td><input class="dict-name" data-kind="${kind}" data-key="${esc(x.key)}" value="${esc(x.name)}" placeholder="${kind === 'account' ? D().accountPlaceholder : esc(x.auto || D().placeholder)}" aria-label="${D().name}"></td>
           ${extraCell(x)}<td class="n">${num(x.used)}</td></tr>`).join('')) : `<p class="meta">${D().none}</p>`}
-      ${shown.length > DICT_SHOW ? `<p class="meta">${D().more(shown.length - DICT_SHOW)}</p>` : ''}</section>`
+      </section>`
   }
   return section('screen', D().screens, d.screens, (x) => `<code>${esc(x.key)}</code>`)
     + section('control', D().controls, d.controls, (x) => `<span class="nm">${esc(screenText(x.route) || x.route)}</span><code class="tech">${esc(x.target)}</code>`)
@@ -1348,6 +1470,7 @@ async function render() {
     $('#content').innerHTML = await TABS[state.tab]()
     $('#open-map')?.addEventListener('click', openMap)
     addCsvButtons()
+    paginate()
     writeHash()
     if (state.focus) ($('#content .failure') ?? $('#content tr.sel'))?.scrollIntoView({ block: $('#content .failure') ? 'start' : 'center' })
     state.focus = false
