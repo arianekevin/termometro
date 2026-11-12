@@ -427,6 +427,21 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
   .irr .irr-kind { display: inline; } .irr .why.kind-only { display: block; }
   .irr-n .meta { display: none; }
 }
+/* Início: the to-do grouped by screen (the other insights of a row folded under it) and the Following card. */
+.fw-more { font-size: 12px; white-space: nowrap; }
+.fw-rest { list-style: none; margin: 8px 0 0; padding: 0 0 0 10px; border-left: 2px solid var(--line); display: grid; gap: 6px; }
+.fw-rest li { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.fw-rest li > .pill { flex: none; height: 20px; font-size: 11px; } .fw-rest li > a { flex: none; font-size: 12px; }
+.fw-say { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-rest .fw-say { flex: 1; }
+.fw-on { height: 28px; }
+.fw-verdict .meta { margin-top: 2px; }
+.follow .fw-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+.fw-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.fw-row:first-child { border-top-color: transparent; } .fw-row[hidden] { display: none; } .fw-row > .pill { justify-self: start; }
+.fw-main { min-width: 0; } .fw-main .fw-say { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } .fw-main .meta { font-size: 12px; line-height: 16px; }
+#fw-all { margin-top: 8px; } .fw-empty { margin: 8px 0 0; max-width: 72ch; }
+@media (max-width: 640px) { .fw-row { grid-template-columns: minmax(0, 1fr); } .fw-row .todo-acts { justify-content: flex-start; flex-wrap: wrap; } }
 </style>
 </head>
 <body>
@@ -453,6 +468,7 @@ const HELP_PT = {
   effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo. "Até a tela" são os cliques no caminho até a tela da ação; "na tela", os cliques nela.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
   release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas a cada 100 sessões. O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
+  follow: ['O que é', 'O que você decidiu corrigir. Ao clicar em Acompanhar, o valor de hoje vira a linha de base: a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da conta. Depois, o mesmo número é medido só com o que veio desde então, com os filtros em uso.', 'Melhorou ou piorou só quando a mudança passa da tolerância (5 pontos de frustração, ou 20% nas outras medidas); dentro dela é Igual. Sem dados ainda: ninguém passou por ali desde que começou.'],
   todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
   adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
@@ -491,6 +507,7 @@ const HELP_EN = {
   effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done. "On the way" are the clicks to reach the action\'s screen; "on the screen", the clicks on it.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
   release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per 100 sessions. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
+  follow: ['What it is', 'What you decided to fix. Clicking Follow keeps today\'s value as the baseline: the screen\'s frustration, failures per 100 sessions, the action\'s clicks per use or the account\'s people a day. Afterwards the same number is measured only on what came since, with the filters in use.', 'Improved or worse only when the change goes past the tolerance (5 frustration points, or 20% for the other measures); within it, Same. No data yet: nobody went there since it started.'],
   todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
   adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
@@ -777,6 +794,18 @@ const L = PT ? {
     byList: 'Por prioridade', byType: 'Ver por tipo', evidence: 'Ver evidência', none: 'Nada para fazer: nenhuma falha, tela ou conta fora do normal neste período.',
     chip: { bugs: 'Bug', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestão', better: 'Melhorou' },
     sessions: (n) => `${num(n)} ${n === 1 ? 'sessão' : 'sessões'}`, people: (n) => `${num(n)} ${n === 1 ? 'pessoa' : 'pessoas'}`, good: 'Melhorou', goodHint: 'Telas com menos frustração que no período anterior.' },
+  // The to-do list grouped by screen (or failure, account, action), and the items followed after a fix.
+  fw: { things: { screen: ['tela', 'telas'], failure: ['falha', 'falhas'], account: ['conta', 'contas'], action: ['ação', 'ações'], other: ['ponto', 'pontos'] }, and: 'e',
+    bad: (t, n) => `${t} ${n === 1 ? 'precisa' : 'precisam'} de você esta semana`, warn: (t) => `${t} com pontos de atenção, nada grave`, toList: 'Ver a lista ↓',
+    more: (n, k) => `+${n} ${{ screen: 'nesta tela', failure: 'nesta falha', account: 'nesta conta', action: 'nesta ação' }[k] ?? 'aqui'}`, less: 'Esconder',
+    alsoHere: 'Também aqui', follow: 'Acompanhar', followTip: 'Guarda o valor de hoje como linha de base; o cartão Acompanhando mostra, nas próximas semanas, se melhorou.',
+    following: 'Acompanhando', title: 'Acompanhando', hint: 'O que você decidiu corrigir, contra o valor do dia em que passou a acompanhar.',
+    empty: 'Nada acompanhado ainda. Em "Para fazer", clique em Acompanhar numa linha: o valor de hoje vira a linha de base, e aqui você vê se a correção melhorou, desde o dia em que começou.',
+    metric: { score: 'frustração', irritation: 'cliques de raiva por 100 visitas', failure: 'ocorrências por 100 sessões', clicks: 'cliques por vez', people: 'pessoas por dia' },
+    state: { better: 'Melhorou', same: 'Igual', worse: 'Piorou', waiting: 'Sem dados ainda' },
+    since: (st, d, v) => `${{ better: 'melhorou', same: 'igual', worse: 'piorou', waiting: 'acompanhando' }[st]} desde ${d}${v ? ` (versão ${v})` : ''}`,
+    waitingHint: 'nada medido depois disso', stop: 'Parar de acompanhar', confirmStop: (x) => `Parar de acompanhar "${x}"? A linha de base se perde.`,
+    all: (n) => `Ver todos (${n})`, fewer: 'Ver só os 5 primeiros' },
   dnew: 'novo', dwas: (b) => `antes ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% contra o período anterior`,
   setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
@@ -970,6 +999,17 @@ const L = PT ? {
     byList: 'By priority', byType: 'See by type', evidence: 'See evidence', none: 'Nothing to do: no failure, screen or account out of the ordinary in this period.',
     chip: { bugs: 'Bug', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestion', better: 'Improved' },
     sessions: (n) => `${num(n)} ${n === 1 ? 'session' : 'sessions'}`, people: (n) => `${num(n)} ${n === 1 ? 'person' : 'people'}`, good: 'Improved', goodHint: 'Screens with less frustration than in the period before.' },
+  fw: { things: { screen: ['screen', 'screens'], failure: ['failure', 'failures'], account: ['account', 'accounts'], action: ['action', 'actions'], other: ['point', 'points'] }, and: 'and',
+    bad: (t, n) => `${t} ${n === 1 ? 'needs' : 'need'} you this week`, warn: (t) => `${t} with points of attention, nothing serious`, toList: 'See the list ↓',
+    more: (n, k) => `+${n} ${{ screen: 'on this screen', failure: 'in this failure', account: 'in this account', action: 'in this action' }[k] ?? 'here'}`, less: 'Hide',
+    alsoHere: 'Also here', follow: 'Follow', followTip: 'Keeps today\'s value as the baseline; the Following card shows over the next weeks whether it got better.',
+    following: 'Following', title: 'Following', hint: 'What you decided to fix, against its value on the day you started following it.',
+    empty: 'Nothing followed yet. In "To do", click Follow on a row: today\'s value becomes the baseline, and here you see whether the fix made it better, since the day it started.',
+    metric: { score: 'frustration', irritation: 'rage clicks per 100 visits', failure: 'occurrences per 100 sessions', clicks: 'clicks per use', people: 'people a day' },
+    state: { better: 'Improved', same: 'Same', worse: 'Worse', waiting: 'No data yet' },
+    since: (st, d, v) => `${{ better: 'improved', same: 'same', worse: 'worse', waiting: 'following' }[st]} since ${d}${v ? ` (version ${v})` : ''}`,
+    waitingHint: 'nothing measured since', stop: 'Stop following', confirmStop: (x) => `Stop following "${x}"? Its baseline is lost.`,
+    all: (n) => `See all (${n})`, fewer: 'See only the top 5' },
   dnew: 'new', dwas: (b) => `before ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% against the period before`,
   setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
@@ -1491,17 +1531,43 @@ function heatMap(o) {
     </div></section>`
 }
 
-// To do this week: one list ordered by the server's impact (severity × reach), the top 5 first; the good news apart.
+// To do this week: one row per root (a screen, or a failure when it is a bug, an account, an action), led by its
+// strongest insight, the others of the same root folded under it; ordered by the group's impact, the top 5 first.
 const TODO_TOP = 5
 const plain = (html) => Object.assign(document.createElement('div'), { innerHTML: html }).textContent.replace(/\s+/g, ' ').trim()
-function todoRow(i, k, say, days) {
-  const T = L.todo
+const rootOf = (i) => i.kind.startsWith('failure_') ? { kind: 'failure', key: `${i.type}\t${i.detail}` }
+  : i.account ? { kind: 'account', key: i.account } : i.route ? { kind: 'screen', key: i.route }
+  : i.action || i.a ? { kind: 'action', key: i.action || i.a } : { kind: 'other', key: i.kind }
+const FOLLOWABLE = ['screen', 'failure', 'account', 'action']
+// A group weighs its strongest insight plus a tenth of the others: three problems on one screen pass one of the same size.
+function groupTodos(list) {
+  const by = new Map()
+  for (const i of list) { const r = rootOf(i), id = r.kind + '\n' + r.key; if (!by.has(id)) by.set(id, { ...r, items: [] }); by.get(id).items.push(i) }
+  return [...by.values()].map((g) => {
+    g.items.sort((a, b) => b.impact - a.impact)
+    g.impact = g.items[0].impact + g.items.slice(1).reduce((t, i) => t + i.impact, 0) / 10
+    return g
+  }).sort((a, b) => b.impact - a.impact)
+}
+const followLabel = (g) => g.kind === 'screen' ? screenText(g.key) || g.key : g.kind === 'account' ? accountText(g.key)
+  : g.kind === 'action' ? actionText(g.key) || g.key : `${L.names[g.key.split('\t')[0]] ?? ''}: ${g.key.split('\t')[1]}`
+const followOf = (g, follows) => (follows ?? []).find((x) => x.kind === g.kind && x.key === g.key)
+function todoRow(g, k, days, follows) {
+  const T = L.todo, W = L.fw, i = g.items[0], say = g.says[0], rest = g.items.slice(1)
   const reach = [i.reach_sessions && T.sessions(i.reach_sessions), i.reach_people && T.people(i.reach_people)].filter(Boolean).join(' · ')
+  let demand = demandOf(i, say, days)
+  if (rest.length) { const cut = demand.lastIndexOf('\n---'); demand = demand.slice(0, cut) + `**${W.alsoHere}:**\n${rest.map((x, n) => '- ' + plain(g.says[n + 1])).join('\n')}\n` + demand.slice(cut) }
+  const followed = followOf(g, follows)
+  const follow = !FOLLOWABLE.includes(g.kind) ? '' : followed ? `<span class="pill same fw-on" title="${esc(W.followTip)}">✓ ${W.following}</span>`
+    : `<button class="small" data-follow="${esc(g.kind)}" data-key="${esc(g.key)}" data-label="${esc(followLabel(g))}" title="${esc(W.followTip)}">${W.follow}</button>`
   return `<li class="todo-row" id="todo-${k}" ${k >= TODO_TOP ? 'hidden' : ''}>
     <span class="pill ${i.severity} kchip" title="${esc(L.sev[i.severity])}">${T.chip[groupOf(i.kind)]}</span>
     <div class="todo-main"><div class="todo-say" title="${esc(plain(say))}">${say}</div>
-      <div class="todo-meta">${reach ? `<b>${reach}</b>` : ''}<span class="tech">${techOf(i)}</span></div></div>
-    <div class="todo-acts"><button class="small" data-copy="${esc(demandOf(i, say, days))}">${L.demand.copy}</button>
+      <div class="todo-meta">${reach ? `<b>${reach}</b>` : ''}<span class="tech">${techOf(i)}</span>
+        ${rest.length ? `<button class="link fw-more" data-todo-more="${k}" aria-expanded="false" aria-controls="todo-more-${k}" data-n="${rest.length}" data-kind="${g.kind}">${W.more(rest.length, g.kind)}</button>` : ''}</div>
+      ${rest.length ? `<ul class="fw-rest" id="todo-more-${k}" hidden>${rest.map((x, n) => `<li><span class="pill ${x.severity}">${T.chip[groupOf(x.kind)]}</span>
+        <span class="fw-say" title="${esc(plain(g.says[n + 1]))}">${g.says[n + 1]}</span><a ${linkAttrs(x.link)}>${L.see} →</a></li>`).join('')}</ul>` : ''}</div>
+    <div class="todo-acts"><button class="small" data-copy="${esc(demand)}">${L.demand.copy}</button>${follow}
       <a class="button small primary" ${linkAttrs(i.link)}>${T.evidence}</a></div></li>`
 }
 function showTodos(open) {
@@ -1509,6 +1575,67 @@ function showTodos(open) {
   const b = $('#todo-all')
   if (b) { b.setAttribute('aria-expanded', String(open)); b.textContent = open ? L.todo.fewer : L.todo.all(b.dataset.n) }
 }
+// "2 telas e 1 falha": how many of each root, in words.
+const countText = (groups) => {
+  const n = {}
+  for (const g of groups) n[g.kind] = (n[g.kind] ?? 0) + 1
+  const parts = Object.keys(L.fw.things).filter((k) => n[k]).map((k) => `${n[k]} ${L.fw.things[k][n[k] === 1 ? 0 : 1]}`)
+  return parts.length > 1 ? parts.slice(0, -1).join(', ') + ` ${L.fw.and} ` + parts.at(-1) : parts[0] ?? ''
+}
+// The banner: one line, the verdict in roots, never the list again; its link goes to the list.
+function verdictBanner(groups) {
+  const bad = groups.filter((g) => g.items.some((i) => i.severity === 'bad')), warn = groups.filter((g) => !bad.includes(g) && g.items.some((i) => i.severity === 'warn'))
+  const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
+  const headline = level === 'bad' ? L.fw.bad(countText(bad), bad.length) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok
+  return `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${{ bad: '!', warn: '•', ok: '✓' }[level]}</span><div class="fw-verdict">
+      <div class="vh">${headline}</div>
+      <div class="meta">${level === 'ok' ? L.verdict.okHint : `<button class="link" data-todo-go>${L.fw.toList}</button>`}</div></div></section>`
+}
+// Following: what someone decided to fix, its baseline against now (since the day it was followed).
+const FW_CLS = { better: 'ok', same: 'same', worse: 'bad', waiting: 'same' }
+const fwNum = (n) => num(Math.round(n * 10) / 10)
+function followCard(follows) {
+  const W = L.fw
+  const day = (at) => new Date(at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit' })
+  const row = (x, k) => {
+    const name = x.label || x.key, what = `${W.metric[x.metric]} ${x.metric === 'score' ? scoreHtml(x.before) : fwNum(x.before)}${x.now === null ? ''
+      : ` → ${x.metric === 'score' ? scoreHtml(x.now) : fwNum(x.now)}`}`
+    const since = W.since(x.state, day(x.at), x.version) + (x.state === 'waiting' ? `, ${W.waitingHint}` : '')
+    return `<li class="fw-row" ${k >= TODO_TOP ? 'hidden' : ''}><span class="pill ${FW_CLS[x.state]}">${W.state[x.state]}</span>
+      <div class="fw-main"><div class="fw-say" title="${esc(`${name}: ${plain(what)} · ${since}`)}"><b>${esc(name)}</b>: ${what}</div><div class="meta">${esc(since)}</div></div>
+      <div class="todo-acts"><button class="small" data-unfollow="${esc(x.id)}" data-label="${esc(name)}">${W.stop}</button>
+        <a class="button small primary" ${linkAttrs(x.link)}>${L.todo.evidence}</a></div></li>`
+  }
+  return `<section class="card follow"><div class="label">${W.title}${follows.length ? ` · ${follows.length}` : ''}${help('follow')}</div><div class="meta">${W.hint}</div>
+    ${follows.length ? `<ul class="fw-list">${follows.map(row).join('')}</ul>
+      ${follows.length > TODO_TOP ? `<button class="small" id="fw-all" aria-expanded="false" data-n="${follows.length}">${W.all(follows.length)}</button>` : ''}`
+      : `<p class="meta fw-empty">${W.empty}</p>`}</section>`
+}
+document.addEventListener('click', async (e) => {
+  const more = e.target.closest?.('[data-todo-more]')
+  if (more) {
+    const open = more.getAttribute('aria-expanded') !== 'true', box = $('#todo-more-' + more.dataset.todoMore)
+    more.setAttribute('aria-expanded', String(open)); box.hidden = !open
+    more.textContent = open ? L.fw.less : L.fw.more(+more.dataset.n, more.dataset.kind)
+    return
+  }
+  if (e.target.closest?.('[data-todo-go]')) return $('.card.todo')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  const all = e.target.closest?.('#fw-all')
+  if (all) {
+    const open = all.getAttribute('aria-expanded') !== 'true'
+    document.querySelectorAll('.fw-row').forEach((r, k) => { if (k >= TODO_TOP) r.hidden = !open })
+    all.setAttribute('aria-expanded', String(open)); all.textContent = open ? L.fw.fewer : L.fw.all(all.dataset.n)
+    return
+  }
+  const fb = e.target.closest?.('[data-follow]'), stop = e.target.closest?.('[data-unfollow]')
+  if (!fb && !stop) return
+  if (stop && !confirm(L.fw.confirmStop(stop.dataset.label))) return
+  ;(fb ?? stop).disabled = true
+  const res = fb ? await fetch(`/api/follow?${query()}`, { method: 'POST', body: JSON.stringify({ kind: fb.dataset.follow, key: fb.dataset.key, label: fb.dataset.label }) })
+    : await fetch(`/api/follow?${new URLSearchParams({ project: $('#project').value, id: stop.dataset.unfollow })}`, { method: 'DELETE' })
+  if (res.status === 401) return boot()
+  render()
+})
 document.addEventListener('click', (e) => {
   const v = e.target.closest?.('[data-todo-view]')
   if (v) {
@@ -1569,7 +1696,7 @@ function releaseCard(rel) {
 }
 
 async function overview() {
-  const [o, rel] = await Promise.all([read('/api/overview'), lastRelease().catch(() => null)])
+  const [o, rel, fw] = await Promise.all([read('/api/overview'), lastRelease().catch(() => null), read('/api/follow').catch(() => ({ items: [] }))])
   const n = o.now, b = o.before
   if (!n.visits && !b.visits) return empty(L.noVisits)
   // Compare only when the period before has data on at least half as many days: otherwise +3000% says nothing.
@@ -1592,17 +1719,11 @@ async function overview() {
     <div class="meta">${foot}</div></div>`
 
   const sentence = (i) => L.insight[i.kind](nameFields(i), esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? ''))
-  const bad = o.insights.filter((i) => i.severity === 'bad'), warn = o.insights.filter((i) => i.severity === 'warn')
-  const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
-  const headline = level === 'bad' ? L.verdict.bad(bad.length) : level === 'warn' ? L.verdict.warn(warn.length) : L.verdict.ok
-  const shortOf = (i) => (L.short[i.kind] ?? (() => ''))(nameFields(i, true))
-  const top = (level === 'bad' ? bad : warn).filter((i) => L.short[i.kind]).slice(0, 4)
-  const icon = { bad: '!', warn: '•', ok: '✓' }[level]
-  const todo = o.insights.filter((i) => groupOf(i.kind) !== 'better'), good = o.insights.filter((i) => groupOf(i.kind) === 'better')
-  // Each item of the banner takes to its row in the list below.
-  const verdict = `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${icon}</span><div>
-      <div class="vh">${headline}</div>
-      <div class="meta">${top.length ? top.map((i) => `<button class="link" data-todo="${todo.indexOf(i)}">${esc(shortOf(i))}</button>`).join(' · ') : level === 'ok' ? L.verdict.okHint : ''}</div></div></section>`
+  const good = o.insights.filter((i) => groupOf(i.kind) === 'better')
+  const todo = groupTodos(o.insights.filter((i) => groupOf(i.kind) !== 'better'))
+  for (const g of todo) g.says = g.items.map(sentence)
+  const follows = fw.items ?? []
+  const verdict = verdictBanner(todo)
 
   const byRoute = Object.fromEntries(o.screens.map((r) => [r.route, r]))
   const mini = (i) => {
@@ -1623,10 +1744,11 @@ async function overview() {
   const insights = `<section class="card todo"><div class="head"><div><div class="label">${L.todo.title}${help('todo')}</div><div class="meta">${L.todo.hint}</div></div>
       ${o.insights.length ? `<div class="seg" role="group">${[['list', L.todo.byList], ['type', L.todo.byType]].map(([v, t]) =>
         `<button data-todo-view="${v}" aria-pressed="${view === v}">${t}</button>`).join('')}</div>` : ''}</div>
-    <div class="todo-list" ${view === 'list' ? '' : 'hidden'}>${todo.length ? `<ol class="todos">${todo.map((i, k) => todoRow(i, k, sentence(i), o.days)).join('')}</ol>
+    <div class="todo-list" ${view === 'list' ? '' : 'hidden'}>${todo.length ? `<ol class="todos">${todo.map((g, k) => todoRow(g, k, o.days, follows)).join('')}</ol>
       ${todo.length > TODO_TOP ? `<button class="small" id="todo-all" aria-expanded="false" data-n="${todo.length}">${L.todo.all(todo.length)}</button>` : ''}`
       : `<p class="meta">${L.todo.none}</p>`}</div>
     <div class="todo-type" ${view === 'type' ? '' : 'hidden'}>${byType}</div></section>
+    ${followCard(follows)}
     ${rel || good.length ? `<div class="two">${releaseCard(rel)}${good.length ? `<section class="card good"><div class="label">${L.todo.good} · ${good.length}</div><div class="meta">${L.todo.goodHint}</div>
       <ul class="insights">${good.map((i) => `<li><div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a></div>${mini(i)}</li>`).join('')}</ul></section>` : ''}</div>` : ''}`
 
