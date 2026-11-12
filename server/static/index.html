@@ -402,6 +402,31 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .acc-name { min-width: 9em; max-width: 18em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 640px) { .xl { margin-right: 24px; } .xl.sm { margin-right: 0; } .xl span.w { visibility: hidden; } .xl span.m { visibility: visible; } }
+/* Failures for developers: per-day series, first and last version, who it hit; a screen's "Onde irrita" one line per element. */
+.fhead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.fhead .title { flex: 1 0 100%; }
+.fspan { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; margin-top: 12px; }
+.fspan b { font-variant-numeric: tabular-nums; }
+.fchart { margin-top: 16px; } .fchart .chart.small { margin-top: 24px; }
+.fchart .cols i.acc { max-width: 14px; }
+.counts li a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcell { min-width: 15em; } .fcell code { overflow-wrap: anywhere; }
+.irr { list-style: none; margin: 4px 0 12px; padding: 0; max-width: 760px; }
+.irr li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+.irr li:first-child { border-top: 0; }
+.irr-name { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.irr-name code.tech { display: inline; margin-left: 8px; font-weight: 400; }
+.irr-name a { font-weight: 500; }
+.irr-n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.irr-n b { display: inline-block; min-width: 4.5ch; }
+.irr .why { grid-column: 1 / -1; color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.irr .irr-kind, .irr .why.kind-only { display: none; }
+@media (max-width: 640px) {
+  .irr { max-width: calc(100vw - 80px); }
+  .irr .irr-kind { display: inline; } .irr .why.kind-only { display: block; }
+  .irr-n .meta { display: none; }
+}
 </style>
 </head>
 <body>
@@ -415,6 +440,8 @@ const HELP_PT = {
   screensByFrustration: ['O que é', 'Cada tela com a frustração e os sinais que a compõem.', 'Abra a primeira da lista: mostra em qual botão as pessoas se irritam e o que falhou logo depois de clicar.'],
   byVersion: ['O que é', 'A frustração de cada versão do app no período.', 'Versão nova com mais frustração que a anterior piorou algo. A aba Versões mostra em qual tela e ação.'],
   failures: ['O que é', 'Erros de tela, do servidor, pedidos recusados e respostas lentas, agrupados pela mensagem.', 'Priorize pelas sessões atingidas, não pelo número de vezes. "Nova" é a que não existia antes do período.'],
+  whereIrritates: ['O que é', 'Os botões e elementos desta tela com sinais de irritação, do que mais acontece para o que menos: rage click (vários cliques seguidos), clique sem resposta e falhas logo depois do clique. "Por quê" diz o que veio depois do rage click: esperando resposta, deu erro, nada aconteceu ou não era clicável.', 'Elemento sem nome no dicionário aparece pelo tipo (ícone, botão…), com o seletor embaixo. Dê um nome a ele no Dicionário.'],
+  failureDays: ['O que é', 'Quantas vezes a falha aconteceu em cada dia do período. O risco marca o dia em que ela apareceu pela primeira vez.', 'Subida depois de um dia tranquilo costuma vir de um deploy: compare com a primeira versão em que apareceu.'],
   screensByUse: ['O que é', 'As telas pela quantidade de visitas, com cliques, pessoas e frustração.', 'Tela muito visitada e com frustração alta é onde uma melhoria rende mais.'],
   elements: ['O que é', 'Os botões e links da tela, com cliques, pessoas e problemas (rage, clique sem resposta e falhas logo depois do clique).', 'Muitos problemas num elemento muito usado é prioridade. O mapa de calor mostra onde ele fica na tela.'],
   never: ['O que é', 'Elementos que apareceram na tela e ninguém clicou no período.', 'Candidatos a sair, mudar de lugar ou ser explicados. Confira antes se não são de uso raro por natureza, como excluir conta.'],
@@ -451,6 +478,8 @@ const HELP_EN = {
   screensByFrustration: ['What it is', 'Each screen with its frustration and the signals behind it.', 'Open the first one: it shows which button irritates people and what failed right after a click.'],
   byVersion: ['What it is', 'The frustration of each app version in the period.', 'A new version with more frustration than the one before made something worse. The Versions tab shows which screen and action.'],
   failures: ['What it is', 'Screen errors, server errors, refused requests and slow responses, grouped by message.', 'Prioritise by sessions hit, not by count. "New" means it did not exist before the period.'],
+  whereIrritates: ['What it is', 'The buttons and elements of this screen with signs of irritation, the most frequent first: rage clicks (many clicks in a row), dead clicks and failures right after a click. "Why" says what came after the rage click: waiting for an answer, an error, nothing happened or it was not clickable.', 'An element with no name in the dictionary shows by its kind (icon, button…), the selector underneath. Name it in the Dictionary.'],
+  failureDays: ['What it is', 'How many times the failure happened on each day of the period. The mark is the day it first appeared.', 'A rise after a quiet day usually comes from a deploy: compare with the first version it showed up in.'],
   screensByUse: ['What it is', 'Screens by visits, with clicks, people and frustration.', 'A much-visited screen with high frustration is where an improvement pays the most.'],
   elements: ['What it is', 'The screen\'s buttons and links, with clicks, people and problems (rage, dead clicks and failures right after the click).', 'Many problems on a much-used element is a priority. The heat map shows where it sits on the screen.'],
   never: ['What it is', 'Elements that were on screen and nobody clicked in the period.', 'Candidates to remove, move or explain. Check first they are not rare by nature, like deleting an account.'],
@@ -1635,6 +1664,17 @@ for (const [on, off] of [['pointerover', 'pointerout'], ['focusin', 'focusout']]
 addEventListener('scroll', () => { tip.hidden = true; $('#prefs')?.remove(); $('#prefs-open')?.setAttribute('aria-expanded', 'false') }, { passive: true })
 
 // Frustration ----------------------------------------------------------------------------------------------
+// An element the dictionary has not named, said by its kind: span.icone is "Ícone sem nome", button#x "Botão sem nome".
+function unnamedText(target) {
+  const t = String(target ?? '').split(/\s*>\s*|\s+/).pop(), tag = (t.match(/^[a-z][a-z0-9-]*/i)?.[0] ?? '').toLowerCase(), U = FD().unnamed
+  if (/^(i|svg|use|path|img)$/.test(tag) || /\bicon|icone|ico\b|glyph/i.test(t)) return U.icon
+  return U[{ button: 'button', a: 'link', input: 'field', select: 'field', textarea: 'field', label: 'field', form: 'form' }[tag]] ?? U.other
+}
+// One line per element in a screen's detail: name (selector muted underneath), the kind and how many times at the right,
+// the "why" in small text below. The same for every kind of signal.
+const irrItem = (nameHtml, tech, type, n, why) => `<li><span class="irr-name">${nameHtml}${tech ? `<code class="tech">${esc(tech)}</code>` : ''}</span>
+  <span class="irr-n"><span class="meta">${esc(L.names[type] ?? type)}</span> <b>${num(n)}×</b></span><span class="why${why ? '' : ' kind-only'}" title="${esc(why)}"><span class="irr-kind">${esc(L.names[type] ?? type)}${why ? ' · ' : ''}</span>${esc(why)}</span></li>`
+
 async function frustration() {
   const r = await read('/api/summary')
   const o = r.overall
@@ -1644,9 +1684,11 @@ async function frustration() {
   const routes = cat ? [...r.routes].sort((a, b) => (b.categories?.[cat] ?? 0) - (a.categories?.[cat] ?? 0)) : r.routes
   const worst = routes.find((x) => x.visits)
   const detail = (x) => {
-    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${num(a.n)}×${reasonsText(a.reasons) ? `<div class="why">${C().why}: ${esc(reasonsText(a.reasons, 3))}</div>` : ''}</li>`).join('')}</ul>` : ''
-    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${num(f.n)}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
-      <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
+    const where = x.targets.length ? `<div class="meta">${L.where}${help('whereIrritates')}</div><ul class="irr">${x.targets.map((a) => irrItem(
+      esc(controlLabel(x.key, a.target) || unnamedText(a.target)), a.target, a.type, a.n, reasonsText(a.reasons) ? `${C().why}: ${reasonsText(a.reasons, 3)}` : '')).join('')}</ul>` : ''
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul class="irr">${x.failures.map((f) => irrItem(
+      `<a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })} title="${esc(f.detail)}">${esc(f.detail)}</a>`, f.after ? `${L.after} ${controlLabel(x.key, f.after) || f.after}` : '',
+      f.type, f.n, [f.seconds && L.average(f.seconds), L.seen(f.first_version, f.last_version, ago(f.last_at))].filter(Boolean).join(' · '))).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`
   }
   // Against the same length of time just before (the server leaves it out when that period has too little data).
@@ -1681,6 +1723,14 @@ async function frustration() {
 
 // Failures -------------------------------------------------------------------------------------------------
 const F = () => L.failureTab
+// The failure detail's and the screen detail's own words (kept apart from L, which several hands change).
+const FD_PT = { perDay: 'Por dia', byDay: 'Vezes por dia', peak: (n, d) => `pico de ${n}× em ${d}`, firstSeen: 'Primeira vez', lastSeen: 'Última vez', inVersion: (v) => `na versão ${v}`,
+  started: 'apareceu', accounts: 'Contas atingidas', people: 'Pessoas atingidas', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copiar demanda',
+  unnamed: { icon: 'Ícone sem nome', button: 'Botão sem nome', link: 'Link sem nome', field: 'Campo sem nome', form: 'Formulário sem nome', other: 'Elemento sem nome' }, accountsMd: 'Contas' }
+const FD_EN = { perDay: 'Per day', byDay: 'Times per day', peak: (n, d) => `peak of ${n}× on ${d}`, firstSeen: 'First seen', lastSeen: 'Last seen', inVersion: (v) => `in version ${v}`,
+  started: 'appeared', accounts: 'Accounts hit', people: 'People hit', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copy request',
+  unnamed: { icon: 'Unnamed icon', button: 'Unnamed button', link: 'Unnamed link', field: 'Unnamed field', form: 'Unnamed form', other: 'Unnamed element' }, accountsMd: 'Accounts' }
+const FD = () => (PT ? FD_PT : FD_EN)
 const when = (at) => (at ? new Date(at).toLocaleString(PT ? 'pt-BR' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 const offset = (ms) => {
   const s = Math.round(ms / 1000), a = Math.abs(s)
@@ -1708,15 +1758,16 @@ const counts = (title, list, name = (k) => k) => `<div><div class="label">${titl
   ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 const sameStep = (a, b) => a.at === b.at && a.type === b.type && a.detail === b.detail
 
-function issueMarkdown(d) {
+function issueMarkdown(d, link = location.href) {
   const I = F().issue, name = L.names[d.type] ?? d.type, list = (xs) => xs.map((x) => `${x.key || F().unknown} (${x.n})`).join(', ')
   const t = d.trails[0]
   const lines = [`## ${name}: ${d.detail}`, '',
     `- ${I.occurrences}: ${F().occurrences(d)} ${I.period($('#days').value)}`,
-    `- ${I.first}: ${d.first_version} (${when(d.first_at)}) · ${I.last}: ${when(d.last_at)}`,
+    `- ${I.first}: ${d.first_version} (${when(d.first_at)}) · ${I.last}: ${d.last_version ? `${d.last_version} (${when(d.last_at)})` : when(d.last_at)}`,
     `- ${F().where}: ${list(d.routes)}`, `- ${F().versions}: ${list(d.versions)}`, `- ${F().agents}: ${list(d.agents)}`,
     `- ${F().devices}: ${list(d.devices.map((x) => ({ ...x, key: F().devicesNames[x.key] ?? x.key })))}`]
   if (d.after_clicking.length) lines.push(`- ${F().afterClicking}: ${list(d.after_clicking)}`)
+  if (d.account_list?.length) lines.push(`- ${FD().accountsMd}: ${list(d.account_list.map((x) => ({ ...x, key: accountText(x.key) })))}`)
   if (d.stacks.length) lines.push('', `### ${F().stack}`, '```', d.stacks[0].key, '```')
   if (t) {
     const ctx = [t.agent, t.device && (F().devicesNames[t.device] ?? t.device), t.version].filter(Boolean).join(', ')
@@ -1724,12 +1775,30 @@ function issueMarkdown(d) {
     ;[...t.before, t.failure].forEach((s, i, all) => { const g = i ? gap(s.at - all[i - 1].at) : ''
       lines.push(`${i + 1}. ${i === all.length - 1 ? '**' : ''}${stepText(namedStep(s))}${s.type !== 'page' ? ` — ${s.route}` : ''}${i === all.length - 1 ? '**' : ''}${g ? ` (${g})` : ''}`) })
   }
-  lines.push('', `${I.link}: ${location.href}`)
+  lines.push('', `${I.link}: ${link}`)
   return lines.join('\n')
 }
 
+// Times per day of one failure: thin columns, the days under them, a mark on the day it first appeared; the tooltip says
+// the day and how many times.
+function failureChart(d) {
+  const days = d.days ?? [], n = days.length
+  if (n < 2) return ''
+  const by = Object.fromEntries(d.per_day.map((x) => [x.day, x.n])), vals = days.map((x) => by[x] ?? 0)
+  const max = Math.max(...vals), top = Math.max(1, max) * 1.15, peak = days[vals.indexOf(max)]
+  const first = d.first_at ? new Date(d.first_at).toISOString().slice(0, 10) : '', at = days.indexOf(first)
+  return `<div class="fchart"><div class="label">${FD().byDay}${help('failureDays')}</div>
+    <div class="meta">${esc(dayText(days[0]))} → ${esc(dayText(days[n - 1]))}${max ? ` · ${esc(FD().peak(num(max), dayText(peak)))}` : ''}</div>
+    <div class="chart small">${max ? `<div class="rule" style="top:${100 - max / top * 100}%"><em>${num(max)}×</em></div>` : ''}${at > 0 ? `<div class="deploy" style="left:${at * 100 / n}%" data-tip="${esc(`${FD().started}: ${dayText(first)} · ${d.first_version}`)}"><span>${esc(d.first_version)}</span></div>` : ''}
+      <div class="cols">${days.map((x, i) => `<div class="c" tabindex="0" data-tip="${esc(FD().dayTip(dayText(x), num(vals[i])))}"><i class="acc" style="height:${vals[i] ? Math.max(2, vals[i] / top * 100) : 0}%"></i></div>`).join('')}</div>
+    </div>${dayAxis(days, 'sm')}</div>`
+}
+// Accounts or people a failure hit, each a link that opens it with that filter on.
+const hitList = (title, list, name, link) => `<div><div class="label">${title}</div>${list?.length
+  ? `<ul class="counts">${list.map((x) => `<li><a ${linkAttrs(link(x.key))} title="${esc(x.key)}">${esc(name(x.key))}</a><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
+
 async function failures() {
-  const { failures: list } = await read('/api/failures')
+  const { failures: list, days } = await read('/api/failures')
   if (!list.length) return empty(F().none)
   const d = state.signal ? await read('/api/failure', { signal: state.signal, detail: state.detail }) : null
   // Back from a failure: the one just seen stays marked, and the list comes back where it was on the screen.
@@ -1746,11 +1815,17 @@ async function failures() {
       <div class="fbar"><button class="small" data-fail-back>← ${F().back}</button>
         <span class="fbar-title" title="${esc(d.detail)}">${esc(L.names[d.type] ?? d.type)}: ${esc(d.detail)}</span>
         <span class="fbar-act"><button class="small" data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><button class="small" data-copy="${esc(link)}">${F().copyLink}</button></span></div>
-      <div class="head"><div style="min-width:0;flex:1"><div class="label">${esc(L.names[d.type] ?? d.type)} ${d.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div>
-        <div class="title"><code>${esc(d.detail)}</code></div>
-        <div class="meta">${esc(F().occurrences(d))} · ${F().since} ${esc(d.first_version)} (${when(d.first_at)}) · ${F().last} ${ago(d.last_at)}</div></div></div>
-      <div class="facts">${counts(F().where, d.routes, (k) => screenText(k) || k)}${counts(F().versions, d.versions)}${counts(F().agents, d.agents)}
-        ${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking, (k) => controlLabel(d.routes[0]?.key, k) || k) : ''}</div>
+      <div class="fhead">${d.new ? `<span class="pill bad">${F().isNew}</span> ` : ''}<span class="meta">${esc(F().occurrences(d))}</span>
+        ${d.detail.length > 60 ? `<div class="title"><code>${esc(d.detail)}</code></div>` : ''}</div>
+      <div class="fspan">
+        <div><div class="label">${FD().firstSeen}</div><b>${esc(d.first_version || F().unknown)}</b> <span class="meta">${when(d.first_at)}</span></div>
+        <div><div class="label">${FD().lastSeen}</div><b>${esc(d.last_version || F().unknown)}</b> <span class="meta">${when(d.last_at)} · ${ago(d.last_at)}</span></div>
+      </div>
+      ${failureChart(d)}
+      <div class="facts">${counts(F().where, d.routes, (k) => screenText(k) || k)}${counts(F().versions, d.versions)}
+        ${hitList(FD().accounts, d.account_list, accountText, (k) => ({ tab: 'accounts', params: { account: k } }))}
+        ${hitList(FD().people, d.people, (k) => personName(k) || `${L.user} ${short(k)}`, (k) => ({ tab: 'people', params: { user: k } }))}
+        ${counts(F().agents, d.agents)}${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking, (k) => controlLabel(d.routes[0]?.key, k) || k) : ''}</div>
       <div class="label" style="margin-top:16px">${F().stack}</div>
       ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${num(x.n)}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
       <div class="label" style="margin-top:16px">${F().trails}</div><div class="meta">${F().trailsHint(15, 3)}</div>
@@ -1760,12 +1835,14 @@ async function failures() {
         <button class="small" data-session="${esc(t.session)}">${F().fullSession}</button></details>`).join('')}</div>
     </section>` : ''
   return `${detail}<section class="card"><div class="label">${F().list}${help('failures')}</div><div class="meta">${F().hint}</div>
-    ${table(`<th>${F().failure}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th>`,
+    ${table(`<th>${F().failure}</th><th>${FD().perDay}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th><th><span class="sr">${F().copyIssue}</span></th>`,
       list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
-        <td><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
+        <td class="fcell"><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
           <div class="meta">${esc(screenText(f.route) || f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
+        <td>${spark(f.daily, `${FD().byDay}: ${num(Math.min(...f.daily))}–${num(Math.max(...f.daily))}`, 96, 24, days)}</td>
         <td class="n">${num(f.sessions)}</td><td class="n">${num(f.users)}</td><td class="n">${num(f.n)}</td>
-        <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td></tr>`).join(''))}</section>`
+        <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td>
+        <td><button class="small" data-copy-failure title="${esc(F().copyIssue)}">${FD().copyRow}</button></td></tr>`).join(''))}</section>`
 }
 
 // Every table can leave as CSV: what is on screen, so the numbers match what was read.
@@ -1843,6 +1920,20 @@ document.addEventListener('click', (e) => {
   if (e.target.closest?.('[data-fail-back]')) return go('failures', {})
   const row = e.target.closest?.('#content tr.row[data-signal]') // remember where the row was, to come back to it
   if (row) state.failBack = { signal: row.dataset.signal, detail: row.dataset.detail, top: row.getBoundingClientRect().top }
+}, true)
+
+// "Copiar demanda" on a list row: the failure's detail is read inside the click (so the browser still lets the page write
+// to the clipboard when it arrives) and told the same way as in the detail; the row does not open.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('#content [data-copy-failure]')
+  if (!b) return
+  e.stopPropagation(); e.preventDefault()
+  const row = b.closest('tr.row'), was = b.textContent, params = { signal: row.dataset.signal, detail: row.dataset.detail }
+  const link = location.origin + location.pathname + hashFor('failures', params)
+  const text = read('/api/failure', params).then((d) => issueMarkdown(d, link))
+  const item = typeof ClipboardItem !== 'undefined' ? new ClipboardItem({ 'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })) }) : null
+  ;(item ? navigator.clipboard.write([item]) : text.then((t) => navigator.clipboard.writeText(t)))
+    .then(() => { b.textContent = L.copied; setTimeout(() => { b.textContent = was }, 1500) }, () => {})
 }, true)
 
 async function showSession(button) {

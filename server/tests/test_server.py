@@ -595,6 +595,24 @@ class Server(unittest.TestCase):
         self.assertEqual(([s["type"] for s in whole["steps"]], whole["user"]), (["page", "click", "js_error", "click"], "u-s1"))
         self.assertEqual(self.read("/api/failure?project=shop&days=1&signal=js_error&detail=nope")["n"], 0)
 
+    def test_failures_have_a_count_per_day_and_the_detail_names_its_accounts_people_and_last_version(self):
+        self.send([{"type": "js_error", "route": "/a", "detail": "E1"}] * 3, session="s1", user="u1", account="acme")
+        self.age(2)
+        self.send([{"type": "js_error", "route": "/a", "detail": "E1"}], session="s2", user="u2", account="beta", version="0.9")
+        self.send([{"type": "page", "route": "/a"}], session="s3")
+        self.age(1)
+        self.send([{"type": "js_error", "route": "/a", "detail": "E1"}] * 3, session="s1", user="u1", account="acme", version="1.1")
+        r = self.read("/api/failures?project=shop&days=7")
+        self.assertEqual(len(r["days"]), 4)  # from the first event of the window to today, the quiet days too
+        [f] = r["failures"]
+        self.assertEqual(f["daily"], [3, 0, 1, 3])
+        self.assertEqual(r["days"][-1], time.strftime("%Y-%m-%d", time.gmtime()))
+        d = self.read("/api/failure?project=shop&days=7&signal=js_error&detail=E1")
+        self.assertEqual((d["first_version"], d["last_version"]), ("1.0", "1.1"))
+        self.assertEqual(d["account_list"], [{"key": "acme", "n": 6}, {"key": "beta", "n": 1}])
+        self.assertEqual(d["people"], [{"key": "u1", "n": 6}, {"key": "u2", "n": 1}])
+        self.assertEqual(len(d["days"]), 4)
+
     def test_journeys_show_how_far_things_are_what_follows_what_and_where_people_go(self):
         sent = int(time.time() * 1000)
         path = [{"type": "page", "route": "/home"}, {"type": "click", "route": "/home", "target": "a.menu"},

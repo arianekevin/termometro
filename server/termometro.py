@@ -11,7 +11,7 @@ and the API:
   GET  /api/me         is this browser signed in, and which projects exist
   GET  /api/overview   the period against the one before, and what deserves a look ┐
   GET  /api/search     screens, elements, failures, actions and ids containing ?q=  │
-  GET  /api/failures   every failure, grouped by kind and message       │
+  GET  /api/failures   every failure, grouped by kind and message, per day │
   GET  /api/failure    one failure in depth (?signal=&detail=): stack, browsers, trails │
   GET  /api/session    everything one session did, in order (?session=) │
   GET  /api/journeys   time on screen, screen to screen, how far things are, actions that follow │
@@ -1441,9 +1441,26 @@ def first_seen(con, f: Filter) -> dict:
             GROUP BY type, detail""", (f.q.get("project", ""), f.mark))}
 
 
+def period_days(con, f: Filter) -> list[str]:
+    """Every UTC day (as SQLite counts them) from the project's first event in the window to the end of it, the quiet
+    ones too: a series per day needs its zeros, and a 30-day window over a week of data needs only that week."""
+    first = con.execute("SELECT MIN(at) FROM events WHERE project = ? AND at >= ?", (f.q.get("project", ""), f.since)).fetchone()[0]
+    start = datetime.datetime.fromtimestamp(max(f.since, first or f.until) / 1000, datetime.timezone.utc).date()
+    end = datetime.datetime.fromtimestamp(f.until / 1000, datetime.timezone.utc).date()
+    return [(start + datetime.timedelta(n)).isoformat() for n in range((end - start).days + 1)]
+
+
 def failures(con, f: Filter) -> dict:
-    """Every failure of the period, grouped by kind and message, the ones that hit the most people first."""
+    """Every failure of the period, grouped by kind and message, the ones that hit the most people first; each with
+    its count per day over `days` (one grouped read for all of them)."""
     first = first_seen(con, f)
+    days = period_days(con, f)
+    at = {d: i for i, d in enumerate(days)}
+    per_day: dict[tuple, list] = {}
+    for kind, detail, d, n in con.execute(f"""SELECT type, detail, date(at / 1000, 'unixepoch') d, COUNT(*) FROM events
+            WHERE {f.sql} AND type IN {FAILURES} GROUP BY type, detail, d""", f.args):
+        if d in at:
+            per_day.setdefault((kind, detail), [0] * len(days))[at[d]] = n
     rows = con.execute(f"""
         SELECT type, detail, COUNT(*), COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')), MAX(at), version,
                COUNT(DISTINCT route), MIN(route)
@@ -1453,9 +1470,10 @@ def failures(con, f: Filter) -> dict:
         first_at, first_version = first.get((kind, detail), (last_at, last_version))
         out.append({"type": kind, "detail": detail, "n": n, "sessions": sessions, "users": users, "routes": routes,
                     "route": route, "first_at": first_at, "first_version": first_version, "last_at": last_at,
-                    "last_version": last_version, "new": first_at >= f.since})
+                    "last_version": last_version, "new": first_at >= f.since,
+                    "daily": per_day.get((kind, detail), [0] * len(days))})
     out.sort(key=lambda x: (-x["sessions"] * FAILURE_WEIGHT[x["type"]], -x["n"]))
-    return {"failures": out}
+    return {"days": days, "failures": out}
 
 
 STEP = "type, route, target, detail, at, version, clicks, duration_ms"
@@ -1503,6 +1521,10 @@ def failure(con, f: Filter) -> dict:
             "stacks": [x for x in count_by("stack", 3) if x["key"]],
             "per_day": [{"day": d, "n": c} for d, c in con.execute(
                 f"SELECT date(at / 1000, 'unixepoch') d, COUNT(*) FROM events WHERE {where} GROUP BY d ORDER BY d", args)],
+            "days": period_days(con, f), "last_version": con.execute(
+                f"SELECT version FROM events WHERE {where} ORDER BY at DESC LIMIT 1", args).fetchone()[0],
+            "account_list": [x for x in count_by("account", 8) if x["key"]],
+            "people": [x for x in count_by("user_id", 8) if x["key"]],
             "trails": trails}
 
 
