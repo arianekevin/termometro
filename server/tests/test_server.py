@@ -611,7 +611,8 @@ class Server(unittest.TestCase):
                     "layout": {"vw": vw, "vh": 800, "dw": vw, "dh": 1600, "boxes": boxes, **extra}}
         self.assertEqual(self.read("/api/usage?project=shop&route=/users")["layout"], None)  # an older collector: no preview
         self.send([{"type": "page", "route": "/users"}, inv(1280, [[10.4, 20, 80, 32], None, [1, 1, 0, 5]],
-                   landmarks=[{"kind": "main", "box": [0, 60, 1280, 700]}, {"kind": "script", "box": [0, 0, 1, 1]}, {"kind": "nav"}])])
+                   landmarks=[{"kind": "main", "box": [0, 60, 1280, 700]}, {"kind": "script", "box": [0, 0, 1, 1]}, {"kind": "nav"},
+                                {"kind": "title", "box": [20, 70, 300, 28]}])])
         self.send([inv(390, [[5, 5, 40, 40], [5, 50, 40, 40], None])], session="m")
         self.send([inv(1280, "junk"), inv(1280, [["a", 1, 2, 3]] * 3), {"type": "inventory", "route": "/users", "targets": ["b"], "layout": {"vw": "x"}}],
                   session="bad")  # no box to draw: the earlier picture stays
@@ -620,7 +621,7 @@ class Server(unittest.TestCase):
         lay = u["layout"]
         self.assertEqual((lay["viewport"], lay["vw"], lay["vh"], lay["dw"], lay["dh"]), ("desktop", 1280, 800, 1280, 1600))
         self.assertEqual(lay["boxes"], {"button#new": [10, 20, 80, 32]})  # hidden and empty boxes left out, whole pixels
-        self.assertEqual(lay["landmarks"], [{"kind": "main", "box": [0, 60, 1280, 700]}])  # only known region kinds
+        self.assertEqual(lay["landmarks"], [{"kind": "main", "box": [0, 60, 1280, 700]}, {"kind": "title", "box": [20, 70, 300, 28]}])  # only known kinds
         self.assertEqual(lay["labels"], {"button#new": "Novo"})
         m = self.read("/api/usage?project=shop&route=/users&viewport=mobile")["layout"]
         self.assertEqual((m["viewport"], m["boxes"]), ("mobile", {"button#new": [5, 5, 40, 40], "a#help": [5, 50, 40, 40]}))

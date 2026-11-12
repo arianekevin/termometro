@@ -504,6 +504,28 @@ describe('termometro', () => {
     } finally { spy.mockRestore() }
   })
 
+  it('places the fields it names and the form and title around them, never their values', async () => {
+    const t = start()
+    document.body.innerHTML = `<h1>Usuários de Maria</h1><form id="user"><label for="name">Nome</label><input id="name" value="Maria Souza">
+      <input id="mail" type="email" placeholder="E-mail" value="ana@x.com"><input type="hidden" id="tok" value="secret">
+      <button id="save">Salvar</button></form>
+      <table><tr><td><input id="cell" aria-label="Quantidade" value="42"></td></tr></table>
+      <div data-termometro-private><textarea id="note" aria-label="Nota">texto</textarea></div>`
+    const boxes: Record<string, number[]> = { name: [10, 40, 200, 32], mail: [10, 80, 200, 32], save: [10, 120, 80, 32], cell: [5, 5, 5, 5],
+      note: [5, 5, 5, 5], tok: [1, 1, 1, 1], user: [0, 30, 400, 140], H1: [0, 0, 300, 28] }
+    const spy = place((el) => boxes[el.id || el.tagName])
+    try {
+      t.page('/config/users')
+      await vi.advanceTimersByTimeAsync(1500)
+      const inv = (await events()).find((e) => e.type === 'inventory')!
+      expect(inv.targets).toEqual(['input#name', 'input#mail', 'button#save'])
+      expect(inv.labels).toEqual(['Nome', 'E-mail', 'Salvar'])
+      expect(inv.layout!.boxes).toEqual([[10, 40, 200, 32], [10, 80, 200, 32], [10, 120, 80, 32]])
+      expect(inv.layout!.landmarks).toEqual([{ kind: 'form', box: [0, 30, 400, 140] }, { kind: 'title', box: [0, 0, 300, 28] }])
+      expect(JSON.stringify(inv)).not.toMatch(/Maria|ana@x|secret|42|texto|Quantidade|Nota/)
+    } finally { spy.mockRestore() }
+  })
+
   it('caps the boxes it sends', async () => {
     const spy = place(() => [1, 1, 10, 10])
     try {

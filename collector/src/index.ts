@@ -22,7 +22,8 @@
  * came back: its duration).
  * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen and screen
  * size — wide or narrow — per session, with where each visible control sits: its box in whole pixels, the window's and
- * the page's size, and the boxes of the main regions — never what they show) and action (a write the backend accepted,
+ * the page's size, and the boxes of the main regions, forms and title — never what they show; fields are listed too,
+ * by the name the app gives them, never their value) and action (a write the backend accepted,
  * with the clicks and time it took since the previous one).
  *
  * Opened with `?termometro_map=<token>` (the dashboard's "Open heat map" button), it loads the server's heat
@@ -120,7 +121,7 @@ export interface Layout {
   vw: number; vh: number; dw: number; dh: number
   /** One per target, in the same order: its box, or null when it is not visible (or past the cap). */
   boxes: Array<Box | null>
-  /** The page's regions — main, nav, header, aside, footer, dialog — as boxes: the screen's skeleton. */
+  /** The page's regions — main, nav, header, aside, footer, dialog, form and the h1 title — as boxes: the screen's skeleton. */
   landmarks: Array<{ kind: string; box: Box }>
 }
 interface Who { account: string; user: string; role: string; user_name?: string }
@@ -142,7 +143,8 @@ const MAX_LANDMARKS = 12
 // Wide and narrow screens are laid out apart: the preview keeps one of each, so a change of size sends another inventory.
 const WIDE_PX = 900
 const LANDMARKS: Array<[string, string]> = [['main', 'main,[role="main"]'], ['nav', 'nav,[role="navigation"]'], ['header', 'header,[role="banner"]'],
-  ['aside', 'aside,[role="complementary"]'], ['footer', 'footer,[role="contentinfo"]'], ['dialog', 'dialog[open],[role="dialog"],[role="alertdialog"]']]
+  ['aside', 'aside,[role="complementary"]'], ['footer', 'footer,[role="contentinfo"]'], ['dialog', 'dialog[open],[role="dialog"],[role="alertdialog"]'],
+  ['form', 'form,[role="form"]'], ['title', 'h1']]
 const MAX_QUEUE = 500
 const MAX_BATCH = 100
 const MAX_SAME_ERROR = 3
@@ -202,7 +204,9 @@ function frame(): Omit<Layout, 'boxes'> {
   const root = document.documentElement
   const landmarks: Layout['landmarks'] = []
   for (const [kind, selector] of LANDMARKS) {
-    for (const el of Array.from(document.querySelectorAll(selector))) {
+    // The title's box only, never its words: the dashboard writes the screen's name there.
+    const found = kind === 'title' ? [document.querySelector(selector)].filter((x): x is Element => !!x) : Array.from(document.querySelectorAll(selector))
+    for (const el of found) {
       if (landmarks.length >= MAX_LANDMARKS) break
       const box = el.closest(OVERLAY) ? null : boxOf(el)
       if (box) landmarks.push({ kind, box })
@@ -268,6 +272,8 @@ export function labelOf(el: Element | null): string {
   return clean(control.getAttribute('aria-label') || labelled || control.getAttribute('title') || value || control.textContent)
 }
 
+// Where a field's place is not sent: rows of records, lists, logs, and what the app marks private.
+const FIELD_PRIVATE = 'table,[role="grid"],[role="table"],[role="row"],[role="treegrid"],[role="listbox"],[role="feed"],[role="log"],[data-termometro-private]'
 const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]),textarea,select'
 
 /** A field's name as the app writes it — its <label>, aria-label or placeholder —, never what is typed in it. */
@@ -512,8 +518,12 @@ export function start(options: Options): Termometro {
       inventoried.add(key)
       const seen = new Map<string, { label: string; box: Box | null }>()
       let boxes = 0
-      for (const el of Array.from(document.querySelectorAll(CLICKABLE))) {
+      // Fields too (a click on one counts as its use): their place and the name the app gives them, never their value;
+      // none inside tables, lists of records or what the app marks private.
+      for (const el of Array.from(document.querySelectorAll(CLICKABLE + ',' + FIELD))) {
         if (el.closest(OVERLAY) || !el.getClientRects().length) continue
+        const field = el.matches(FIELD)
+        if (field && el.closest(FIELD_PRIVATE)) continue
         const selector = selectorOf(el)
         const kept = seen.get(selector)
         if (kept?.label && kept.box) continue
@@ -521,7 +531,7 @@ export function start(options: Options): Termometro {
         // The same selector many times (a menu's items): the first label and the first visible box stand for it.
         const box = kept?.box ?? (boxes < MAX_BOXES ? boxOf(el) : null)
         if (box && !kept?.box) boxes++
-        seen.set(selector, { label: kept?.label || labelOf(el), box })
+        seen.set(selector, { label: kept?.label || (field ? fieldLabelOf(el) : labelOf(el)), box })
       }
       if (!seen.size) return
       const items = Array.from(seen.values())

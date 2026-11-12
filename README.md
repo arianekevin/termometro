@@ -47,7 +47,7 @@ bank data or anything under LGPD/GDPR. Termometro keeps only the shape of the in
 | the ids you choose to give (account, user, role) | recordings, screenshots |
 | optionally, the user's name (`identity.name`), kept apart and never in what an AI reads; `"people_names": false` on the project drops it | |
 | browser and system family (`Chrome 130 · macOS`), kind of screen (phone, tablet, desktop) | exact versions, IP |
-| once per screen and window size (wide or narrow): the box of each visible control and of the page's regions (main, nav, header…) in whole pixels, and the window's and page's size — for the screen map | what is inside the boxes: no text beyond the labels above, no screenshots |
+| once per screen and window size (wide or narrow): the box of each visible control and field (fields outside tables and lists, named as above) and of the page's regions (main, nav, header, forms, dialogs, the title) in whole pixels, and the window's and page's size — for the screen map | what is inside the boxes: no text beyond the labels above, no field values, no screenshots |
 | where an error happened in your code (`loadRows @ /assets/index.js:1:4567`) | the page's query string or data |
 
 E-mails, uuids, numbers with 3+ digits and quoted text are scrubbed in the browser before anything is sent.

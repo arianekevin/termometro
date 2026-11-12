@@ -47,7 +47,7 @@ dado bancário ou qualquer coisa sob a LGPD. O Termometro guarda só a forma da 
 | os ids que você escolher mandar (conta, usuário, papel) | gravações, prints |
 | se quiser, o nome do usuário (`identity.name`), guardado à parte e nunca no que uma IA lê; `"people_names": false` no projeto descarta | |
 | família do navegador e do sistema (`Chrome 130 · macOS`), tipo de tela (celular, tablet, computador) | versões exatas, IP |
-| uma vez por tela e tamanho de janela (larga ou estreita): a caixa de cada controle visível e das regiões da página (conteúdo, menu, cabeçalho…) em pixels inteiros, e o tamanho da janela e da página — para o mapa da tela | o que há dentro das caixas: nenhum texto além dos rótulos acima, nenhum print |
+| uma vez por tela e tamanho de janela (larga ou estreita): a caixa de cada controle e campo visível (campos fora de tabelas e listas, com o nome acima) e das regiões da página (conteúdo, menu, cabeçalho, formulários, janelas, o título) em pixels inteiros, e o tamanho da janela e da página — para o mapa da tela | o que há dentro das caixas: nenhum texto além dos rótulos acima, nenhum valor de campo, nenhum print |
 | onde o erro aconteceu no seu código (`loadRows @ /assets/index.js:1:4567`) | a query string ou os dados da página |
 
 E-mails, uuids, números com 3 dígitos ou mais e texto entre aspas são limpos no navegador antes de sair.

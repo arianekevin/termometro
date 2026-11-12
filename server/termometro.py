@@ -106,7 +106,7 @@ MAX_INVENTORY = 300
 # The preview of a screen: where its controls and regions sit, kept per screen and kind of window (wide or narrow).
 MAX_BOXES, MAX_LANDMARKS, MAX_PX = 300, 12, 100_000
 WIDE_PX = 900
-LANDMARK_KINDS = ("main", "nav", "header", "aside", "footer", "dialog")
+LANDMARK_KINDS = ("main", "nav", "header", "aside", "footer", "dialog", "form", "title")
 MAX_PER_MINUTE = 1200
 MAX_LOGINS_PER_MINUTE = 10
 SESSION_SECONDS = 7 * 86400
