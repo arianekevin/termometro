@@ -107,6 +107,8 @@ MAX_INVENTORY = 300
 MAX_BOXES, MAX_LANDMARKS, MAX_PX = 300, 12, 100_000
 WIDE_PX = 900
 LANDMARK_KINDS = ("main", "nav", "header", "aside", "footer", "dialog", "form", "title")
+MAX_BLOCKS, MAX_TEXTS = 80, 250
+HEX = re.compile(r"#[0-9a-f]{6}")
 MAX_PER_MINUTE = 1200
 MAX_LOGINS_PER_MINUTE = 10
 SESSION_SECONDS = 7 * 86400
@@ -226,7 +228,7 @@ def connect() -> sqlite3.Connection:
     """)
     for table, columns in (("events", NEW_COLUMNS), ("elements", {"label": "TEXT NOT NULL DEFAULT ''",
                                                                   "first_seen": "INTEGER NOT NULL DEFAULT 0"}),
-                           ("layouts", {"extra": "TEXT NOT NULL DEFAULT '{}'"})):
+                           ("layouts", {"extra": "TEXT NOT NULL DEFAULT '{}'", "look": "TEXT NOT NULL DEFAULT '{}'"})):
         have = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
         for column, kind in columns.items():
             if column not in have:
@@ -416,8 +418,49 @@ def box_of(value) -> list[int] | None:
     return [x, y, min(w, MAX_PX), min(h, MAX_PX)]
 
 
+def color_of(value) -> str | None:
+    """`#rrggbb`, or None."""
+    return value if isinstance(value, str) and HEX.fullmatch(value) else None
+
+
+def small_int(value, top: int = 999) -> int:
+    return max(0, min(top, int(round(value)))) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def look_of(raw, targets: list[str], raw_styles) -> dict:
+    """How the screen looks, checked: its colour, each control's style, its blocks and where its lines of text sit.
+    Colours and numbers only: anything else is dropped."""
+    look = raw if isinstance(raw, dict) else {}
+    styles = {}
+    for target, st in zip(targets, raw_styles if isinstance(raw_styles, list) else []):
+        if target and isinstance(st, list) and len(st) == 5:
+            styles[target] = [color_of(st[0]), color_of(st[1]), color_of(st[2]), small_int(st[3]), small_int(st[4], 200)]
+    blocks = []
+    for b in look.get("blocks") if isinstance(look.get("blocks"), list) else []:
+        box = box_of(b.get("box")) if isinstance(b, dict) else None
+        if not box or len(blocks) >= MAX_BLOCKS:
+            continue
+        block = {"box": box, "r": small_int(b.get("r"))}
+        for k in ("bg", "bd"):
+            if color_of(b.get(k)):
+                block[k] = b[k]
+        if isinstance(b.get("sides"), str) and re.fullmatch(r"[trbl]{1,3}", b["sides"]):
+            block["sides"] = b["sides"]
+        if "bg" in block or "bd" in block:
+            blocks.append(block)
+    texts = []
+    for x in look.get("texts") if isinstance(look.get("texts"), list) else []:
+        box = box_of(x[:4]) if isinstance(x, list) and len(x) == 5 else None
+        if box and color_of(x[4]) and len(texts) < MAX_TEXTS:
+            texts.append(box + [x[4]])
+    out = {"styles": styles, "blocks": blocks, "texts": texts}
+    if color_of(look.get("page")):
+        out["page"] = look["page"]
+    return out
+
+
 def layout_of(raw, targets: list[str]) -> tuple | None:
-    """An inventory's layout -> (viewport, vw, vh, dw, dh, boxes JSON, landmarks JSON, partial), or None. Numbers and region
+    """An inventory's layout -> (viewport, vw, vh, dw, dh, boxes JSON, landmarks JSON, look JSON, partial), or None. Numbers and region
     kinds only. `partial`: what a click opened on the screen (a dialog, a menu), an addition to its drawing."""
     if not isinstance(raw, dict):
         return None
@@ -439,8 +482,11 @@ def layout_of(raw, targets: list[str]) -> tuple | None:
             landmarks.append({"kind": x["kind"], "box": box})
     if not boxes:
         return None
+    look = look_of(raw.get("look"), targets, raw.get("styles"))
+    look["styles"] = {t: v for t, v in look["styles"].items() if t in boxes}
     return ("desktop" if vw >= WIDE_PX else "mobile", vw, vh, max(dw, vw), max(dh, vh),
-            json.dumps(boxes, separators=(",", ":")), json.dumps(landmarks, separators=(",", ":")), raw.get("partial") is True)
+            json.dumps(boxes, separators=(",", ":")), json.dumps(landmarks, separators=(",", ":")),
+            json.dumps(look, separators=(",", ":")), raw.get("partial") is True)
 
 
 def parse_batch(batch, origin: str | None, agent: str = "", layouts: list | None = None) -> tuple[str, list[tuple], list[tuple]]:
@@ -795,19 +841,27 @@ def usage(con, f: Filter) -> dict:
 def save_layouts(con, layouts: list) -> None:
     """The screen as the last person saw it, per kind of window: one coherent picture, replaced whole. What clicks opened
     on it (dialogs, menus) is kept apart in `extra` and survives the next whole picture, which is taken with them closed."""
-    for project, route, viewport, vw, vh, dw, dh, boxes, landmarks, partial, at in layouts:
+    for project, route, viewport, vw, vh, dw, dh, boxes, landmarks, look, partial, at in layouts:
         if not partial:
-            con.execute("""INSERT INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            con.execute("""INSERT INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at, look) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (project, route, viewport) DO UPDATE SET vw = excluded.vw, vh = excluded.vh, dw = excluded.dw, dh = excluded.dh,
-                boxes = excluded.boxes, landmarks = excluded.landmarks, at = excluded.at""",
-                        (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at))
+                boxes = excluded.boxes, landmarks = excluded.landmarks, at = excluded.at, look = excluded.look""",
+                        (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at, look))
             continue
         row = con.execute("SELECT extra FROM layouts WHERE project = ? AND route = ? AND viewport = ?", (project, route, viewport)).fetchone()
         extra = json.loads(row[0]) if row else {}
         added = {**extra.get("boxes", {}), **json.loads(boxes)}
         marks = extra.get("landmarks", [])
         marks += [x for x in json.loads(landmarks) if x not in marks]
-        extra = json.dumps({"boxes": dict(list(added.items())[-MAX_BOXES:]), "landmarks": marks[-MAX_LANDMARKS:]}, separators=(",", ":"))
+        new_look = json.loads(look)
+        styles = {**extra.get("styles", {}), **new_look["styles"]}
+        blocks = extra.get("blocks", [])
+        blocks += [b for b in new_look["blocks"] if b not in blocks]
+        texts = extra.get("texts", [])
+        texts += [x for x in new_look["texts"] if x not in texts]
+        extra = json.dumps({"boxes": dict(list(added.items())[-MAX_BOXES:]), "landmarks": marks[-MAX_LANDMARKS:],
+                            "styles": dict(list(styles.items())[-MAX_BOXES:]), "blocks": blocks[-MAX_BLOCKS:], "texts": texts[-MAX_TEXTS:]},
+                           separators=(",", ":"))
         if row:
             con.execute("UPDATE layouts SET extra = ? WHERE project = ? AND route = ? AND viewport = ?", (extra, project, route, viewport))
         else:  # the addition came before the whole screen: it waits for it with an empty drawing
@@ -818,18 +872,22 @@ def save_layouts(con, layouts: list) -> None:
 def layout_read(con, project: str, route: str, viewport: str | None, labels: dict) -> dict:
     """The screen's preview: `layouts` lists the kinds of window there is one for; `layout` is the one asked for (desktop by
     default, else the one there is), with each box's label."""
-    rows = {r[0]: r for r in con.execute("SELECT viewport, vw, vh, dw, dh, boxes, landmarks, at, extra FROM layouts WHERE project = ? AND route = ?",
+    rows = {r[0]: r for r in con.execute("SELECT viewport, vw, vh, dw, dh, boxes, landmarks, at, extra, look FROM layouts WHERE project = ? AND route = ?",
                                          (project, route))}
     kinds = [k for k in ("desktop", "mobile") if k in rows]
     pick = viewport if viewport in rows else kinds[0] if kinds else None
     if not pick:
         return {"layouts": [], "layout": None}
-    _, vw, vh, dw, dh, boxes, landmarks, at, extra = rows[pick]
-    extra = json.loads(extra or "{}")
+    _, vw, vh, dw, dh, boxes, landmarks, at, extra, look = rows[pick]
+    extra, look = json.loads(extra or "{}"), json.loads(look or "{}")
+    # How it looks: the whole picture's, then what clicks opened, drawn on top (a dialog over the page).
+    look = {"page": look.get("page"), "styles": {**extra.get("styles", {}), **look.get("styles", {})},
+            "blocks": look.get("blocks", []), "texts": look.get("texts", []),
+            "over": {"blocks": extra.get("blocks", []), "texts": extra.get("texts", [])}} if look else None
     boxes = {**extra.get("boxes", {}), **json.loads(boxes)}  # what the whole picture has wins over an older addition
     landmarks = json.loads(landmarks) + [x for x in extra.get("landmarks", []) if x not in json.loads(landmarks)]
     return {"layouts": kinds, "layout": {"viewport": pick, "vw": vw, "vh": vh, "dw": dw, "dh": dh, "at": at, "boxes": boxes,
-                                         "landmarks": landmarks,
+                                         "landmarks": landmarks, "look": look,
                                          "labels": {t: labels.get(route + "\t" + t, "") for t in boxes}}}
 
 

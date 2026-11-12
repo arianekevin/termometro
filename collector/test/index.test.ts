@@ -498,7 +498,7 @@ describe('termometro', () => {
       expect(at('main > div.menu > a.opt')).toEqual([5, 130, 40, 20])
       expect(inv.layout!.landmarks).toEqual([{ kind: 'main', box: [0, 60, 1200, 700] }, { kind: 'nav', box: [0, 0, 1200, 56] }])
       // sizes, boxes and region kinds: no text of the page
-      expect(Object.keys(inv.layout!).sort()).toEqual(['boxes', 'dh', 'dw', 'landmarks', 'vh', 'vw'])
+      expect(Object.keys(inv.layout!).sort()).toEqual(['boxes', 'dh', 'dw', 'landmarks', 'look', 'styles', 'vh', 'vw'])
       expect(inv.layout!.vw).toBe(innerWidth)
       expect(JSON.stringify(inv.layout)).not.toMatch(/Pedidos|Salvar|Abrir/)
     } finally { spy.mockRestore() }
@@ -546,6 +546,36 @@ describe('termometro', () => {
       expect(inventories[1]!.layout!.landmarks).toEqual([{ kind: 'dialog', box: [450, 250, 400, 200] }])
       expect(JSON.stringify(inventories[1])).not.toMatch(/ana@x/)
     } finally { spy.mockRestore() }
+  })
+
+  it('says how the screen looks — colours, blocks, where text sits — never the words', async () => {
+    const t = start()
+    document.body.style.background = '#f3f1ec'
+    document.body.innerHTML = `<aside id="side" style="background:#2a2733"><a href="/x" id="go" style="color:#ffffff;background:#3b3747;border-radius:8px;font-size:14px">Ir</a></aside>
+      <div id="card" style="background:rgb(255, 255, 255);border:1px solid #e0dcd2;border-radius:12px"><p id="p" style="color:#555555">Cliente Maria Souza</p>
+        <label for="f">Nome</label><input id="f"><span id="ghost" style="background:rgba(0, 0, 0, 0.4)">x</span></div>
+      <div data-termometro-private><p>segredo</p></div>
+      <div id="list" style="overflow:auto"><div id="r1" style="background:#fafafa">a</div><div id="r2" style="background:#fafafa">b</div></div>`
+    const boxes: Record<string, number[]> = { go: [10, 10, 120, 36], side: [0, 0, 200, 800], card: [240, 20, 600, 300], ghost: [0, 0, 900, 900], f: [260, 80, 200, 30],
+      list: [240, 400, 600, 100], r1: [240, 400, 600, 60], r2: [240, 480, 600, 60] /* half scrolled out */ }
+    const spy = place((el) => boxes[el.id])
+    const rects = vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
+      const id = (this.startContainer as Node).parentElement?.id
+      if (id === 'r1' || id === 'r2') return [] as unknown as DOMRectList
+      return (id === 'p' ? [{ left: 260, top: 40, width: 150, height: 18 }] : id === 'ghost' ? [{ left: 0, top: 0, width: 1, height: 1 }] : [{ left: 999, top: 999, width: 50, height: 18 }]) as unknown as DOMRectList
+    })
+    try {
+      t.page('/clients')
+      await vi.advanceTimersByTimeAsync(1500)
+      const inv = (await events()).find((e) => e.type === 'inventory')!
+      expect(inv.layout!.styles![inv.targets!.indexOf('a#go')]).toEqual(['#3b3747', '#ffffff', null, 8, 14])
+      const look = inv.layout!.look!
+      expect(look.blocks).toEqual([{ box: [0, 0, 200, 800], bg: '#2a2733', r: 0 }, { box: [240, 20, 600, 300], bg: '#ffffff', bd: '#e0dcd2', r: 12 },
+        { box: [240, 400, 600, 60], bg: '#fafafa', r: 0 }, { box: [240, 480, 600, 20], bg: '#fafafa', r: 0 }]) // the second row cut where the list scrolls
+      expect(look.texts).toEqual([[260, 40, 150, 18, '#555555']]) // the paragraph; a speck, the label, the link and the private part left out
+      expect(look.page).toBe('#f3f1ec')
+      expect(JSON.stringify(inv.layout)).not.toMatch(/Maria|Cliente|segredo|Nome|Ir"/)
+    } finally { spy.mockRestore(); rects.mockRestore(); document.body.style.background = '' }
   })
 
   it('caps the boxes it sends', async () => {

@@ -300,6 +300,20 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mapsvg .arr path.go { stroke: var(--accent); } .mapsvg .arr path.back { stroke: var(--warn); }
 .mapsvg .arr path.from { stroke: var(--faint); stroke-width: 1.5px; stroke-dasharray: 4 5; opacity: .8; }
 .mapsvg marker.go path { fill: var(--accent); } .mapsvg marker.back path { fill: var(--warn); }
+/* With the app's own look: the element keeps its colours and the lens is a layer on top of it, as on the app. */
+.mapsvg.looks { background: none; }
+.mapsvg .hair { vector-effect: non-scaling-stroke; stroke-width: 1px; }
+.mapsvg.looks .me rect.box { fill: transparent; stroke: transparent; }
+.mapsvg.looks .me.s1 rect.box { fill: var(--ms1); fill-opacity: .4; stroke: var(--ms2); stroke-width: 1.5px; }
+.mapsvg.looks .me.s2 rect.box { fill: var(--ms2); fill-opacity: .45; stroke: var(--ms3); stroke-width: 2.5px; }
+.mapsvg.looks .me.s3 rect.box { fill: var(--ms3); fill-opacity: .5; stroke: var(--ms3); stroke-width: 3.5px; }
+.mapsvg.looks .me.u1 rect.box { fill: var(--mu1); fill-opacity: .35; stroke: var(--accent); stroke-width: 1px; }
+.mapsvg.looks .me.u2 rect.box { fill: var(--mu2); fill-opacity: .45; stroke: var(--accent); stroke-width: 1.5px; }
+.mapsvg.looks .me.u3 rect.box { fill: var(--mu3); fill-opacity: .55; stroke: var(--accent); stroke-width: 2px; }
+.mapsvg.looks .me.u4 rect.box { fill: var(--mu4); fill-opacity: .6; stroke: var(--accent); stroke-width: 3px; }
+.mapsvg.looks .me.never rect.box { fill: transparent; stroke: var(--fg2); stroke-dasharray: 5 4; stroke-width: 1.5px; }
+.mapsvg.looks .me:hover rect.box, .mapsvg.looks .me:focus-visible rect.box { stroke: var(--accent); stroke-width: 2.5px; }
+.mapsvg.looks .me.sel rect.box { stroke: var(--accent); stroke-width: 3.5px; }
 .mapsvg .pill rect { stroke: var(--surface); stroke-width: 2px; vector-effect: non-scaling-stroke; }
 .mapsvg .pill text { font-weight: 600; }
 .mapsvg .pill.go rect { fill: var(--accent); } .mapsvg .pill.go text { fill: var(--on-accent); }
@@ -2947,7 +2961,22 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
   const pad = 6 * k
   // Regions: the page's frame as faint blocks; forms, dialogs and side cards as cards; the title's box gets the screen's name.
   const title = screenText(m.route)
-  const lm = (lay.landmarks ?? []).map((l) => { const [x, y, w, h] = l.box
+  // With how the screen looks: its colour, its blocks (sidebar, cards, rows) and its lines of text as bars, words left out.
+  const look = lay.look
+  const side = (b, sides) => { const [x, y, w, h] = b.box
+    return [...sides].map((c) => { const [x1, y1, x2, y2] = { t: [x, y, x + w, y], b: [x, y + h, x + w, y + h], l: [x, y, x, y + h], r: [x + w, y, x + w, y + h] }[c]
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${b.bd}" class="hair"/>` }).join('') }
+  // What a click opened (a dialog, a menu) floats over the page with a shadow, as in the app.
+  const block = (b, lift) => { const [x, y, w, h] = b.box
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(b.r, h / 2, w / 2)}" fill="${b.bg ?? 'none'}"${b.bd && !b.sides ? ` stroke="${b.bd}" class="hair"` : ''}${lift ? ' filter="url(#mk-lift)"' : ''}/>` +
+      (b.bd && b.sides ? side(b, b.sides) : '') }
+  const bar = ([x, y, w, h, c]) => `<rect x="${x}" y="${y + h * 0.28}" width="${w}" height="${h * 0.44}" rx="${h * 0.22}" fill="${c}" fill-opacity=".28"/>`
+  const over = look?.over ?? { blocks: [], texts: [] }
+  const biggest = over.blocks.reduce((a, b) => (!a || b.box[2] * b.box[3] > a.box[2] * a.box[3] ? b : a), null)
+  const scene = !look ? '' : `<rect x="${X0}" y="${Y0}" width="${W}" height="${H}" fill="${look.page ?? '#ffffff'}"/>` +
+    look.blocks.map((b) => block(b)).join('') + look.texts.map(bar).join('') +
+    over.blocks.map((b) => block(b, b === biggest)).join('') + over.texts.map(bar).join('')
+  const lm = (lay.landmarks ?? []).filter((l) => !look || l.kind === 'title').map((l) => { const [x, y, w, h] = l.box
     if (l.kind === 'title') { const px = Math.min(20, h / k * 0.8), line = mapFit(title, w / k, [px, px - 2, px - 4], 1)
       return line ? `<text class="lt" x="${x}" y="${y + h / 2 + px * k * 0.36}" font-size="${line.px * k}">${esc(line.lines[0])}</text>` : '' }
     const card = l.kind === 'form' || l.kind === 'dialog' || (l.kind === 'aside' && x > 0)
@@ -2965,18 +2994,25 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     // A field is named above its box; a button inside it, smaller or on two lines when it must; an icon gets a glyph and its name
     // beside it when there is room.
     const name = unnamed(x.target), field = mapIsField(x.target), icon = !field && bw <= 48 && bh <= 48
+    const st = look?.styles?.[x.target], ink = st?.[1] ? ` style="fill:${st[1]}"` : '', fs = st?.[4] ? Math.min(16, Math.max(9, st[4])) : 13
+    const sizes = [fs, fs - 1, fs - 2, fs - 3].filter((v) => v >= 9)
     let text = ''
     if (field) { const line = mapFit(name, bw / k, [11, 10], 1)
       if (line && by - 6 * k > 0) taken.push([bx, by - 18 * k, bw, 18 * k])
       if (line && by - 6 * k > 0) text = `<text class="flabel" x="${bx + 2 * k}" y="${by - 6 * k}" font-size="${11 * k}">${esc(line.lines[0])}</text>` }
     else if (icon) {
       const r = Math.min(bw, bh) * 0.22, cx = bx + bw / 2, cy = by + bh / 2
-      text = `<circle class="glyph" cx="${cx}" cy="${cy}" r="${r}"/><circle class="glyph" cx="${cx}" cy="${cy}" r="${r * 0.35}"/>`
-      if (lens === 'routes') { const line = mapFit(name, 140, [11], 1); if (line) pills.push(mapPill(lay.boxes[x.target], line.lines[0], k, B, 'name', taken, true)) }
+      text = `<circle class="glyph" cx="${cx}" cy="${cy}" r="${r}"${st?.[1] ? ` style="stroke:${st[1]}"` : ''}/><circle class="glyph" cx="${cx}" cy="${cy}" r="${r * 0.35}"${st?.[1] ? ` style="stroke:${st[1]}"` : ''}/>`
+      // An icon's name beside it, only on the plain drawing: with the app's look the screen is drawn as it is, the name is in the tip.
+      if (lens === 'routes' && !look) { const line = mapFit(name, 140, [11], 1); if (line) pills.push(mapPill(lay.boxes[x.target], line.lines[0], k, B, 'name', taken, true)) }
     } else {
-      const fit = mapFit(name, (bw - 2 * pad) / k, [13, 12, 11, 10, 9], Math.max(1, Math.min(2, Math.floor(bh / k / 12))))
-      if (fit) { const lh = fit.px * 1.15 * k, y0 = by + bh / 2 - (fit.lines.length - 1) * lh / 2 + fit.px * k * 0.36
-        text = fit.lines.map((t, i) => `<text x="${bx + pad}" y="${y0 + i * lh}" font-size="${fit.px * k}">${esc(t)}</text>`).join('') }
+      // With the real look the name is drawn at the app's own size, shrinking with the drawing like a picture of the screen,
+      // where the app puts it: centred in a filled button, from the left in a plain link. Without it, at a size read on screen.
+      const u = look ? 1 : k, padIn = look ? Math.min(12, bw * 0.12) : pad
+      const fit = mapFit(name, (bw - 2 * padIn) / u, look ? sizes : [13, 12, 11, 10, 9], Math.max(1, Math.min(2, Math.floor(bh / u / 12))))
+      const centred = look && st?.[0] && st[0] !== look.page
+      if (fit) { const lh = fit.px * 1.15 * u, y0 = by + bh / 2 - (fit.lines.length - 1) * lh / 2 + fit.px * u * 0.36
+        text = fit.lines.map((t, i) => `<text x="${centred ? bx + bw / 2 : bx + padIn}"${centred ? ' text-anchor="middle"' : ''} y="${y0 + i * lh}" font-size="${fit.px * u}"${ink}>${esc(t)}</text>`).join('') }
     }
     // The number in words above the element: how much it irritates, or how much it is clicked.
     if (lens === 'problems' && x.sev) pills.push(mapPill(lay.boxes[x.target], MP().irritates(mapPct(x.rate)), k, B, 'bad', taken))
@@ -2984,7 +3020,8 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     const hit = Math.max(0, 8 * k - Math.min(bw, bh) / 2)
     return `<g class="me ${cls}${sel === x.target ? ' sel' : ''}${dim ? ' dim' : ''}" data-map-el="${esc(x.target)}" tabindex="0" role="button" data-tip="${esc(tipOf(x))}" aria-label="${esc(tipOf(x))}">
       <rect class="hit" x="${bx - hit}" y="${by - hit}" width="${bw + 2 * hit}" height="${bh + 2 * hit}"/>
-      <rect class="box" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${Math.min(6 * k, bh / 2)}"/>
+      ${st ? `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${Math.min(st[3], bh / 2)}" fill="${st[0] ?? 'none'}"${st[2] ? ` stroke="${st[2]}" class="hair"` : ''}/>` : ''}
+      <rect class="box" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${st ? Math.min(Math.max(st[3], 3), bh / 2) : Math.min(6 * k, bh / 2)}"/>
       ${text}</g>`
   }).join('')
   // A curved arrow from the edge of one element to the edge of the other.
@@ -3008,14 +3045,15 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     return `<path class="${loop ? 'back' : 'go'}" d="${c.d}" stroke-width="${2 + p.share * 7}" marker-end="url(#mk-${loop ? 'back' : 'go'})"/>`
   }).join('')
   const mk = (id, cls) => `<marker id="${id}" class="${cls}" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="${12 * k}" markerHeight="${12 * k}" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>`
-  return `<svg class="mapsvg" viewBox="${X0} ${Y0} ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
-    <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}</defs>${lm}${boxes}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
+  return `<svg class="mapsvg${look ? ' looks' : ''}" viewBox="${X0} ${Y0} ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
+    <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}<filter id="mk-lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="${6 * k}" stdDeviation="${10 * k}" flood-color="#000" flood-opacity=".22"/></filter></defs>${scene}${lm}${boxes}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
     <g class="pills" aria-hidden="true">${pills.join('')}</g></svg>`
 }
 
 // What the drawing shows of the page: the controls, cards and title with a margin, not the empty rest of a tall or wide page.
 function mapFrame(lay) {
-  const parts = [...Object.values(lay.boxes), ...(lay.landmarks ?? []).filter((l) => ['form', 'dialog', 'title', 'nav'].includes(l.kind) || (l.kind === 'aside' && l.box[0] > 0)).map((l) => l.box)]
+  const parts = [...Object.values(lay.boxes), ...(lay.landmarks ?? []).filter((l) => ['form', 'dialog', 'title', 'nav'].includes(l.kind) || (l.kind === 'aside' && l.box[0] > 0)).map((l) => l.kind === 'title' ? [l.box[0], l.box[1], Math.min(l.box[2], 320), l.box[3]] : l.box),
+    ...(lay.look?.blocks ?? []).map((b) => b.box).filter((b) => b[3] < lay.vh * 0.8 && b[2] < lay.vw * 0.8), ...(lay.look?.texts ?? []).map((x) => x.slice(0, 4))]
   const m = 24
   const x0 = Math.max(0, Math.min(...parts.map((b) => b[0])) - m), y0 = Math.max(0, Math.min(...parts.map((b) => b[1])) - m - 24)
   const x1 = Math.min(lay.dw, Math.max(...parts.map((b) => b[0] + b[2])) + m), y1 = Math.min(lay.dh, Math.max(...parts.map((b) => b[1] + b[3])) + m + 24)

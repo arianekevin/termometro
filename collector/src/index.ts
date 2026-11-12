@@ -125,6 +125,19 @@ export interface Layout {
   landmarks: Array<{ kind: string; box: Box }>
   /** An addition to the screen's drawing (what a click opened), not the whole screen. */
   partial?: boolean
+  /** One per target, like `boxes`: how it looks (colours, radius, font size), never what it says. */
+  styles?: Array<Style | null>
+  /** How the screen around the controls looks: its colour, its blocks, where its lines of text sit. */
+  look?: Look
+}
+/** `[background, text colour, border colour, corner radius, font size]`; a colour is `#rrggbb` or null (none). */
+export type Style = [string | null, string | null, string | null, number, number]
+export interface Look {
+  page: string
+  /** Blocks with their own background or a border; `sides` only when not all four: some of "trbl". */
+  blocks: Array<{ box: Box; bg?: string; bd?: string; r: number; sides?: string }>
+  /** Lines of text: `[x, y, width, height, colour]`, the words left out. */
+  texts: Array<[number, number, number, number, string]>
 }
 interface Who { account: string; user: string; role: string; user_name?: string }
 interface Queued { event: TrackedEvent; who: Who }
@@ -219,6 +232,97 @@ function frame(): Omit<Layout, 'boxes'> {
   }
   return { vw: Math.round(innerWidth), vh: Math.round(innerHeight), dw: Math.round(Math.max(root.scrollWidth, innerWidth)),
     dh: Math.round(Math.max(root.scrollHeight, innerHeight)), landmarks }
+}
+
+/** A computed colour as `#rrggbb`, or null when it is (nearly) transparent: a see-through layer is not drawn. */
+export function hexOf(color: string): string | null {
+  const short = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((color || '').trim())
+  if (short) return '#' + (short[1]!.length === 3 ? short[1]!.split('').map((c) => c + c).join('') : short[1]!).toLowerCase()
+  const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/.exec(color || '')
+  if (!m) return null
+  const alpha = m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4])
+  if (alpha < 0.9) return null
+  return '#' + [m[1], m[2], m[3]].map((v) => Math.max(0, Math.min(255, Math.round(Number(v)))).toString(16).padStart(2, '0')).join('')
+}
+
+/** How a control looks — background, text colour, border colour, corner radius and font size — never what it says. */
+export function styleOf(el: Element): Style {
+  const c = getComputedStyle(el)
+  const border = parseFloat(c.borderTopWidth) > 0 && c.borderTopStyle !== 'none' ? hexOf(c.borderTopColor) : null
+  return [hexOf(c.backgroundColor), hexOf(c.color), border, Math.min(999, Math.round(parseFloat(c.borderTopLeftRadius) || 0)),
+    Math.round(parseFloat(c.fontSize) || 0)]
+}
+
+// How the screen looks around its controls: its colour, the blocks that have a background or a border (sidebar, cards,
+// rows) and where its lines of text sit — their place and colour, never their words. Text in controls, fields, labels,
+// the title and what the app marks private is left out.
+const MAX_BLOCKS = 80, MAX_TEXTS = 250, MAX_VISITED = 2500, MIN_BLOCK_AREA = 600
+const NO_TEXT = 'script,style,noscript,template,svg,label,h1,[data-termometro-private]'
+export function lookOf(roots?: Element[]): Look {
+  const body = document.body
+  const page = hexOf(getComputedStyle(body).backgroundColor) ?? hexOf(getComputedStyle(document.documentElement).backgroundColor) ?? '#ffffff'
+  const blocks: Look['blocks'] = [], texts: Look['texts'] = []
+  const behind = new Map<Element, string>()
+  // What a scrolling or clipping box hides is not on the screen: each box is cut to its clipping ancestors, or dropped.
+  const clips = new Map<Element, Box | null>()
+  const clipOf = (el: Element | null): Box | null => {
+    if (!el || el === body) return null
+    if (clips.has(el)) return clips.get(el)!
+    const up = clipOf(el.parentElement)
+    const c = getComputedStyle(el)
+    let clip = up
+    if (c.overflowX !== 'visible' || c.overflowY !== 'visible') { const own = boxOf(el); clip = own ? (up ? cut(own, up) : own) : up }
+    clips.set(el, clip)
+    return clip
+  }
+  const cut = (a: Box, b: Box): Box | null => {
+    const x = Math.max(a[0], b[0]), y = Math.max(a[1], b[1]), r = Math.min(a[0] + a[2], b[0] + b[2]), d = Math.min(a[1] + a[3], b[1] + b[3])
+    return r > x && d > y ? [x, y, r - x, d - y] : null
+  }
+  const visible = (box: Box, el: Element | null): Box | null => { const clip = clipOf(el); return clip ? cut(box, clip) : box }
+  const within = roots ?? [body]
+  let visited = 0
+  for (const root of within) {
+    for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
+      if (++visited > MAX_VISITED || blocks.length >= MAX_BLOCKS) break
+      if (el.closest(OVERLAY) || el.matches(CLICKABLE + ',' + FIELD) || el.closest('svg')) continue
+      const parentBg = (el.parentElement && behind.get(el.parentElement)) ?? page
+      const c = getComputedStyle(el)
+      const bg = hexOf(c.backgroundColor)
+      behind.set(el, bg ?? parentBg)
+      if (c.visibility === 'hidden' || c.opacity === '0') continue
+      const sides = (['Top', 'Right', 'Bottom', 'Left'] as const).filter((d) =>
+        parseFloat(c.getPropertyValue(`border-${d.toLowerCase()}-width`)) > 0 && c.getPropertyValue(`border-${d.toLowerCase()}-style`) !== 'none')
+      const ownBg = bg && bg !== parentBg ? bg : null
+      if (!ownBg && !sides.length) continue
+      const own = boxOf(el), box = own && visible(own, el.parentElement)
+      if (!box || box[2] * box[3] < MIN_BLOCK_AREA) continue
+      const block: Look['blocks'][number] = { box, r: Math.min(999, Math.round(parseFloat(c.borderTopLeftRadius) || 0)) }
+      if (ownBg) block.bg = ownBg
+      if (sides.length) {
+        const bd = hexOf(c.getPropertyValue(`border-${sides[0]!.toLowerCase()}-color`))
+        if (bd) block.bd = bd
+        if (sides.length < 4) block.sides = sides.map((d) => d[0]!.toLowerCase()).join('')
+      }
+      if (block.bg || block.bd) blocks.push(block)
+    }
+    if (typeof document.createTreeWalker !== 'function' || typeof document.createRange !== 'function') continue
+    const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */)
+    const sx = typeof scrollX === 'number' ? scrollX : 0, sy = typeof scrollY === 'number' ? scrollY : 0
+    for (let n = walker.nextNode(); n && texts.length < MAX_TEXTS; n = walker.nextNode()) {
+      const parent = n.parentElement
+      if (!parent || !(n.textContent ?? '').trim() || parent.closest(OVERLAY + ',' + CLICKABLE + ',' + FIELD + ',' + NO_TEXT)) continue
+      const range = document.createRange()
+      range.selectNodeContents(n)
+      const color = hexOf(getComputedStyle(parent).color) ?? '#000000'
+      for (const r of Array.from(range.getClientRects?.() ?? [])) {
+        if (r.width < 2 || r.height < 2 || texts.length >= MAX_TEXTS) continue
+        const line = visible([Math.round(r.left + sx), Math.round(r.top + sy), Math.round(r.width), Math.round(r.height)], parent)
+        if (line && line[3] >= r.height * 0.6) texts.push([...line, color])
+      }
+    }
+  }
+  return { page, blocks, texts }
 }
 
 /** URL path with the segments that look like ids replaced by `:id`. */
@@ -547,12 +651,16 @@ export function start(options: Options): Termometro {
       for (const selector of seen.keys()) known.add(selector)
       additions.set(key, (additions.get(key) ?? 0) + 1)
       const base = frame()
-      sendInventory(route, seen, { ...base, landmarks: base.landmarks.filter((l) => l.kind === 'dialog'), partial: true })
+      // How it looks: only what opened — the dialogs, else the box the new controls sit in (a menu's panel).
+      const dialogs = Array.from(document.querySelectorAll(LANDMARKS.find(([k]) => k === 'dialog')![1])).filter((d) => !d.closest(OVERLAY) && boxOf(d))
+      const parents = Array.from(new Set(Array.from(seen.values()).map((x) => x.el?.parentElement).filter((x): x is HTMLElement => !!x)))
+      sendInventory(route, seen, { ...base, landmarks: base.landmarks.filter((l) => l.kind === 'dialog'), partial: true },
+        dialogs.length ? dialogs : parents)
     }, ADDITION_DELAY_MS)
   }
 
-  function scan(skip: Set<string>): Map<string, { label: string; box: Box | null }> {
-    const seen = new Map<string, { label: string; box: Box | null }>()
+  function scan(skip: Set<string>): Map<string, { label: string; box: Box | null; el?: Element }> {
+    const seen = new Map<string, { label: string; box: Box | null; el?: Element }>()
     let boxes = 0
     // Fields too (a click on one counts as its use): their place and the name the app gives them, never their value;
     // none inside tables, lists of records or what the app marks private.
@@ -568,15 +676,21 @@ export function start(options: Options): Termometro {
       // The same selector many times (a menu's items): the first label and the first visible box stand for it.
       const box = kept?.box ?? (boxes < MAX_BOXES ? boxOf(el) : null)
       if (box && !kept?.box) boxes++
-      seen.set(selector, { label: kept?.label || (field ? fieldLabelOf(el) : labelOf(el)), box })
+      seen.set(selector, { label: kept?.label || (field ? fieldLabelOf(el) : labelOf(el)), box, el: kept?.box ? kept.el : box ? el : undefined })
     }
     return seen
   }
 
-  function sendInventory(route: string, seen: Map<string, { label: string; box: Box | null }>, base: Omit<Layout, 'boxes'>) {
+  function sendInventory(route: string, seen: Map<string, { label: string; box: Box | null; el?: Element }>, base: Omit<Layout, 'boxes'>,
+    roots?: Element[]) {
     const items = Array.from(seen.values())
+    let look: Look | undefined, styles: Array<Style | null> | undefined
+    try {
+      styles = items.map((x) => x.box && x.el ? styleOf(x.el) : null)
+      look = lookOf(roots)
+    } catch { /* how it looks is a bonus: the places still go */ }
     record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: items.map((x) => x.label),
-      layout: { ...base, boxes: items.map((x) => x.box) } })
+      layout: { ...base, boxes: items.map((x) => x.box), ...(styles ? { styles } : {}), ...(look ? { look } : {}) } })
   }
 
   function page(route?: string) {

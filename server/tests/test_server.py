@@ -643,6 +643,24 @@ class Server(unittest.TestCase):
             t.apply_retention(con, now=time.time() + 400 * 86400)
             self.assertEqual(con.execute("SELECT COUNT(*) FROM layouts").fetchone()[0], 0)
 
+    def test_layout_carries_how_the_screen_looks_colours_and_places_only(self):
+        self.send([{"type": "inventory", "route": "/c", "targets": ["a#go", "button#x"], "layout": {
+            "vw": 1280, "vh": 800, "dw": 1280, "dh": 900, "boxes": [[10, 10, 120, 36], [10, 60, 80, 30]],
+            "styles": [["#3b3747", "#ffffff", None, 8, 14], ["red", "<b>", "#000000", "9", 13]],
+            "look": {"page": "#f3f1ec", "blocks": [{"box": [0, 0, 200, 800], "bg": "#2a2733", "r": 0, "text": "Maria"},
+                                                   {"box": [240, 20, 600, 300], "bd": "#e0dcd2", "r": 12, "sides": "b"}, {"box": [1, 1, 5, 5], "r": 0}],
+                     "texts": [[260, 40, 150, 18, "#555555"], [1, 2, 3, 4, "Maria Souza"], "texto"]}}}])
+        lay = self.read("/api/usage?project=shop&route=/c")["layout"]
+        self.assertEqual(lay["look"], {"page": "#f3f1ec", "styles": {"a#go": ["#3b3747", "#ffffff", None, 8, 14], "button#x": [None, None, "#000000", 0, 13]},
+                                       "blocks": [{"box": [0, 0, 200, 800], "r": 0, "bg": "#2a2733"}, {"box": [240, 20, 600, 300], "r": 12, "bd": "#e0dcd2", "sides": "b"}],
+                                       "texts": [[260, 40, 150, 18, "#555555"]], "over": {"blocks": [], "texts": []}})
+        # what a dialog adds is drawn over the page
+        self.send([{"type": "inventory", "route": "/c", "targets": ["input#e"], "layout": {
+            "vw": 1280, "vh": 800, "dw": 1280, "dh": 900, "boxes": [[500, 300, 200, 30]], "partial": True, "styles": [["#ffffff", "#111111", "#cccccc", 4, 14]],
+            "look": {"page": "#f3f1ec", "blocks": [{"box": [450, 250, 400, 200], "bg": "#ffffff", "r": 12}], "texts": []}}}], session="d")
+        look = self.read("/api/usage?project=shop&route=/c")["layout"]["look"]
+        self.assertEqual((look["over"]["blocks"], look["styles"]["input#e"]), ([{"box": [450, 250, 400, 200], "r": 12, "bg": "#ffffff"}], ["#ffffff", "#111111", "#cccccc", 4, 14]))
+
     def test_usage_of_a_screen_says_why_each_element_irritated(self):
         self.send([{"type": "page", "route": "/u"}, {"type": "click", "route": "/u", "target": "button#s"},
                    {"type": "rage", "route": "/u", "target": "button#s", "detail": "waiting"},
