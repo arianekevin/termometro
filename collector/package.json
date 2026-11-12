@@ -1,6 +1,6 @@
 {
   "name": "termometro",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "See where your users struggle — rage clicks, dead clicks, errors, effort per action and a heat map — without recording anyone.",
   "license": "AGPL-3.0-only",
   "type": "module",
