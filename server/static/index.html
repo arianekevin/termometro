@@ -1030,11 +1030,11 @@ function kindsCard(o) {
         <span class="meta">${C().what[c]} · ${C().share(Math.round(k.now[c] / total * 100))}</span>
         ${c === 'irritation' && reasonsText(k.rage_reasons) ? `<span class="why">${C().why}: ${esc(reasonsText(k.rage_reasons))}</span>` : ''}
         <span class="kshare"><i class="k-${c}" style="width:${k.now[c] / total * 100}%"></i></span></a>`).join('')}
-      <div class="kind effort"><span class="kname">${C().effort}</span>
+      <a class="kind effort" ${linkAttrs({ tab: 'actions', params: {} })}><span class="kname">${C().effort}</span>
         <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions && e.now.clicks !== e.before.clicks
           ? `<span class="delta ${e.now.clicks > e.before.clicks ? 'bad' : 'ok'}">${e.now.clicks > e.before.clicks ? '▲' : '▼'}&nbsp;${FT().before(num(e.before.clicks))}</span>` : ''}</span>
         ${spark(e.daily.map((d) => d.clicks), `${C().effort}: ${L.perDay}`, 96, 24)}
-        <span class="meta">${C().effortWhat} · ${num(e.now.actions)} ${PT ? 'ações' : 'actions'}</span></div>
+        <span class="meta">${C().effortWhat} · ${num(e.now.actions)} ${PT ? 'ações' : 'actions'}</span></a>
     </div></section>`
 }
 
