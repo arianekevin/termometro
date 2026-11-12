@@ -381,6 +381,27 @@ header.busy .progress { opacity: 1; transition-delay: .12s; }
   #marks-open { width: 100%; max-width: none; }
   .tg { padding-top: 4px; } .tgroup.tg-config { margin-left: 0; }
 }
+/* Failure detail, dates on charts, accounts' trend. */
+.failure { scroll-margin-top: calc(var(--hh, 0px) + 8px); }
+.fbar { position: sticky; top: var(--hh, 0px); z-index: 4; display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin: -16px -16px 12px; padding: 8px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+.fbar-title { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fbar-act { display: flex; gap: 8px; flex-wrap: wrap; }
+code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty))) .t { display: none; }
+.xl { display: flex; margin: 4px 28px 0 0; font-size: 11px; line-height: 14px; color: var(--faint); }
+.xl.sm { margin-right: 0; }
+.xl span { flex: 1 1 0; min-width: 0; display: flex; justify-content: center; white-space: nowrap; visibility: hidden; }
+.xl span.w { visibility: visible; }
+.heat .xl.hx { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; margin: 2px 0 0; }
+.chart .rule { border-top-style: dashed; }
+.chart .rule em { position: absolute; left: 0; top: -15px; padding-right: 4px; font: normal 11px/14px system-ui, sans-serif; color: var(--faint); pointer-events: none;
+  background: color-mix(in srgb, var(--surface) 80%, transparent); }
+.spark .pt rect { fill: transparent; } .spark .pt circle { fill: var(--fg2); stroke: none; opacity: 0; } .spark .pt:hover circle { opacity: 1; }
+.pill.flat { background: var(--sunken); color: var(--fg2); }
+.pill.trend { gap: 4px; } td > button[data-copy] { white-space: nowrap; } .chips button[disabled] { opacity: .45; cursor: default; }
+.acc-name { min-width: 9em; max-width: 18em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 640px) { .xl { margin-right: 24px; } .xl.sm { margin-right: 0; } .xl span.w { visibility: hidden; } .xl span.m { visibility: visible; } }
 </style>
 </head>
 <body>
@@ -410,7 +431,7 @@ const HELP_PT = {
   adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
   featureScore: ['O que é', 'A frustração da feature: sinais nas telas e botões dela, divididos pelos usos.', 'Feature importante com frustração alta é a melhor candidata a revisão de experiência.'],
   byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
-  accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
+  accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. A Tendência diz "Caiu" quando um desses números ficou em 60% ou menos do que era e além da oscilação normal; "Subiu" é o espelho (o de antes era 60% ou menos do atual, além da oscilação) sem nada caindo; o resto é "Estável". A variação aparece em %; passe o mouse para ver o número de antes.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
   kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
   map: ['O que é', 'O mapa abre o próprio app numa aba nova, com o uso desenhado por cima da tela real: no Calor, cada elemento pintado pelo quanto é clicado (tracejado é o que ninguém clica); nas Rotas, setas de um clique para o próximo, mais grossas e quentes nas mais feitas. O link vale por uma hora.', 'Rotas que vão e voltam entre os mesmos dois pontos, ou que atravessam a tela de ponta a ponta, sugerem aproximar os elementos ou mudar a ordem.'],
@@ -446,7 +467,7 @@ const HELP_EN = {
   adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
   featureScore: ['What it is', 'The feature\'s frustration: signals on its screens and buttons, divided by its uses.', 'An important feature with high frustration is the best candidate for an experience review.'],
   byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
-  accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
+  accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. The Trend says "Dropped" when one of those numbers is at 60% or less of before and beyond the usual ups and downs; "Rose" is the mirror (before was 60% or less of now, beyond the ups and downs) with nothing dropping; the rest is "Steady". The change shows as a %; hover it to see the number before.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
   kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
   map: ['What it is', 'The map opens the app itself in a new tab, with use drawn over the real screen: Heat paints each element by how much it is clicked (dashed is what nobody clicks); Routes draws arrows from one click to the next, thicker and hotter the more taken. The link lasts an hour.', 'Routes going back and forth between the same two points, or crossing the screen end to end, suggest bringing the elements closer or changing their order.'],
@@ -552,14 +573,18 @@ const L = PT ? {
   failureTab: {
     list: 'Falhas, das que atingem mais sessões para as que atingem menos', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
     none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
-    occurrences: (f) => `${f.n}× em ${f.sessions} ${f.sessions === 1 ? 'sessão' : 'sessões'} · ${f.users} ${f.users === 1 ? 'usuário' : 'usuários'} · ${f.accounts} ${f.accounts === 1 ? 'conta' : 'contas'}`,
+    occurrences: (f) => `${num(f.n)}× em ${plural(f.sessions, 'sessão', 'sessões')} · ${plural(f.users, 'usuário', 'usuários')} · ${plural(f.accounts, 'conta', 'contas')}`,
     where: 'Telas', versions: 'Versões', agents: 'Navegadores', devices: 'Tipo de tela', afterClicking: 'Logo depois de clicar em',
     stack: 'Onde no código', noStack: 'Sem stack: falhas de rede e lentidão não têm, e erros de versões antigas do coletor também não.',
     trails: 'Passos até a falha', trailsHint: (b, a) => `As sessões mais recentes em que aconteceu: até ${b} passos antes e ${a} depois.`,
-    fullSession: 'Sessão inteira', copyIssue: 'Copiar para issue', close: 'Fechar', unknown: 'desconhecido',
+    fullSession: 'Sessão inteira', copyIssue: 'Copiar como demanda', close: 'Fechar', unknown: 'desconhecido', back: 'Voltar às falhas', copyLink: 'Copiar link',
     devicesNames: { phone: 'celular', tablet: 'tablet', desktop: 'computador' }, session: 'Sessão', truncated: 'Mostrando só os primeiros 500 passos.',
-    step: { page: (s) => `Abriu ${s.route}`, click: (s) => `Clicou em ${s.target}`, rage: (s) => `Rage click em ${s.target}`, dead: (s) => `Clique sem resposta em ${s.target}`,
-      action: (s) => `Gravou ${s.detail}${s.clicks ? ` (${s.clicks} cliques)` : ''}`, abandon: (s) => `Abandonou ${s.target}`, bounce: () => 'Voltou na hora' },
+    step: { page: (s) => `Abriu ${s.route}`, click: (s) => `Clicou em ${s.target}`, rage: (s) => `Rage click em ${s.target}${L.rageWhy[s.detail] ? ` (${L.rageWhy[s.detail]})` : ''}`, dead: (s) => `Clique sem resposta em ${s.target}`,
+      action: (s) => `Gravou ${s.detail}${s.clicks ? ` (${plural(s.clicks, 'clique', 'cliques')})` : ''}`, abandon: (s) => `Abandonou o formulário ${s.target}`, bounce: () => 'Voltou na hora',
+      retry: (s) => `Tentou de novo: clicou outra vez em ${s.target}`, near_miss: (s) => `Quase acertou o clique em ${s.target}`, typed: (s) => `Digitou em ${s.target}`,
+      enter: (s) => `Apertou Enter em ${s.target}`, away: (s) => `Saiu do navegador${s.duration_ms ? ` por ${offset(s.duration_ms).slice(1)}` : ''} e voltou`, track: (s) => `Evento do app: ${s.detail}`,
+      inventory: () => 'A tela terminou de carregar', js_error: (s) => `Erro na tela: ${s.detail}`, http_5xx: (s) => `Erro do servidor: ${s.detail}`, http_4xx: (s) => `Pedido recusado: ${s.detail}`,
+      slow: (s) => `Resposta lenta${s.duration_ms ? ` (${offset(s.duration_ms).slice(1)})` : ''}: ${s.detail}` },
     issue: { occurrences: 'Ocorrências', period: (d) => `nos últimos ${d} dias`, first: 'Desde', last: 'Última vez', steps: 'Passos até a falha', link: 'No Termometro' },
   },
   journey: {
@@ -567,12 +592,12 @@ const L = PT ? {
     item: 'Botão ou ação', uses: 'Usos', clicksTo: 'Cliques até chegar', screensTo: 'Telas no caminho', far: 'longe', noneFar: 'Nada muito usado e longe neste período.', allReach: (n) => `Todos os botões e ações (${Math.min(n, 50)} mais usados)`, element: 'botão', action: 'ação',
     pairs: 'Andam juntas', pairsHint: 'Ações que costumam vir uma logo depois da outra. Quando a segunda vem quase sempre, e com caminho longo entre elas, vale aproximar ou virar um passo só.',
     pair: (p) => `Depois de <code>${p.a}</code>, <b>${Math.round(p.share * 100)}%</b> das vezes vem <code>${p.b}</code>`,
-    pairMeta: (p) => `${p.n} vezes · ${p.clicks} cliques e ${p.screens} ${p.screens === 1 ? 'tela' : 'telas'} entre elas (mediana)`, linked: 'juntas', noPairs: 'Nenhuma sequência de ações se repete o bastante neste período.',
+    pairMeta: (p) => `${plural(p.n, 'vez', 'vezes')} · ${plural(p.clicks, 'clique', 'cliques')} e ${plural(p.screens, 'tela', 'telas')} entre elas (mediana)`, linked: 'juntas', noPairs: 'Nenhuma sequência de ações se repete o bastante neste período.',
     flow: 'De onde vêm e para onde vão', flowHint: 'Escolha uma tela. Clique numa origem ou destino para seguir o caminho.', from: 'Chegam de', to: 'Vão para', exit: 'saíram do app', start: 'começaram aqui',
     timeOn: (s) => `tempo típico na tela: ${s} s`,
     funnel: 'Funil', funnelHint: 'Monte uma sequência de passos e veja quantas sessões chegam a cada um, nessa ordem (pode haver outras coisas no meio).',
     addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
-    reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
+    reached: (n, pct) => `${plural(n, 'sessão', 'sessões')} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
   },
   tabs: { overview: 'Início', product: 'Produto', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', map: 'Mapa', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
   nav: { label: 'Seções do painel', groups: { summary: 'Resumo', problems: 'Problemas', usage: 'Uso', people: 'Gente', config: 'Ajustes' } },
@@ -581,7 +606,7 @@ const L = PT ? {
   prod: { areas: 'Áreas do produto', areasHint: 'Telas agrupadas por área. Clique numa área para ver as telas dela.', area: 'Área', screens: 'Telas', share: 'das visitas',
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
     seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
-    nScreens: (n) => `${n} ${n === 1 ? 'tela' : 'telas'}`, since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
+    nScreens: (n) => plural(n, 'tela', 'telas'), since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
   cat: { title: 'Frustração por tipo', hint: 'O que está pesando: cada tipo é uma parte da frustração. O esforço fica à parte.', all: 'Todos os tipos',
     names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
@@ -640,11 +665,13 @@ const L = PT ? {
     kinds: { screen: 'Tela', control: 'Botão', action: 'Ação', track: 'Evento do app' }, pick: 'escolha…', trackPh: 'nome passado a termometro.track()', add: 'Adicionar',
     save: 'Salvar feature', cancel: 'Cancelar', needs: 'Dê um nome e adicione pelo menos uma parte.', duplicate: 'Já existe uma feature com esse nome.', usesByDay: 'Usos por dia', byAccount: 'Por conta',
     byAccountHint: 'Usos da feature em cada conta, agora contra o período anterior.', back: 'Todas as features', before: (b) => `antes: ${b}`, failures: 'Falhas', score: 'Frustração',
-    dayTip: (d, n) => `${d}: ${n} usos` },
+    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'uso', 'usos')}` },
   acc: { title: 'Engajamento por conta', hint: (d) => `Pessoas e sessões por dia (média dos ${d} dias com dados) e o uso das features vigiadas, agora contra o período anterior. Quem caiu aparece primeiro.`,
+    trendCol: 'Tendência', trend: { down: 'Caiu', flat: 'Estável', up: 'Subiu' }, onlyDown: (n) => `Só quem caiu (${n})`, noneDown: 'Nenhuma conta caiu neste período.',
+    copySummary: 'Copiar resumo', fromZero: 'novo', fellFeatures: 'Features vigiadas que caíram', period: (d) => `últimos ${d} dias contra os ${d} anteriores`,
     noCompare: 'Ainda não há período anterior com dados para comparar.', account: 'Conta', usersDay: 'Pessoas/dia', sessionsDay: 'Sessões/dia', people: 'Pessoas no período', fell: 'caiu',
     none: 'Nenhuma conta com id neste período.', noFeatures: 'Vigie features na aba Features para ver o uso delas por conta.', pulse: 'Pessoas por dia',
-    open: 'Clique numa conta para ver o pulso dela; o painel inteiro passa a mostrar só ela.', back: 'Todas as contas', dayTip: (d, n) => `${d}: ${n} pessoas`, featureUses: 'Uso das features' },
+    open: 'Clique numa conta para ver o pulso dela; o painel inteiro passa a mostrar só ela.', back: 'Todas as contas', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'pessoa', 'pessoas')}`, featureUses: 'Uso das features' },
   dict: { title: 'Dicionário', hint: 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra. O nome de uma conta fica só neste servidor.',
     filter: 'Filtrar por nome ou chave…', screens: 'Telas', controls: 'Botões e elementos', actions: 'Ações (gravações)', accounts: 'Contas',
     key: 'Chave técnica', auto: 'Nome no app', name: 'Nome', used: 'Uso', users: 'Usuários', placeholder: 'dar nome…', accountPlaceholder: 'ex.: Contrato Acme Saúde',
@@ -652,7 +679,7 @@ const L = PT ? {
   search: 'Buscar tela, botão, erro, ação, usuário…', noResults: 'Nada com esse nome neste período.',
   kinds: { screen: 'Telas', element: 'Elementos', failure: 'Falhas', action: 'Ações', user: 'Usuários', account: 'Contas' },
   vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
-  scoreByDay: 'Frustração por dia', peak: (n) => `dia mais frustrante: ${n}`, dayTip: (d, s, v) => `${d}: frustração ${s} em ${v} visitas`,
+  scoreByDay: 'Frustração por dia', peak: (n) => `dia mais frustrante: ${n}`, dayTip: (d, s, v) => `${dayText(d)}: frustração ${s} em ${plural(v, 'visita', 'visitas')}`, vsPrevDay: (x) => `${x} contra o dia anterior`,
   whatToSee: 'O que merece atenção', insightsHint: 'Do mais grave para o menos. Cada item leva aonde dá para ver mais.', nothing: 'Nada fora do normal neste período.',
   sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' },
   verdict: { bad: (n) => `${n} ${n === 1 ? 'coisa precisa' : 'coisas precisam'} de você`, warn: (n) => `${n} ${n === 1 ? 'ponto' : 'pontos'} de atenção, nada grave`,
@@ -663,7 +690,7 @@ const L = PT ? {
   prev: 'Anterior', next: 'Próxima', range: (a, b, n) => `${a}–${b} de ${n}`, record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'em todas as telas',
   bands: { ok: 'baixa (até 19)', warn: 'moderada (20–49)', bad: 'alta (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
   heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, mais frustração naquele dia. Clique na tela para ver os detalhes.',
-  heatTip: (r, d, x) => x ? `${r} · ${d}: frustração ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Frustração do dia',
+  heatTip: (r, d, x) => x ? `${r} · ${dayText(d)}: frustração ${x.score} em ${plural(x.visits, 'visita', 'visitas')}` : `${r} · ${dayText(d)}: sem visitas`, heatScale: 'Frustração do dia',
   forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
     form_detour: (i) => `Em <b>${i.route}</b>, ${Math.round(i.share * 100)}% de quem começa algo sai para <b>${i.via}</b> e volta para concluir: dá para trazer para cá o que as pessoas vão buscar lá (buscar ou preencher aqui mesmo).`,
@@ -692,7 +719,7 @@ const L = PT ? {
   names: { rage: 'Rage click', dead: 'Clique sem resposta', js_error: 'Erro na tela', http_5xx: 'Erro do servidor', http_4xx: 'Pedido recusado', abandon: 'Formulário abandonado', bounce: 'Voltou na hora', slow: 'Resposta lenta' },
   noProjects: 'Nenhum projeto configurado. Veja TERMOMETRO_PROJECTS no README.', noVisits: 'Nenhuma visita neste período.', failed: 'Não consegui ler os dados: ',
   overall: 'Frustração geral', visits: 'Visitas', worst: 'Tela mais frustrante', calm: 'baixa', attention: 'moderada', much: 'alta',
-  sessionsCol: 'Sessões', sessions: (n) => `${n} ${n === 1 ? 'sessão' : 'sessões'}`, visitsN: (n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`, scoreIn: (s, v) => `frustração ${s} em ${v}`,
+  sessionsCol: 'Sessões', sessions: (n) => plural(n, 'sessão', 'sessões'), visitsN: (n) => plural(n, 'visita', 'visitas'), scoreIn: (s, v) => `frustração ${s} em ${v}`,
   screensByFrustration: 'Telas, da mais frustrante para a menos', openRow: 'Clique numa tela para ver onde irrita e o que falhou.',
   screen: 'Tela', score: 'Frustração', signals: 'Sinais', none: 'nenhum sinal', where: 'Onde irrita', whatFailed: 'O que falhou', after: 'depois de clicar em',
   noDetail: 'Os sinais desta tela não têm elemento nem falha (voltas, abandonos).', byVersion: 'Por versão', versionHint: 'Um deploy que aumenta a frustração piorou a experiência.',
@@ -739,14 +766,18 @@ const L = PT ? {
   failureTab: {
     list: 'Failures, the ones hitting the most sessions first', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
     none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
-    occurrences: (f) => `${f.n}× in ${f.sessions} ${f.sessions === 1 ? 'session' : 'sessions'} · ${f.users} ${f.users === 1 ? 'user' : 'users'} · ${f.accounts} ${f.accounts === 1 ? 'account' : 'accounts'}`,
+    occurrences: (f) => `${num(f.n)}× in ${plural(f.sessions, 'session', 'sessions')} · ${plural(f.users, 'user', 'users')} · ${plural(f.accounts, 'account', 'accounts')}`,
     where: 'Screens', versions: 'Versions', agents: 'Browsers', devices: 'Kind of screen', afterClicking: 'Right after clicking',
     stack: 'Where in the code', noStack: 'No stack: network failures and slowness have none, and neither do errors from older collectors.',
     trails: 'Steps up to the failure', trailsHint: (b, a) => `The latest sessions where it happened: up to ${b} steps before and ${a} after.`,
-    fullSession: 'Whole session', copyIssue: 'Copy for an issue', close: 'Close', unknown: 'unknown',
+    fullSession: 'Whole session', copyIssue: 'Copy as a request', close: 'Close', unknown: 'unknown', back: 'Back to failures', copyLink: 'Copy link',
     devicesNames: { phone: 'phone', tablet: 'tablet', desktop: 'desktop' }, session: 'Session', truncated: 'Showing only the first 500 steps.',
-    step: { page: (s) => `Opened ${s.route}`, click: (s) => `Clicked ${s.target}`, rage: (s) => `Rage click on ${s.target}`, dead: (s) => `Dead click on ${s.target}`,
-      action: (s) => `Saved ${s.detail}${s.clicks ? ` (${s.clicks} clicks)` : ''}`, abandon: (s) => `Abandoned ${s.target}`, bounce: () => 'Went right back' },
+    step: { page: (s) => `Opened ${s.route}`, click: (s) => `Clicked ${s.target}`, rage: (s) => `Rage click on ${s.target}${L.rageWhy[s.detail] ? ` (${L.rageWhy[s.detail]})` : ''}`, dead: (s) => `Dead click on ${s.target}`,
+      action: (s) => `Saved ${s.detail}${s.clicks ? ` (${plural(s.clicks, 'click', 'clicks')})` : ''}`, abandon: (s) => `Abandoned the form ${s.target}`, bounce: () => 'Went right back',
+      retry: (s) => `Tried again: clicked ${s.target} once more`, near_miss: (s) => `Nearly hit ${s.target}`, typed: (s) => `Typed in ${s.target}`,
+      enter: (s) => `Pressed Enter in ${s.target}`, away: (s) => `Left the browser${s.duration_ms ? ` for ${offset(s.duration_ms).slice(1)}` : ''} and came back`, track: (s) => `App event: ${s.detail}`,
+      inventory: () => 'The screen finished loading', js_error: (s) => `Screen error: ${s.detail}`, http_5xx: (s) => `Server error: ${s.detail}`, http_4xx: (s) => `Request refused: ${s.detail}`,
+      slow: (s) => `Slow response${s.duration_ms ? ` (${offset(s.duration_ms).slice(1)})` : ''}: ${s.detail}` },
     issue: { occurrences: 'Occurrences', period: (d) => `in the last ${d} days`, first: 'Since', last: 'Last seen', steps: 'Steps up to the failure', link: 'On Termometro' },
   },
   journey: {
@@ -754,12 +785,12 @@ const L = PT ? {
     item: 'Button or action', uses: 'Uses', clicksTo: 'Clicks to get there', screensTo: 'Screens on the way', far: 'far', noneFar: 'Nothing used a lot and far away in this period.', allReach: (n) => `Every button and action (top ${Math.min(n, 50)})`, element: 'button', action: 'action',
     pairs: 'Go together', pairsHint: 'Actions that tend to come one right after the other. When the second almost always follows, with a long way between them, bring them closer or make them one step.',
     pair: (p) => `After <code>${p.a}</code>, <b>${Math.round(p.share * 100)}%</b> of the time comes <code>${p.b}</code>`,
-    pairMeta: (p) => `${p.n} times · ${p.clicks} clicks and ${p.screens} ${p.screens === 1 ? 'screen' : 'screens'} between them (median)`, linked: 'together', noPairs: 'No sequence of actions repeats enough in this period.',
+    pairMeta: (p) => `${plural(p.n, 'time', 'times')} · ${plural(p.clicks, 'click', 'clicks')} and ${plural(p.screens, 'screen', 'screens')} between them (median)`, linked: 'together', noPairs: 'No sequence of actions repeats enough in this period.',
     flow: 'Where they come from and go to', flowHint: 'Pick a screen. Click an origin or a destination to follow the path.', from: 'Come from', to: 'Go to', exit: 'left the app', start: 'started here',
     timeOn: (s) => `typical time on screen: ${s} s`,
     funnel: 'Funnel', funnelHint: 'Build a sequence of steps and see how many sessions reach each one, in that order (other things in between are fine).',
     addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
-    reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
+    reached: (n, pct) => `${plural(n, 'session', 'sessions')} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
   },
   tabs: { overview: 'Overview', product: 'Product', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', map: 'Map', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
   nav: { label: 'Dashboard sections', groups: { summary: 'Summary', problems: 'Problems', usage: 'Usage', people: 'People', config: 'Settings' } },
@@ -768,7 +799,7 @@ const L = PT ? {
   prod: { areas: 'Product areas', areasHint: 'Screens grouped by area. Click an area to see its screens.', area: 'Area', screens: 'Screens', share: 'of the visits',
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
     seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
-    nScreens: (n) => `${n} ${n === 1 ? 'screen' : 'screens'}`, since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
+    nScreens: (n) => plural(n, 'screen', 'screens'), since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
   cat: { title: 'Frustration by kind', hint: 'What is weighing: each kind is a part of the frustration. Effort stays apart.', all: 'All kinds',
     names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
@@ -827,11 +858,13 @@ const L = PT ? {
     kinds: { screen: 'Screen', control: 'Button', action: 'Action', track: 'App event' }, pick: 'pick…', trackPh: 'name given to termometro.track()', add: 'Add',
     save: 'Save feature', cancel: 'Cancel', needs: 'Give it a name and add at least one part.', duplicate: 'There is already a feature with this name.', usesByDay: 'Uses per day', byAccount: 'By account',
     byAccountHint: 'The feature\'s uses in each account, now against the period before.', back: 'All features', before: (b) => `before: ${b}`, failures: 'Failures', score: 'Frustration',
-    dayTip: (d, n) => `${d}: ${n} uses` },
+    dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'use', 'uses')}` },
   acc: { title: 'Engagement by account', hint: (d) => `People and sessions a day (average of the ${d} days with data) and the use of the watched features, now against the period before. Who dropped comes first.`,
+    trendCol: 'Trend', trend: { down: 'Dropped', flat: 'Steady', up: 'Rose' }, onlyDown: (n) => `Only who dropped (${n})`, noneDown: 'No account dropped in this period.',
+    copySummary: 'Copy summary', fromZero: 'new', fellFeatures: 'Watched features that dropped', period: (d) => `last ${d} days against the ${d} before`,
     noCompare: 'No previous period with data to compare with yet.', account: 'Account', usersDay: 'People/day', sessionsDay: 'Sessions/day', people: 'People in the period', fell: 'dropped',
     none: 'No account with an id in this period.', noFeatures: 'Watch features on the Features tab to see their use per account.', pulse: 'People per day',
-    open: 'Click an account to see its pulse; the whole dashboard then shows only it.', back: 'All accounts', dayTip: (d, n) => `${d}: ${n} people`, featureUses: 'Use of the features' },
+    open: 'Click an account to see its pulse; the whole dashboard then shows only it.', back: 'All accounts', dayTip: (d, n) => `${dayText(d)}: ${plural(n, 'person', 'people')}`, featureUses: 'Use of the features' },
   dict: { title: 'Dictionary', hint: 'The name people use for each screen, control, action and account. Empty uses the name the app shows. An account\'s name stays on this server.',
     filter: 'Filter by name or key…', screens: 'Screens', controls: 'Buttons and elements', actions: 'Actions (writes)', accounts: 'Accounts',
     key: 'Technical key', auto: 'Name in the app', name: 'Name', used: 'Use', users: 'Users', placeholder: 'give it a name…', accountPlaceholder: 'e.g. Acme Health contract',
@@ -839,7 +872,7 @@ const L = PT ? {
   search: 'Search screen, button, error, action, user…', noResults: 'Nothing by that name in this period.',
   kinds: { screen: 'Screens', element: 'Elements', failure: 'Failures', action: 'Actions', user: 'Users', account: 'Accounts' },
   vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
-  scoreByDay: 'Frustration per day', peak: (n) => `most frustrating day: ${n}`, dayTip: (d, s, v) => `${d}: frustration ${s} over ${v} visits`,
+  scoreByDay: 'Frustration per day', peak: (n) => `most frustrating day: ${n}`, dayTip: (d, s, v) => `${dayText(d)}: frustration ${s} over ${plural(v, 'visit', 'visits')}`, vsPrevDay: (x) => `${x} against the day before`,
   whatToSee: 'What deserves a look', insightsHint: 'Most serious first. Each item leads where you can see more.', nothing: 'Nothing out of the ordinary in this period.',
   sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' },
   verdict: { bad: (n) => `${n} ${n === 1 ? 'thing needs' : 'things need'} you`, warn: (n) => `${n} ${n === 1 ? 'point' : 'points'} of attention, nothing serious`,
@@ -850,7 +883,7 @@ const L = PT ? {
   prev: 'Previous', next: 'Next', range: (a, b, n) => `${a}–${b} of ${n}`, record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'on every screen',
   bands: { ok: 'low (up to 19)', warn: 'medium (20–49)', bad: 'high (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
   heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the more frustration that day. Click a screen for the details.',
-  heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Frustration of the day',
+  heatTip: (r, d, x) => x ? `${r} · ${dayText(d)}: frustration ${x.score} over ${plural(x.visits, 'visit', 'visits')}` : `${r} · ${dayText(d)}: no visits`, heatScale: 'Frustration of the day',
   forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
     form_detour: (i) => `On <b>${i.route}</b>, ${Math.round(i.share * 100)}% of those who start something leave for <b>${i.via}</b> and come back to finish: what they fetch there could be brought here (look it up or fill it in right here).`,
@@ -879,7 +912,7 @@ const L = PT ? {
   names: { rage: 'Rage click', dead: 'Dead click', js_error: 'Screen error', http_5xx: 'Server error', http_4xx: 'Request refused', abandon: 'Abandoned form', bounce: 'Quick back', slow: 'Slow response' },
   noProjects: 'No project configured. See TERMOMETRO_PROJECTS in the README.', noVisits: 'No visits in this period.', failed: 'Could not read the data: ',
   overall: 'Overall frustration', visits: 'Visits', worst: 'Most frustrating screen', calm: 'low', attention: 'medium', much: 'high',
-  sessionsCol: 'Sessions', sessions: (n) => `${n} ${n === 1 ? 'session' : 'sessions'}`, visitsN: (n) => `${n} ${n === 1 ? 'visit' : 'visits'}`, scoreIn: (s, v) => `frustration ${s} over ${v}`,
+  sessionsCol: 'Sessions', sessions: (n) => plural(n, 'session', 'sessions'), visitsN: (n) => plural(n, 'visit', 'visits'), scoreIn: (s, v) => `frustration ${s} over ${v}`,
   screensByFrustration: 'Screens, most frustrating first', openRow: 'Click a screen to see where it irritates and what failed.',
   screen: 'Screen', score: 'Frustration', signals: 'Signals', none: 'no signals', where: 'Where it irritates', whatFailed: 'What failed', after: 'after clicking',
   noDetail: 'This screen\'s signals have no element or failure (bounces, abandoned forms).', byVersion: 'By version', versionHint: 'A deploy that raises frustration made things worse.',
@@ -967,7 +1000,7 @@ const techOf = (i) => [...new Set([i.route, i.via, i.target, i.next_target, i.ac
   .map((x) => `<code>${esc(x)}</code>`).join(' · ')
 const signals = (s) => {
   const items = Object.entries(s).sort((a, b) => b[1] - a[1])
-  return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
+  return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${num(n)}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
 const state = { me: null, tab: 'overview', user: '', all: '', cat: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
@@ -1355,17 +1388,38 @@ const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['versi
 const groupOf = (kind) => Object.keys(GROUPS).find((g) => GROUPS[g].includes(kind)) ?? 'ideas'
 const num = (n) => Number(n).toLocaleString(PT ? 'pt-BR' : 'en')
 
-// A 2px line of the values, oldest to newest, with a dot on the latest. Its tooltip names the range.
-function spark(values, tip, w = 120, h = 28) {
+// Counts said the way people read them: thousands separated, the noun agreeing ("1 sessão", "1.234 sessões").
+const plural = (n, one, many) => `${num(n)} ${Math.abs(n) === 1 ? one : many}`
+// A day (YYYY-MM-DD, a UTC day as SQLite counts them) as people write it: 05/11, or 11/05 in English.
+const dayText = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T12:00:00Z').toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }) : d)
+// Day labels under columns, thinned to fit: every day, every 2 or every week (the latest day always labelled);
+// "w" marks the ones shown on a wide screen, "m" the ones shown on a phone.
+const every = (n, fit) => [1, 2, 7, 14, 28].find((k) => Math.ceil(n / k) <= fit) ?? 28
+const dayAxis = (days, cls = '') => { const n = days.length, w = every(n, 16), m = every(n, 6)
+  return `<div class="xl ${cls}" aria-hidden="true">${days.map((d, i) => `<span class="${(n - 1 - i) % w ? '' : 'w'} ${(n - 1 - i) % m ? '' : 'm'}">${esc(dayText(d))}</span>`).join('')}</div>` }
+// Frustration now against before, in points: going up is worse (▲ +42), down is better (▼ −12); the number before in the tooltip.
+const scoreDelta = (now, before) => before === null || before === undefined ? '' : now === before ? `<span class="delta meta" title="${esc(FT().before(before))}">=</span>`
+  : `<span class="delta ${now > before ? 'bad' : 'ok'}" title="${esc(FT().before(before))}">${now > before ? '▲ +' : '▼ −'}${Math.abs(now - before)}</span>`
+// A count now against before, in %: neither good nor bad by itself (visits), so no colour; the number before in the tooltip.
+const countDelta = (now, before) => { if (before === null || before === undefined || !before) return ''
+  const pct = Math.round((now - before) / before * 100)
+  return `<span class="delta meta" title="${esc(FT().before(num(before)))}">${pct ? `${pct > 0 ? '▲ +' : '▼ −'}${Math.abs(pct)}%` : '='}</span>` }
+
+// A 2px line of the values, oldest to newest, with a dot on the latest. Each point has a hover target as wide as its
+// slot, its value (and its day, when given) in the tooltip; the whole names the range.
+function spark(values, tip, w = 120, h = 28, days) {
   if (values.length < 2) return ''
   const top = Math.max(...values), low = Math.min(...values), span = top - low || 1
   const xy = values.map((v, i) => [i / (values.length - 1) * (w - 8) + 4, h - 4 - (v - low) / span * (h - 8)])
   const [lx, ly] = xy[xy.length - 1]
+  const slot = (w - 8) / (values.length - 1), name = tip.split(':')[0]
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">
-    <polyline points="${xy.map((p) => p.join(',')).join(' ')}"/><circle cx="${lx}" cy="${ly}" r="4"/></svg>`
+    <polyline points="${xy.map((p) => p.join(',')).join(' ')}"/><circle cx="${lx}" cy="${ly}" r="4"/>
+    ${xy.map(([x, y], i) => `<g class="pt" data-tip="${esc(`${days?.[i] ? dayText(days[i]) : name}: ${num(values[i])}`)}"><rect x="${Math.max(0, x - slot / 2)}" y="0" width="${slot}" height="${h}"/><circle cx="${x}" cy="${y}" r="3"/></g>`).join('')}</svg>`
 }
 
-// Score per day: one column per day in its band's colour, the 20 and 50 lines, and a mark where each version began.
+// Score per day: one column per day in its band's colour, the 20 and 50 lines named after the band they open, a mark
+// where each version began, the days under the columns; the tooltip says the day, its score and the change from the day before.
 function scoreChart(o) {
   const days = o.daily, n = days.length
   if (n < 2) return ''
@@ -1374,15 +1428,17 @@ function scoreChart(o) {
   const at = Object.fromEntries(days.map((d, i) => [d.day, i]))
   const marks = o.deploys.filter((d) => d.day in at && at[d.day] > 0)
   const col = 100 / n
+  const vsPrev = (i) => { if (!i) return ''; const x = days[i].score - days[i - 1].score
+    return ' · ' + L.vsPrevDay(x > 0 ? `▲ +${x}` : x < 0 ? `▼ −${-x}` : '=') }
   return `<section class="card"><div class="head"><div><div class="label">${L.scoreByDay}${help('scoreByDay')}</div>
-      <div class="meta">${esc(days[0].day)} → ${esc(days[n - 1].day)} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>
+      <div class="meta">${esc(dayText(days[0].day))} → ${esc(dayText(days[n - 1].day))} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>
       <div class="legend">${['ok', 'warn', 'bad'].map((b) => `<span><i class="sw ${b}"></i>${L.bands[b]}</span>`).join('')}</div></div>
     <div class="chart">
-      ${[20, 50].filter((v) => v < top).map((v) => `<div class="rule" style="top:${y(v)}%"><span>${v}</span></div>`).join('')}
+      ${[[20, L.attention], [50, L.much]].filter(([v]) => v < top).map(([v, name]) => `<div class="rule" style="top:${y(v)}%"><span>${v}</span><em>${name}</em></div>`).join('')}
       ${marks.map((d) => `<div class="deploy" style="left:${at[d.day] * col}%" data-tip="${esc(L.deployTip(d.version, when(d.at)))}"><span>${esc(d.version)}</span></div>`).join('')}
-      <div class="cols">${days.map((d) => `<div class="c" tabindex="0" data-tip="${esc(L.dayTip(d.day, d.score, d.visits))}">
+      <div class="cols">${days.map((d, i) => `<div class="c" tabindex="0" data-tip="${esc(L.dayTip(d.day, d.score, d.visits) + vsPrev(i))}">
         <i class="${band(d.score)}" style="height:${Math.max(1.5, d.score / top * 100)}%"></i></div>`).join('')}</div>
-    </div></section>`
+    </div>${dayAxis(days.map((d) => d.day))}</section>`
 }
 
 // Screens by day: the darker the cell, the worse that day's score (one hue, the scale below says how much).
@@ -1399,6 +1455,7 @@ function heatMap(o) {
       ${o.screens.map((r) => `<a class="hl" ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(screenText(r.route) || r.route)}</a>
         <div class="cells">${days.map((d) => { const x = r.days[d]; const k = x ? HEAT.find(([v]) => x.score >= v)[1] : 0
           return `<i class="h${k}${at.has(d) && d !== first ? ' dep' : ''}" tabindex="0" data-tip="${esc(L.heatTip(screenText(r.route) || r.route, d, x))}"></i>` }).join('')}</div>`).join('')}
+      <div></div>${dayAxis(days, 'hx')}
     </div></section>`
 }
 
@@ -1584,17 +1641,19 @@ async function frustration() {
   const routes = cat ? [...r.routes].sort((a, b) => (b.categories?.[cat] ?? 0) - (a.categories?.[cat] ?? 0)) : r.routes
   const worst = routes.find((x) => x.visits)
   const detail = (x) => {
-    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${a.n}×${reasonsText(a.reasons) ? `<div class="why">${C().why}: ${esc(reasonsText(a.reasons, 3))}</div>` : ''}</li>`).join('')}</ul>` : ''
-    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
+    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${num(a.n)}×${reasonsText(a.reasons) ? `<div class="why">${C().why}: ${esc(reasonsText(a.reasons, 3))}</div>` : ''}</li>`).join('')}</ul>` : ''
+    const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${num(f.n)}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
       <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`
   }
+  // Against the same length of time just before (the server leaves it out when that period has too little data).
+  const b = r.before, vs = b ? r.days === 1 ? L.vsDay : L.vsBefore(r.days) : L.noCompare
   return `
     <section class="numbers">
-      <div class="card"><div class="label">${L.overall}</div><div class="big ${band(o.score)}">${o.score}</div><span class="pill ${band(o.score)}">${say(o.score)}</span></div>
-      <div class="card"><div class="label">${L.visits}</div><div class="big">${o.visits}</div><div class="meta">${L.sessions(o.sessions)}</div></div>
+      <div class="card"><div class="label">${L.overall}</div><div class="big ${band(o.score)}">${o.score} ${b ? scoreDelta(o.score, b.score) : ''}</div><span class="pill ${band(o.score)}">${say(o.score)}</span> <span class="meta">${vs}</span></div>
+      <div class="card"><div class="label">${L.visits}</div><div class="big">${num(o.visits)} ${b ? countDelta(o.visits, b.visits) : ''}</div><div class="meta">${L.sessions(o.sessions)}</div></div>
       <div class="card"><div class="label">${L.worst}</div><div class="route" style="margin-top:8px">${worst ? scr(worst.key) : '—'}</div>
-        <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}</div></div>
+        <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}${worst?.before ? ' ' + scoreDelta(worst.score, worst.before.score) : ''}</div></div>
     </section>
     <section class="card">
       <div class="label">${L.screensByFrustration}${help('screensByFrustration')}</div><div class="meta">${L.openRow}${cat ? ' · ' + C().by(C().names[cat]) : ''}</div>
@@ -1603,14 +1662,15 @@ async function frustration() {
       ${table(`<th>${L.screen}</th><th class="n">${cat ? esc(C().names[cat]) : L.score}</th><th class="n">${L.visits}</th><th class="n">${C().effortCol}</th><th>${L.signals}</th>`, routes.map((x, i) => `
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${scr(x.key)}</div></td>
-          <td class="n">${cat ? `<b>${x.categories?.[cat] ?? 0}</b><div class="meta">${L.score} ${x.score}</div>` : scoreHtml(x.score)}${kindBar(x.categories, x.score)}</td>
-          <td class="n">${x.visits}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${x.effort.here_median !== null && x.effort.here_median !== undefined ? esc(C().effortSplit(x.effort.path_median, x.effort.here_median)) : PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
+          <td class="n">${cat ? `<b>${x.categories?.[cat] ?? 0}</b>${x.before ? scoreDelta(x.categories?.[cat] ?? 0, x.before.categories?.[cat] ?? 0) : ''}<div class="meta">${L.score} ${x.score}</div>`
+            : scoreHtml(x.score) + (x.before ? scoreDelta(x.score, x.before.score) : '')}${kindBar(x.categories, x.score)}</td>
+          <td class="n">${num(x.visits)}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${x.effort.here_median !== null && x.effort.here_median !== undefined ? esc(C().effortSplit(x.effort.path_median, x.effort.here_median)) : PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
         <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="5">${detail(x)}</td></tr>`).join(''))}
       ${kindLegend()}
     </section>
     ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}${help('byVersion')}</div><div class="meta">${L.versionHint}</div>
       ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
-        <td class="n">${scoreHtml(v.score)}</td><td class="n">${v.visits}</td><td>${signals(v.signals)}</td></tr>`).join(''))}</section>` : ''}
+        <td class="n">${scoreHtml(v.score)}</td><td class="n">${num(v.visits)}</td><td>${signals(v.signals)}</td></tr>`).join(''))}</section>` : ''}
     <details class="card"><summary>${L.how}</summary>
       <p>${L.howText(Object.entries(r.weights).map(([k, w]) => `${esc(L.names[k] ?? k)} ${w}`).join(', '), r.factor)}</p>
       <p class="meta">${L.privacy}</p></details>`
@@ -1626,8 +1686,15 @@ const offset = (ms) => {
 }
 const stepText = (s) => (F().step[s.type] ?? ((x) => `${L.names[x.type] ?? x.type}: ${x.detail}`))(s)
 const isFailure = (s) => ['js_error', 'http_5xx', 'http_4xx', 'slow'].includes(s.type)
-const stepHtml = (s, zero, here) => `<li class="${here ? 'here' : isFailure(s) || s.type === 'rage' || s.type === 'dead' ? 'sig' : ''}">
-  <span class="t">${offset(s.at - zero)}</span><span>${esc(stepText(namedStep(s)))} <code class="tech">${esc([s.type === 'page' ? '' : s.route, s.target].filter(Boolean).join(' · ') || s.route)}</code></span></li>`
+// The time since the step before ("+12 s"); nothing when it was the same moment.
+const gap = (ms) => (Math.round(ms / 1000) > 0 ? offset(ms) : '')
+const stepHtml = (s, t, here) => `<li class="${here ? 'here' : isFailure(s) || s.type === 'rage' || s.type === 'dead' ? 'sig' : ''}">
+  <span class="t">${t}</span><span>${esc(stepText(namedStep(s)))} <code class="tech">${esc([s.type === 'page' ? '' : s.route, s.target].filter(Boolean).join(' · ') || s.route)}</code></span></li>`
+const stepsHtml = (list, isHere) => list.map((s, i) => stepHtml(s, i ? gap(s.at - list[i - 1].at) : '', isHere(s))).join('')
+// Who was in a session, leaving out what is not known: "Hugo Sá u27", the id muted beside the name.
+const whoHtml = (t) => [t.version && esc(t.version), t.agent && esc(t.agent), t.device && esc(F().devicesNames[t.device] ?? t.device),
+  t.user && (personName(t.user) ? `${esc(personName(t.user))} <code class="idm" title="${esc(t.user)}">${esc(short(t.user))}</code>` : `${L.user} <code title="${esc(t.user)}">${esc(short(t.user))}</code>`),
+  t.role && esc(t.role)].filter(Boolean)
 // A step told with names: "Opened Users", "Clicked Users › New user", "Saved Save".
 function namedStep(s) {
   const page = screenText(s.route) || s.route
@@ -1635,7 +1702,7 @@ function namedStep(s) {
     detail: s.type === 'action' && actionText(s.detail) ? `${actionText(s.detail)} (${s.detail})` : s.detail }
 }
 const counts = (title, list, name = (k) => k) => `<div><div class="label">${title}</div>${list.length
-  ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${x.n}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
+  ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 const sameStep = (a, b) => a.at === b.at && a.type === b.type && a.detail === b.detail
 
 function issueMarkdown(d) {
@@ -1649,8 +1716,10 @@ function issueMarkdown(d) {
   if (d.after_clicking.length) lines.push(`- ${F().afterClicking}: ${list(d.after_clicking)}`)
   if (d.stacks.length) lines.push('', `### ${F().stack}`, '```', d.stacks[0].key, '```')
   if (t) {
-    lines.push('', `### ${I.steps} (${t.agent || F().unknown}, ${F().devicesNames[t.device] ?? t.device}, ${t.version})`)
-    ;[...t.before, t.failure].forEach((s, i, all) => lines.push(`${i + 1}. ${i === all.length - 1 ? '**' : ''}${stepText(s)}${s.type !== 'page' ? ` — ${s.route}` : ''}${i === all.length - 1 ? '**' : ''} (${offset(s.at - t.at)})`))
+    const ctx = [t.agent, t.device && (F().devicesNames[t.device] ?? t.device), t.version].filter(Boolean).join(', ')
+    lines.push('', `### ${I.steps}${ctx ? ` (${ctx})` : ''}`)
+    ;[...t.before, t.failure].forEach((s, i, all) => { const g = i ? gap(s.at - all[i - 1].at) : ''
+      lines.push(`${i + 1}. ${i === all.length - 1 ? '**' : ''}${stepText(namedStep(s))}${s.type !== 'page' ? ` — ${s.route}` : ''}${i === all.length - 1 ? '**' : ''}${g ? ` (${g})` : ''}`) })
   }
   lines.push('', `${I.link}: ${location.href}`)
   return lines.join('\n')
@@ -1660,21 +1729,31 @@ async function failures() {
   const { failures: list } = await read('/api/failures')
   if (!list.length) return empty(F().none)
   const d = state.signal ? await read('/api/failure', { signal: state.signal, detail: state.detail }) : null
-  const isSel = (f) => f.type === state.signal && f.detail === state.detail
+  // Back from a failure: the one just seen stays marked, and the list comes back where it was on the screen.
+  const back = !state.signal && state.failBack
+  const isSel = (f) => back ? f.type === back.signal && f.detail === back.detail : f.type === state.signal && f.detail === state.detail
+  if (back) requestAnimationFrame(() => {
+    const row = [...document.querySelectorAll('#content tr.row[data-signal]')].find((r) => r.dataset.signal === back.signal && r.dataset.detail === back.detail)
+    if (row) scrollBy(0, row.getBoundingClientRect().top - back.top)
+    state.failBack = null
+  })
+  if (d?.n) watchHeader()
+  const link = location.origin + location.pathname + hashFor('failures', { signal: state.signal, detail: state.detail })
   const detail = d?.n ? `<section class="card failure">
+      <div class="fbar"><button class="small" data-fail-back>← ${F().back}</button>
+        <span class="fbar-title" title="${esc(d.detail)}">${esc(L.names[d.type] ?? d.type)}: ${esc(d.detail)}</span>
+        <span class="fbar-act"><button class="small" data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><button class="small" data-copy="${esc(link)}">${F().copyLink}</button></span></div>
       <div class="head"><div style="min-width:0;flex:1"><div class="label">${esc(L.names[d.type] ?? d.type)} ${d.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div>
         <div class="title"><code>${esc(d.detail)}</code></div>
-        <div class="meta">${esc(F().occurrences(d))} · ${F().since} ${esc(d.first_version)} (${when(d.first_at)}) · ${F().last} ${ago(d.last_at)}</div></div>
-        <div class="field"><button data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)" ${linkAttrs({ tab: 'failures', params: {} })}>${F().close}</a></div></div>
+        <div class="meta">${esc(F().occurrences(d))} · ${F().since} ${esc(d.first_version)} (${when(d.first_at)}) · ${F().last} ${ago(d.last_at)}</div></div></div>
       <div class="facts">${counts(F().where, d.routes, (k) => screenText(k) || k)}${counts(F().versions, d.versions)}${counts(F().agents, d.agents)}
         ${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking, (k) => controlLabel(d.routes[0]?.key, k) || k) : ''}</div>
       <div class="label" style="margin-top:16px">${F().stack}</div>
-      ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${x.n}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
+      ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${num(x.n)}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
       <div class="label" style="margin-top:16px">${F().trails}</div><div class="meta">${F().trailsHint(15, 3)}</div>
       <div class="trails">${d.trails.map((t, i) => `<details class="trail" data-trail="${esc(t.session)}" data-zero="${t.at}" ${i ? '' : 'open'}>
-        <summary class="meta"><b>${F().session} ${esc(short(t.session))}</b> · ${when(t.at)} · ${esc(t.version)} · ${esc(t.agent || F().unknown)} · ${esc(F().devicesNames[t.device] ?? t.device ?? '')}
-          ${t.user ? ` · ${personName(t.user) ? esc(personName(t.user)) + ' ' : L.user + ' '}<code>${esc(short(t.user))}</code>` : ''}${t.role ? ` · ${esc(t.role)}` : ''}</summary>
-        <ol class="steps">${t.before.map((s) => stepHtml(s, t.at)).join('')}${stepHtml(t.failure, t.at, true)}${t.after.map((s) => stepHtml(s, t.at)).join('')}</ol>
+        <summary class="meta">${[`<b>${F().session} ${esc(short(t.session))}</b>`, when(t.at), ...whoHtml(t)].join(' · ')}</summary>
+        <ol class="steps">${stepsHtml([...t.before, t.failure, ...t.after], (s) => s === t.failure)}</ol>
         <button class="small" data-session="${esc(t.session)}">${F().fullSession}</button></details>`).join('')}</div>
     </section>` : ''
   return `${detail}<section class="card"><div class="label">${F().list}${help('failures')}</div><div class="meta">${F().hint}</div>
@@ -1682,7 +1761,7 @@ async function failures() {
       list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
         <td><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
           <div class="meta">${esc(screenText(f.route) || f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
-        <td class="n">${f.sessions}</td><td class="n">${f.users}</td><td class="n">${f.n}</td>
+        <td class="n">${num(f.sessions)}</td><td class="n">${num(f.users)}</td><td class="n">${num(f.n)}</td>
         <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td></tr>`).join(''))}</section>`
 }
 
@@ -1749,10 +1828,24 @@ function addCsvButtons() {
   })
 }
 
+// The page header is sticky and its height changes with the width: what sticks under it (a failure's bar) and
+// what scrolls into view stays clear of it.
+function watchHeader() {
+  const h = $('header'), set = () => document.documentElement.style.setProperty('--hh', h.offsetHeight + 'px')
+  if (!h || h.dataset.watched) return
+  h.dataset.watched = '1'
+  set(); new ResizeObserver(set).observe(h)
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest?.('[data-fail-back]')) return go('failures', {})
+  const row = e.target.closest?.('#content tr.row[data-signal]') // remember where the row was, to come back to it
+  if (row) state.failBack = { signal: row.dataset.signal, detail: row.dataset.detail, top: row.getBoundingClientRect().top }
+}, true)
+
 async function showSession(button) {
   const box = button.closest('.trail'), zero = Number(box.dataset.zero)
   const s = await read('/api/session', { session: button.dataset.session })
-  box.querySelector('.steps').innerHTML = s.steps.map((x) => stepHtml(x, zero, x.at === zero && isFailure(x))).join('')
+  box.querySelector('.steps').innerHTML = stepsHtml(s.steps, (x) => x.at === zero && isFailure(x))
   button.replaceWith(Object.assign(document.createElement('div'), { className: 'meta', textContent: s.truncated ? F().truncated : '' }))
 }
 
@@ -1788,7 +1881,7 @@ async function journeys() {
     </section>`
   const reachTable = (rows) => table(`<th>${J().item}</th><th>${L.screen}</th><th class="n">${J().uses}</th><th class="n">${L.users}</th><th class="n">${J().clicksTo}</th><th class="n">${J().screensTo}</th>`,
         rows.map((r) => `<tr><td><span class="meta">${J()[r.kind]}</span> ${r.far ? `<span class="pill idea">${J().far}</span>` : ''}<br>${r.kind === 'action' ? act(r.key) : ctl(r.route, r.key)}</td>
-          <td>${scr(r.route)}</td><td class="n">${r.uses}</td><td class="n">${r.users}</td>
+          <td>${scr(r.route)}</td><td class="n">${num(r.uses)}</td><td class="n">${num(r.users)}</td>
           <td class="n"><b class="${r.clicks_median >= 5 ? 'warn' : ''}">${r.clicks_median}</b></td><td class="n"><b class="${r.screens_median >= 2 ? 'warn' : ''}">${r.screens_median}</b></td></tr>`).join(''))
   const P = L.pat, pc = (x) => `${Math.round(x * 100)}%`
   const patTable = (title, rows, head, row) => rows.length ? `<div class="psec"><div class="meta"><b>${title}</b></div>${table(head, rows.map(row).join(''))}</div>` : ''
@@ -1861,15 +1954,15 @@ async function usage() {
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
             <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--fill)"></i></div></td>
-            <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
+            <td class="n">${num(s.visits)}</td><td class="n">${num(s.clicks)}</td><td class="n">${num(s.users)}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
       </div>
       <div class="card">
         <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}${help('elements')}</div><div class="meta">${L.visitsN(d.visits)}</div></div>
           ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
         ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
           <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><span class="named">${named(controlLabel(d.route, e.target), e.target)}</span></td>
-            <td class="n">${e.clicks}</td><td class="n">${e.users}</td>
-            <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${e.rage + e.dead + e.errors}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
+            <td class="n">${num(e.clicks)}</td><td class="n">${num(e.users)}</td>
+            <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${num(e.rage + e.dead + e.errors)}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
           : `<p class="meta">${L.noClicks}</p>`}
       </div>
     </section>
@@ -1892,17 +1985,17 @@ async function openMap(route = '', mode = 'heat') {
 async function people() {
   const p = await read('/api/people')
   if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
-  const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${s.visits}</span>`).join('<br>')
+  const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${num(s.visits)}</span>`).join('<br>')
   const group = (title, hint, list, col, name = (k) => esc(k)) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
     ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
-      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${num(g.users)}</td><td class="n">${num(g.visits)}</td><td class="n">${num(g.clicks)}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
   return `
     <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account, (k) => esc(accountText(k)))}</section>
     <section class="card" data-scroll><div class="label">${L.byUser}${help('byUser')}</div><div class="meta">${L.userHint}</div>
       ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
         p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
           <td>${personName(u.key) ? `<span class="nm">${esc(personName(u.key))}</span>` : ''}<code class="${personName(u.key) ? 'tech' : ''}" title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(accountText(u.account))}</td>
-          <td class="n">${u.visits}</td><td class="n">${u.clicks}</td><td class="n">${scoreHtml(u.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
+          <td class="n">${num(u.visits)}</td><td class="n">${num(u.clicks)}</td><td class="n">${scoreHtml(u.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
 }
 
 // Actions --------------------------------------------------------------------------------------------------
@@ -1912,7 +2005,7 @@ async function actions() {
   const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
   return `<section class="card"><div class="label">${L.effort}${help('effort')}</div><div class="meta">${L.effortHint}</div>
     ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${PT ? 'Até a tela' : 'On the way'}</th><th class="n">${PT ? 'Na tela' : 'On the screen'}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
-      actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td>${act(a.action)}</td><td class="n">${a.times}</td><td class="n">${a.users}</td>
+      actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td>${act(a.action)}</td><td class="n">${num(a.times)}</td><td class="n">${num(a.users)}</td>
         <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td>
         <td class="n">${a.path_median ?? '—'}</td><td class="n">${a.here_median ?? '—'}</td><td class="n">${a.clicks_p90}</td>
         <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
@@ -1994,7 +2087,7 @@ async function product() {
         p.areas.map((a, i) => `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
           <td class="n">${num(a.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
           <td class="n">${Math.round(a.adoption * 100)}%<div class="bar"><i style="width:${a.adoption * 100}%;background:var(--fill)"></i></div></td>
-          <td class="n">${scoreHtml(a.score)}</td><td class="n">${num(a.failures)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`)}</td></tr>
+          <td class="n">${scoreHtml(a.score)}</td><td class="n">${num(a.failures)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`, 120, 28, a.daily.map((d) => d.day))}</td></tr>
           <tr class="detail" data-of="a${i}" hidden><td colspan="6"><ul class="counts">${a.screens.map((r) => `<li><a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })}>${esc(screenText(r.route) || r.route)}</a>
             <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>`).join(''))}
     </section>
@@ -2015,9 +2108,9 @@ const FT = () => L.feat, AC = () => L.acc
 function barsChart(title, days, value, tip) {
   if (days.length < 2) return ''
   const top = Math.max(1, ...days.map(value)) * 1.1
-  return `<section class="card"><div class="label">${title}</div><div class="meta">${esc(days[0].day)} → ${esc(days[days.length - 1].day)}</div>
+  return `<section class="card"><div class="label">${title}</div><div class="meta">${esc(dayText(days[0].day))} → ${esc(dayText(days[days.length - 1].day))}</div>
     <div class="chart small"><div class="cols">${days.map((d) => `<div class="c" tabindex="0" data-tip="${esc(tip(d))}">
-      <i class="acc" style="height:${Math.max(1.5, value(d) / top * 100)}%"></i></div>`).join('')}</div></div></section>`
+      <i class="acc" style="height:${Math.max(1.5, value(d) / top * 100)}%"></i></div>`).join('')}</div></div>${dayAxis(days.map((d) => d.day), 'sm')}</section>`
 }
 // Now against before, where down is the bad direction (engagement): ▼ red, ▲ green.
 const change = (now, before) => before === null || before === undefined ? '' : now === before ? '<span class="delta meta">=</span>'
@@ -2044,7 +2137,7 @@ async function features() {
   return head + `<div class="fgrid">${r.features.map((ft) => `<section class="card feature">
       <div class="head"><div class="fname">${esc(ft.name)}</div><span class="pill ${band(ft.score)}">${FT().score} ${ft.score}</span></div>
       <div class="row"><div><div class="big">${num(ft.uses)}</div><div class="meta">${FT().uses} ${change(ft.uses, ft.before)}</div></div>
-        ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`)}</div>
+        ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`, 120, 28, ft.daily.map((d) => d.day))}</div>
       <div class="adopt"><div class="meta">${FT().adoption} ${Math.round(ft.adoption * 100)}% · ${FT().adoptionHint(r.active_users)}</div>
         <div class="bar"><i style="width:${ft.adoption * 100}%;background:var(--fill)"></i></div></div>
       <div class="meta">${num(ft.users)} ${FT().people.toLowerCase()} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}</div>
@@ -2071,7 +2164,7 @@ async function featureDetail(ft, r) {
     <section class="card"><div class="label">${FT().byAccount}${help('byAccount')}</div><div class="meta">${FT().byAccountHint}</div>
       ${rows.length ? table(`<th>${AC().account}</th><th class="n">${FT().uses}</th><th class="n">${AC().usersDay}</th>`,
         rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0"><td>${esc(accountText(a.account))}${a.drops.some((d) => d.feature === ft.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td>
-          <td class="n">${num(a.f.now)}${change(a.f.now, a.f.before)}</td><td class="n">${num(a.now.users_day)}</td></tr>`).join('')) : `<p class="meta">${AC().none}</p>`}
+          <td class="n">${num(a.f.now)}${accDelta(a.f.now, a.f.before, a.f.move)}</td><td class="n">${num(a.now.users_day)}</td></tr>`).join('')) : `<p class="meta">${AC().none}</p>`}
     </section>`
 }
 
@@ -2098,6 +2191,8 @@ async function featureEditor() {
 }
 
 async function onFeatureClick(e) {
+  if (e.target.closest('[data-copy]')) return // copying a row's summary does not open the account
+  if (e.target.closest('[data-acc-down]')) { state.accDown = !state.accDown; return render() }
   const b = e.target.closest('[data-feat]')
   const row = e.target.closest('tr[data-account]')
   if (row) { $('#account').value = row.dataset.account; keep('account', row.dataset.account); return go('accounts', {}) }
@@ -2135,38 +2230,65 @@ async function onFeatureClick(e) {
   }
 }
 
+// An account's trend, as a chip that says it in words (the colour only repeats it).
+const TREND = { down: ['bad', '▼'], flat: ['flat', '='], up: ['ok', '▲'] }
+const trendChip = (t) => t ? `<span class="pill trend ${TREND[t][0]}">${TREND[t][1]} ${AC().trend[t]}</span>` : '<span class="meta">—</span>'
+// A number now against before, as a %: coloured only when it moved beyond chance (the server's move), the number before in the tooltip.
+const pctText = (now, before) => !before ? (now ? AC().fromZero : '=') : Math.round((now - before) / before * 100) || '='
+const accDelta = (now, before, mv) => { if (before === null || before === undefined) return ''
+  const p = pctText(now, before), cls = mv === 'down' ? 'bad' : mv === 'up' ? 'ok' : 'meta'
+  return `<span class="delta ${cls}" title="${esc(FT().before(num(before)))}">${typeof p === 'number' ? `${p > 0 ? '▲ +' : '▼ −'}${Math.abs(p)}%` : p === '=' ? '=' : '▲ ' + p}</span>` }
+// What customer success pastes in a ticket or a chat: who, the trend, the numbers before → now, the features that fell.
+function accountSummary(a, e) {
+  const line = (label, now, before) => `${label}: ${before === null || before === undefined ? num(now) : `${num(before)} → ${num(now)}`}${before ? (typeof pctText(now, before) === 'number' ? ` (${pctText(now, before) > 0 ? '+' : '−'}${Math.abs(pctText(now, before))}%)` : '') : ''}`
+  const fell = a.features.filter((x) => x.move === 'down').map((x) => `- ${(e.features.find((f) => f.id === x.id) ?? {}).name ?? x.id}: ${num(x.before)} → ${num(x.now)}`)
+  return [`${AC().account}: ${accountText(a.account)}`,
+    `${AC().trendCol}: ${a.trend ? AC().trend[a.trend] : '—'} (${a.before ? AC().period(e.days) : AC().noCompare})`,
+    line(AC().usersDay, a.now.users_day, a.before?.users_day), line(AC().sessionsDay, a.now.sessions_day, a.before?.sessions_day),
+    line(AC().people, a.now.users, a.before?.users),
+    ...(fell.length ? [`${AC().fellFeatures}:`, ...fell] : []),
+    `${L.demand.evidence}: ${location.origin + location.pathname + hashFor('accounts', { account: a.account })}`].join('\n')
+}
+
 async function accounts() {
   const e = await read('/api/engagement')
   const id = $('#account').value
   if (id) return accountDetail(e, id)
   if (!e.accounts.length) return empty(AC().none)
   const feats = e.features
+  const down = e.accounts.filter((a) => a.trend === 'down').length
+  const rows = state.accDown ? e.accounts.filter((a) => a.trend === 'down') : e.accounts
   return `<section class="card"><div class="label">${AC().title}${help('accounts')}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
     ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
-    ${table(`<th>${AC().account}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}`,
-      e.accounts.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
-        <td><span class="nm">${esc(accountText(a.account))}</span>${a.drops.length ? `<span class="pill bad">${AC().fell}</span>` : ''}</td>
-        <td class="n">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</td>
-        <td class="n">${num(a.now.sessions_day)}${a.before ? change(a.now.sessions_day, a.before.sessions_day) : ''}</td>
+    ${e.comparable ? `<div class="chips"><button data-acc-down aria-pressed="${!!state.accDown}" ${down || state.accDown ? '' : 'disabled'}>${AC().onlyDown(down)}</button></div>` : ''}
+    ${rows.length ? table(`<th>${AC().account}</th><th>${AC().trendCol}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}<th><span class="sr">${AC().copySummary}</span></th>`,
+      rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
+        <td><span class="nm acc-name" title="${esc(accountText(a.account))}">${esc(accountText(a.account))}</span></td>
+        <td>${trendChip(a.trend)}</td>
+        <td class="n">${num(a.now.users_day)}${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</td>
+        <td class="n">${num(a.now.sessions_day)}${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</td>
         <td class="n">${num(a.now.users)}</td>
-        ${a.features.map((f) => `<td class="n">${num(f.now)}${change(f.now, f.before)}</td>`).join('')}</tr>`).join(''))}</section>`
+        ${a.features.map((f) => `<td class="n">${num(f.now)}${accDelta(f.now, f.before, f.move)}</td>`).join('')}
+        <td><button class="small" data-copy="${esc(accountSummary(a, e))}">${AC().copySummary}</button></td></tr>`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
 }
 
 function accountDetail(e, id) {
   const a = e.accounts.find((x) => x.account === id)
   const days = e.daily ?? []
-  const head = `<section class="card"><button class="link" data-feat="no-account">← ${AC().back}</button><div class="fname big-name">${esc(accountText(id))}</div></section>`
+  const head = `<section class="card"><button class="link" data-feat="no-account">← ${AC().back}</button>
+    <div class="head"><div class="fname big-name">${esc(accountText(id))} ${a ? trendChip(a.trend) : ''}</div>
+      ${a ? `<button class="small" data-copy="${esc(accountSummary(a, e))}">${AC().copySummary}</button>` : ''}</div></section>`
   if (!a) return head + empty(L.noVisits)
   return head + `<section class="numbers">
-      <div class="card"><div class="label">${AC().usersDay}${help('usersDay')}</div><div class="big">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</div></div>
-      <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)}${a.before ? change(a.now.sessions_day, a.before.sessions_day) : ''}</div></div>
+      <div class="card"><div class="label">${AC().usersDay}${help('usersDay')}</div><div class="big">${num(a.now.users_day)} ${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</div></div>
+      <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)} ${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
     </section>
     ${barsChart(AC().pulse, days, (d) => d.users, (d) => AC().dayTip(d.day, d.users))}
     ${e.features.length ? `<section class="card"><div class="label">${AC().featureUses}</div>
       ${table(`<th>Feature</th><th class="n">${FT().uses}</th><th>${FT().usesByDay}</th>`, e.features.map((f) => { const x = a.features.find((y) => y.id === f.id)
-        return `<tr><td>${esc(f.name)}${a.drops.some((d) => d.feature === f.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td><td class="n">${num(x.now)}${change(x.now, x.before)}</td>
-          <td>${spark(days.map((d) => d.features[f.id] ?? 0), `${f.name}: ${FT().usesByDay}`)}</td></tr>` }).join(''))}</section>` : `<section class="card"><p class="meta">${AC().noFeatures}</p></section>`}`
+        return `<tr><td>${esc(f.name)}${a.drops.some((d) => d.feature === f.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td><td class="n">${num(x.now)}${accDelta(x.now, x.before, x.move)}</td>
+          <td>${spark(days.map((d) => d.features[f.id] ?? 0), `${f.name}: ${FT().usesByDay}`, 120, 28, days.map((d) => d.day))}</td></tr>` }).join(''))}</section>` : `<section class="card"><p class="meta">${AC().noFeatures}</p></section>`}`
 }
 
 // Map ---------------------------------------------------------------------------------------------------------
