@@ -17,6 +17,7 @@
 
   const pt = /^pt\b/i.test(navigator.language)
   const fmt = (n) => Number(n || 0).toLocaleString(pt ? 'pt-BR' : 'en-US')
+  const secs = (ms) => `${(ms / 1000).toLocaleString(pt ? 'pt-BR' : 'en-US', { maximumFractionDigits: 1 })} s`
   const pc = (f) => `${Math.round(Math.min(1, f) * 100)}%`
   const T = pt ? {
     title: 'Termometro · mapa', close: 'Fechar', collapse: 'Recolher', expand: 'Abrir', loading: 'Carregando…',
@@ -46,6 +47,21 @@
     pickedSpread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
     pickedNone: (a) => `Não há clique seguinte registrado depois de ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irrita ${p} das vezes que é clicado: ${why}. ${advice}`,
+    causesTitle: 'Por que irrita', whyNote: (n, p, list, fix) => `${n}: ${p} dos cliques irritam. Por quê: ${list}. O que fazer: ${fix}`,
+    noCauses: 'Nada irrita neste elemento no período.',
+    cause: { rage_waiting: (c) => `clicou de novo enquanto carregava: o botão seguiu clicável${c.slow ? ` (${c.slow} levou ${secs(c.slow_ms)} na mediana)` : ''}`,
+      rage_nothing: () => 'clicou de novo porque nada mudou na tela', rage_unclear: () => 'a tela mudou, mas não deu para perceber; clicou de novo',
+      rage_error: () => 'clicou de novo depois de um erro', rage_disabled: () => 'insistiu no botão desabilitado',
+      rage_not_clickable: () => 'clicou várias vezes em algo que não é clicável', rage: () => 'cliques repetidos sem motivo claro',
+      dead: () => 'clicou e nada aconteceu', retry: () => 'o primeiro clique não pegou; clicou de novo', near_miss: () => 'clicou do lado, quase acertou',
+      failed: (c) => `deu erro logo depois: ${c.detail}`, slow: (c) => `${c.slow} demorou ${secs(c.slow_ms)} depois do clique (mediana)` },
+    fix: { rage_waiting: (c) => `trave o botão e mostre que está carregando já no primeiro clique${c.slow ? `; e veja por que ${c.slow} leva ${secs(c.slow_ms)}` : ''}.`,
+      rage_nothing: () => 'faça o clique ter um efeito visível; se depende de algo, diga do quê.', rage_unclear: () => 'deixe o retorno evidente perto do clique (mensagem, destaque).',
+      rage_error: () => 'corrija a falha que vem logo depois (aba Falhas) e mostre uma mensagem quando falhar.', rage_disabled: () => 'diga por que está desabilitado e o que falta para liberar.',
+      rage_not_clickable: () => 'parece clicável e não é: torne clicável ou mude a aparência.', rage: () => 'mostre resposta logo no primeiro clique.',
+      dead: () => 'ou faz algo visível, ou deixa de parecer clicável.', retry: () => 'o primeiro clique precisa responder: confira o que acontece nele.',
+      near_miss: () => 'aumente a área de clique ou afaste o que está em volta.', failed: (c) => `corrija ${c.detail} e mostre uma mensagem quando falhar.`,
+      slow: (c) => `mostre que está carregando e acelere ${c.slow}.` },
     noteUsage: (n, share) => `${n} leva ${share} dos cliques desta tela.`,
     legend: { next: 'próximo passo mais comum', back: 'vai e volta', wider: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais',
       in: 'de onde chegam', bad: 'cor mais forte = mais cliques que irritam', none: 'sem cor = nenhum problema',
@@ -81,6 +97,21 @@
     pickedSpread: (a) => `After ${a} people scatter: no next step dominates. If there is an expected path, the screen does not make it clear.`,
     pickedNone: (a) => `No next click recorded after ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irritates ${p} of the times it is clicked: ${why}. ${advice}`,
+    causesTitle: 'Why it irritates', whyNote: (n, p, list, fix) => `${n}: ${p} of the clicks irritate. Why: ${list}. What to do: ${fix}`,
+    noCauses: 'Nothing about this element irritates in this period.',
+    cause: { rage_waiting: (c) => `clicked again while it was loading: the button stayed clickable${c.slow ? ` (${c.slow} took ${secs(c.slow_ms)}, median)` : ''}`,
+      rage_nothing: () => 'clicked again because nothing changed on screen', rage_unclear: () => 'the screen changed, but not visibly; clicked again',
+      rage_error: () => 'clicked again after an error', rage_disabled: () => 'kept clicking the disabled button',
+      rage_not_clickable: () => 'clicked repeatedly on something not clickable', rage: () => 'repeated clicks, no clear reason',
+      dead: () => 'clicked and nothing happened', retry: () => 'the first click did not take; clicked again', near_miss: () => 'clicked beside it, nearly hit',
+      failed: (c) => `an error right after: ${c.detail}`, slow: (c) => `${c.slow} took ${secs(c.slow_ms)} after the click (median)` },
+    fix: { rage_waiting: (c) => `lock the button and show it is loading on the first click${c.slow ? `; and see why ${c.slow} takes ${secs(c.slow_ms)}` : ''}.`,
+      rage_nothing: () => 'make the click do something visible; if it depends on something, say what.', rage_unclear: () => 'make the answer obvious near the click (message, highlight).',
+      rage_error: () => 'fix the failure that follows (Failures tab) and show a message when it fails.', rage_disabled: () => 'say why it is disabled and what is missing.',
+      rage_not_clickable: () => 'it looks clickable and is not: make it clickable or change how it looks.', rage: () => 'answer on the first click.',
+      dead: () => 'make it do something visible, or stop it looking clickable.', retry: () => 'the first click has to respond: check what it does.',
+      near_miss: () => 'make the click area bigger or move what is around it.', failed: (c) => `fix ${c.detail} and show a message when it fails.`,
+      slow: (c) => `show it is loading and speed up ${c.slow}.` },
     noteUsage: (n, share) => `${n} takes ${share} of this screen's clicks.`,
     legend: { next: 'most common next step', back: 'back and forth', wider: 'thicker arrow = bigger share', min: 'only steps of 15% or more',
       in: 'where they come from', bad: 'stronger colour = more irritating clicks', none: 'no colour = no problem',
@@ -235,6 +266,13 @@
     return [...best.values()].filter((p) => share(p) >= MIN).sort((a, b) => share(b) - share(a))
   }
   const problems = () => [...els.values()].filter((e) => e.irr >= MIN_IRR).sort((a, b) => b.pain - a.pain || b.irr - a.irr)
+  // Why it irritates, from the server's count of each cause: the sentence, the count, and what to do about the first.
+  const causes = (e) => (e?.causes || []).filter((c) => T.cause[c.kind])
+  const causeText = (c) => T.cause[c.kind](c)
+  const causeLine = (e) => { const list = causes(e); const top = list[0]
+    return top ? `${causeText(top)} · ${T.times(top.n)}` : (T.why[e.main] || '') }
+  const whyNote = (e) => { const list = causes(e).slice(0, 3); if (!list.length) return T.noteProblem(nameOf(e.target), pc(e.pain), T.why[e.main], T.advice[e.main])
+    return T.whyNote(nameOf(e.target), pc(e.pain), list.map((c) => `${causeText(c)} (${T.times(c.n)})`).join('; '), T.fix[list[0].kind](list[0])) }
   const used = () => [...els.values()].filter((e) => e.clicks > 0).sort((a, b) => b.clicks - a.clicks)
 
   // ---------- drawing ----------
@@ -401,11 +439,11 @@
   const btn = `font:inherit;font-size:12px;background:${C.surface};border:1px solid ${C.line};color:${C.fg};border-radius:8px;padding:3px 10px;cursor:pointer`
   const chip = (text, color) => `<span style="display:inline-block;font-size:11px;font-weight:600;padding:0 8px;border-radius:999px;color:${color};background:${color}22">${esc(text)}</span>`
   const code = (s) => `<code style="font:11px ui-monospace,'SF Mono',Menlo,monospace;color:${C.faint};overflow-wrap:anywhere">${esc(s)}</code>`
-  function item(t, name, num, say, { dim = false } = {}) {
+  function item(t, name, num, say, { dim = false, flat = false } = {}) {
     return `<li style="list-style:none"><button data-t="${esc(t)}" style="width:100%;text-align:left;font:inherit;color:inherit;border:0;border-radius:10px;` +
       `padding:7px 10px;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;opacity:${dim ? 0.55 : 1};` +
-      `background:${picked === t && !name.includes(':') ? C.sunken : 'none'}">` +
-      `<span style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span>` +
+      `background:${picked === t && !flat && !name.includes(':') ? C.sunken : 'none'}">` +
+      `<span style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:${flat ? 'normal' : 'nowrap'}">${esc(name)}</span>` +
       `<span style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right">${esc(num)}</span>` +
       `<span style="grid-column:1/-1;color:${C.fg2};font-size:12px">${say}<span data-offtag ${shown(t) ? 'hidden' : ''} style="color:${C.faint}"> · ${esc(T.offTag)}</span></span></button></li>`
   }
@@ -417,6 +455,15 @@
       const go = paths().filter((p) => p.from === picked).sort((a, b) => b.n - a.n)
       const come = paths().filter((p) => p.to === picked).sort((a, b) => b.n - a.n).slice(0, 3)
       const name = nameOf(picked)
+      if (lens === 'problems') {
+        const list = causes(e), total = list.reduce((a, c) => a + c.n, 0)
+        return {
+          title: name,
+          lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}`,
+          items: list.map((c) => item(picked, causeText(c), pc(c.n / (total || 1)), esc(T.times(c.n)), { flat: true })).join(''),
+          empty: list.length ? '' : T.noCauses, note: list.length ? whyNote(e) : ''
+        }
+      }
       return {
         title: name,
         lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}` +
@@ -446,8 +493,8 @@
       const top = list[0]
       return {
         title: T.irritTitle, lead: esc(T.irritLead),
-        items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), pc(e.pain), esc(T.why[e.main] || ''))).join(''),
-        empty: list.length ? '' : T.noProblems, note: top ? T.noteProblem(nameOf(top.target), pc(top.pain), T.why[top.main], T.advice[top.main]) : ''
+        items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), pc(e.pain), esc(causeLine(e)))).join(''),
+        empty: list.length ? '' : T.noProblems, note: top ? whyNote(top) : ''
       }
     }
     const list = used(), total = list.reduce((s, e) => s + e.clicks, 0)

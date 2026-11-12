@@ -123,6 +123,8 @@ export interface Layout {
   boxes: Array<Box | null>
   /** The page's regions — main, nav, header, aside, footer, dialog, form and the h1 title — as boxes: the screen's skeleton. */
   landmarks: Array<{ kind: string; box: Box }>
+  /** An addition to the screen's drawing (what a click opened), not the whole screen. */
+  partial?: boolean
 }
 interface Who { account: string; user: string; role: string; user_name?: string }
 interface Queued { event: TrackedEvent; who: Who }
@@ -140,6 +142,9 @@ const INVENTORY_DELAY_MS = 1500
 const MAX_INVENTORY = 300
 const MAX_BOXES = 150
 const MAX_LANDMARKS = 12
+// After a click, a dialog or menu may have opened: looked for once things settle, a few times per screen and session.
+const ADDITION_DELAY_MS = 800
+const MAX_ADDITIONS = 6
 // Wide and narrow screens are laid out apart: the preview keeps one of each, so a change of size sends another inventory.
 const WIDE_PX = 900
 const LANDMARKS: Array<[string, string]> = [['main', 'main,[role="main"]'], ['nav', 'nav,[role="navigation"]'], ['header', 'header,[role="banner"]'],
@@ -358,6 +363,10 @@ export function start(options: Options): Termometro {
   const slowSeen = new Set<string>()
   const slowMs = options.slowMs ?? SLOW_MS
   const inventoried = new Set<string>()
+  // Per screen and size: the selectors already drawn, and how many additions were sent.
+  const drawn = new Map<string, Set<string>>()
+  const additions = new Map<string, number>()
+  let additionTimer: ReturnType<typeof setTimeout> | undefined
   const ignore = rulesOf([...BUILT_IN_IGNORE, ...(options.requests?.ignore ?? [])])
   const background = rulesOf(options.requests?.background)
   const notActions = rulesOf(options.requests?.notActions)
@@ -516,28 +525,58 @@ export function start(options: Options): Termometro {
       const key = inventoryKey(route)
       if (route !== currentRoute || inventoried.has(key)) return
       inventoried.add(key)
-      const seen = new Map<string, { label: string; box: Box | null }>()
-      let boxes = 0
-      // Fields too (a click on one counts as its use): their place and the name the app gives them, never their value;
-      // none inside tables, lists of records or what the app marks private.
-      for (const el of Array.from(document.querySelectorAll(CLICKABLE + ',' + FIELD))) {
-        if (el.closest(OVERLAY) || !el.getClientRects().length) continue
-        const field = el.matches(FIELD)
-        if (field && el.closest(FIELD_PRIVATE)) continue
-        const selector = selectorOf(el)
-        const kept = seen.get(selector)
-        if (kept?.label && kept.box) continue
-        if (!kept && seen.size >= MAX_INVENTORY) break
-        // The same selector many times (a menu's items): the first label and the first visible box stand for it.
-        const box = kept?.box ?? (boxes < MAX_BOXES ? boxOf(el) : null)
-        if (box && !kept?.box) boxes++
-        seen.set(selector, { label: kept?.label || (field ? fieldLabelOf(el) : labelOf(el)), box })
-      }
+      const seen = scan(new Set())
       if (!seen.size) return
-      const items = Array.from(seen.values())
-      record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: items.map((x) => x.label),
-        layout: { ...frame(), boxes: items.map((x) => x.box) } })
+      drawn.set(key, new Set(seen.keys()))
+      sendInventory(route, seen, frame())
     }, INVENTORY_DELAY_MS)
+  }
+
+  // What is visible now and was not on the screen's drawing: a dialog or menu someone opened. Sent as an addition, so
+  // the drawing keeps the screen and gains what opens on it.
+  function scheduleAdditions() {
+    const route = currentRoute, key = inventoryKey(route)
+    if (!drawn.has(key) || (additions.get(key) ?? 0) >= MAX_ADDITIONS) return
+    clearTimeout(additionTimer)
+    additionTimer = setTimeout(() => {
+      const known = drawn.get(key)
+      if (route !== currentRoute || !known) return
+      const seen = scan(known)
+      for (const [selector, item] of seen) if (!item.box) seen.delete(selector)
+      if (!seen.size) return
+      for (const selector of seen.keys()) known.add(selector)
+      additions.set(key, (additions.get(key) ?? 0) + 1)
+      const base = frame()
+      sendInventory(route, seen, { ...base, landmarks: base.landmarks.filter((l) => l.kind === 'dialog'), partial: true })
+    }, ADDITION_DELAY_MS)
+  }
+
+  function scan(skip: Set<string>): Map<string, { label: string; box: Box | null }> {
+    const seen = new Map<string, { label: string; box: Box | null }>()
+    let boxes = 0
+    // Fields too (a click on one counts as its use): their place and the name the app gives them, never their value;
+    // none inside tables, lists of records or what the app marks private.
+    for (const el of Array.from(document.querySelectorAll(CLICKABLE + ',' + FIELD))) {
+      if (el.closest(OVERLAY) || !el.getClientRects().length) continue
+      const field = el.matches(FIELD)
+      if (field && el.closest(FIELD_PRIVATE)) continue
+      const selector = selectorOf(el)
+      if (skip.has(selector)) continue
+      const kept = seen.get(selector)
+      if (kept?.label && kept.box) continue
+      if (!kept && seen.size >= MAX_INVENTORY) break
+      // The same selector many times (a menu's items): the first label and the first visible box stand for it.
+      const box = kept?.box ?? (boxes < MAX_BOXES ? boxOf(el) : null)
+      if (box && !kept?.box) boxes++
+      seen.set(selector, { label: kept?.label || (field ? fieldLabelOf(el) : labelOf(el)), box })
+    }
+    return seen
+  }
+
+  function sendInventory(route: string, seen: Map<string, { label: string; box: Box | null }>, base: Omit<Layout, 'boxes'>) {
+    const items = Array.from(seen.values())
+    record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: items.map((x) => x.label),
+      layout: { ...base, boxes: items.map((x) => x.box) } })
   }
 
   function page(route?: string) {
@@ -605,6 +644,7 @@ export function start(options: Options): Termometro {
       if (near) record({ type: 'near_miss', route: currentRoute, target: selectorOf(near), label: labelOf(near) || undefined })
     }
     record({ type: 'click', route: currentRoute, target: selector, label })
+    scheduleAdditions()
     lastClick = { target: selector, t: now }
     if (label) lastLabel = label
     if (!actionClicks || now - lastClickAt > ACTION_IDLE_MS) {

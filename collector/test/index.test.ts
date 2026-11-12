@@ -526,6 +526,28 @@ describe('termometro', () => {
     } finally { spy.mockRestore() }
   })
 
+  it('adds to the drawing what a click opens, a dialog or a menu, and only that', async () => {
+    const boxes: Record<string, number[]> = { novo: [10, 10, 80, 30], email: [500, 300, 200, 30], dlg: [450, 250, 400, 200], MAIN: [0, 0, 1200, 700] }
+    const spy = place((el) => boxes[el.id || el.tagName])
+    try {
+      const t = start()
+      document.body.innerHTML = '<main><button id="novo">Novo usuário</button></main>'
+      t.page('/users')
+      await vi.advanceTimersByTimeAsync(1500)
+      click(document.querySelector('#novo')!)
+      document.body.insertAdjacentHTML('beforeend', '<div id="dlg" role="dialog"><label for="email">E-mail</label><input id="email" value="ana@x.com"></div>')
+      await vi.advanceTimersByTimeAsync(1000)
+      click(document.querySelector('#email')!) // nothing new opened: no other addition
+      await vi.advanceTimersByTimeAsync(1000)
+      const inventories = (await events()).filter((e) => e.type === 'inventory')
+      expect(inventories.map((e) => [e.targets, e.layout!.partial ?? false])).toEqual([[['button#novo'], false], [['input#email'], true]])
+      expect(inventories[1]!.labels).toEqual(['E-mail'])
+      expect(inventories[1]!.layout!.boxes).toEqual([[500, 300, 200, 30]])
+      expect(inventories[1]!.layout!.landmarks).toEqual([{ kind: 'dialog', box: [450, 250, 400, 200] }])
+      expect(JSON.stringify(inventories[1])).not.toMatch(/ana@x/)
+    } finally { spy.mockRestore() }
+  })
+
   it('caps the boxes it sends', async () => {
     const spy = place(() => [1, 1, 10, 10])
     try {

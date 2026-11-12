@@ -225,7 +225,8 @@ def connect() -> sqlite3.Connection:
             PRIMARY KEY (project, version, key));
     """)
     for table, columns in (("events", NEW_COLUMNS), ("elements", {"label": "TEXT NOT NULL DEFAULT ''",
-                                                                  "first_seen": "INTEGER NOT NULL DEFAULT 0"})):
+                                                                  "first_seen": "INTEGER NOT NULL DEFAULT 0"}),
+                           ("layouts", {"extra": "TEXT NOT NULL DEFAULT '{}'"})):
         have = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
         for column, kind in columns.items():
             if column not in have:
@@ -416,7 +417,8 @@ def box_of(value) -> list[int] | None:
 
 
 def layout_of(raw, targets: list[str]) -> tuple | None:
-    """An inventory's layout -> (viewport, vw, vh, dw, dh, boxes JSON, landmarks JSON), or None. Numbers and region kinds only."""
+    """An inventory's layout -> (viewport, vw, vh, dw, dh, boxes JSON, landmarks JSON, partial), or None. Numbers and region
+    kinds only. `partial`: what a click opened on the screen (a dialog, a menu), an addition to its drawing."""
     if not isinstance(raw, dict):
         return None
     size = [raw.get(k) for k in ("vw", "vh", "dw", "dh")]
@@ -438,7 +440,7 @@ def layout_of(raw, targets: list[str]) -> tuple | None:
     if not boxes:
         return None
     return ("desktop" if vw >= WIDE_PX else "mobile", vw, vh, max(dw, vw), max(dh, vh),
-            json.dumps(boxes, separators=(",", ":")), json.dumps(landmarks, separators=(",", ":")))
+            json.dumps(boxes, separators=(",", ":")), json.dumps(landmarks, separators=(",", ":")), raw.get("partial") is True)
 
 
 def parse_batch(batch, origin: str | None, agent: str = "", layouts: list | None = None) -> tuple[str, list[tuple], list[tuple]]:
@@ -681,6 +683,33 @@ STEP_MS = 30_000  # a click this soon after another on the same screen is the ne
 PATHS_MAX = 40
 
 
+def causes_of(e: dict, failed: list, slow: dict) -> list:
+    """Why an element irritates, most frequent first, each with its count: the rage clicks by the reason the collector saw
+    (waiting, nothing, unclear, error, disabled, not_clickable), clicks with no answer, the first click that did not take,
+    near misses and the failures right after. A slow answer after the click goes with "waiting" as its evidence."""
+    out = []
+    reasons = e.get("reasons") or {}
+    for reason, n in reasons.items():
+        out.append({"kind": "rage_" + reason, "n": n})
+    rest = (e.get("rage") or 0) - sum(reasons.values())
+    if rest > 0:
+        out.append({"kind": "rage", "n": rest})
+    for kind in ("dead", "retry", "near_miss"):
+        if e.get(kind):
+            out.append({"kind": kind, "n": e[kind]})
+    out += [{"kind": "failed", "n": x["n"], "detail": x["detail"]} for x in failed]
+    worst = max(slow.items(), key=lambda kv: len(kv[1]), default=None)
+    if worst:
+        ms = sorted(worst[1])
+        evidence = {"slow": worst[0], "slow_n": len(ms), "slow_ms": ms[len(ms) // 2]}
+        waiting = next((c for c in out if c["kind"] == "rage_waiting"), None)
+        if waiting:
+            waiting.update(evidence)
+        else:
+            out.append({"kind": "slow", "n": len(ms), **evidence})
+    return sorted(out, key=lambda c: -c["n"])
+
+
 def usage(con, f: Filter) -> dict:
     """No route: how much each screen is used. With a route: how much each element is clicked, and what never was."""
     route = f.q.get("route")
@@ -743,25 +772,64 @@ def usage(con, f: Filter) -> dict:
             AND target != '' AND detail != '' GROUP BY target, detail""", f.args):
         if target in elements:
             elements[target].setdefault("reasons", {})[detail] = n
+    # What went wrong right after each element, in detail: the failures (which request, which status) and the slow
+    # answers (which request, how long), the evidence behind "why it irritates".
+    failed: dict = {}
+    for target, detail, n in con.execute(f"""SELECT target, detail, COUNT(*) FROM events WHERE {f.sql} AND target != ''
+            AND type IN ('js_error', 'http_5xx', 'http_4xx') GROUP BY target, detail ORDER BY COUNT(*) DESC""", f.args):
+        if target in elements and len(failed.setdefault(target, [])) < 3:
+            failed[target].append({"detail": detail, "n": n})
+    slow: dict = {}
+    for target, detail, ms in con.execute(f"""SELECT target, detail, duration_ms FROM events WHERE {f.sql} AND target != ''
+            AND type = 'slow' AND duration_ms > 0""", f.args):
+        if target in elements:
+            slow.setdefault(target, {}).setdefault(detail, []).append(ms)
+    for target, e in elements.items():
+        e["causes"] = causes_of(e, failed.get(target, []), slow.get(target, {}))
     return {"route": route, "visits": visits, "visits_before": visits_before, "paths": paths,
             **layout_read(con, f.q.get("project", ""), route, f.q.get("viewport"), labels),
             "elements": sorted(elements.values(), key=lambda e: -e["clicks"]),
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}
 
 
+def save_layouts(con, layouts: list) -> None:
+    """The screen as the last person saw it, per kind of window: one coherent picture, replaced whole. What clicks opened
+    on it (dialogs, menus) is kept apart in `extra` and survives the next whole picture, which is taken with them closed."""
+    for project, route, viewport, vw, vh, dw, dh, boxes, landmarks, partial, at in layouts:
+        if not partial:
+            con.execute("""INSERT INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (project, route, viewport) DO UPDATE SET vw = excluded.vw, vh = excluded.vh, dw = excluded.dw, dh = excluded.dh,
+                boxes = excluded.boxes, landmarks = excluded.landmarks, at = excluded.at""",
+                        (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at))
+            continue
+        row = con.execute("SELECT extra FROM layouts WHERE project = ? AND route = ? AND viewport = ?", (project, route, viewport)).fetchone()
+        extra = json.loads(row[0]) if row else {}
+        added = {**extra.get("boxes", {}), **json.loads(boxes)}
+        marks = extra.get("landmarks", [])
+        marks += [x for x in json.loads(landmarks) if x not in marks]
+        extra = json.dumps({"boxes": dict(list(added.items())[-MAX_BOXES:]), "landmarks": marks[-MAX_LANDMARKS:]}, separators=(",", ":"))
+        if row:
+            con.execute("UPDATE layouts SET extra = ? WHERE project = ? AND route = ? AND viewport = ?", (extra, project, route, viewport))
+        else:  # the addition came before the whole screen: it waits for it with an empty drawing
+            con.execute("INSERT INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at, extra) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?)",
+                        (project, route, viewport, vw, vh, dw, dh, at, extra))
+
+
 def layout_read(con, project: str, route: str, viewport: str | None, labels: dict) -> dict:
     """The screen's preview: `layouts` lists the kinds of window there is one for; `layout` is the one asked for (desktop by
     default, else the one there is), with each box's label."""
-    rows = {r[0]: r for r in con.execute("SELECT viewport, vw, vh, dw, dh, boxes, landmarks, at FROM layouts WHERE project = ? AND route = ?",
+    rows = {r[0]: r for r in con.execute("SELECT viewport, vw, vh, dw, dh, boxes, landmarks, at, extra FROM layouts WHERE project = ? AND route = ?",
                                          (project, route))}
     kinds = [k for k in ("desktop", "mobile") if k in rows]
     pick = viewport if viewport in rows else kinds[0] if kinds else None
     if not pick:
         return {"layouts": [], "layout": None}
-    _, vw, vh, dw, dh, boxes, landmarks, at = rows[pick]
-    boxes = json.loads(boxes)
+    _, vw, vh, dw, dh, boxes, landmarks, at, extra = rows[pick]
+    extra = json.loads(extra or "{}")
+    boxes = {**extra.get("boxes", {}), **json.loads(boxes)}  # what the whole picture has wins over an older addition
+    landmarks = json.loads(landmarks) + [x for x in extra.get("landmarks", []) if x not in json.loads(landmarks)]
     return {"layouts": kinds, "layout": {"viewport": pick, "vw": vw, "vh": vh, "dw": dw, "dh": dh, "at": at, "boxes": boxes,
-                                         "landmarks": json.loads(landmarks),
+                                         "landmarks": landmarks,
                                          "labels": {t: labels.get(route + "\t" + t, "") for t in boxes}}}
 
 
@@ -2506,9 +2574,7 @@ class Handler(BaseHTTPRequestHandler):
                             "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen, "
                             "label = CASE WHEN excluded.label != '' THEN excluded.label ELSE elements.label END",
                             [e + (e[3],) for e in elements])  # first_seen: kept from the first insert
-            # The screen as the last person saw it, per kind of window: one coherent picture, replaced whole.
-            con.executemany("INSERT OR REPLACE INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", layouts)
+            save_layouts(con, layouts)
         self.send(204, headers=headers)
 
     def login(self):

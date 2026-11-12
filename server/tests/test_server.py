@@ -631,6 +631,14 @@ class Server(unittest.TestCase):
         self.assertEqual((lay["vw"], lay["boxes"]), (1440, {"a#help": [100, 10, 60, 20]}))
         # the inventory still lists every target, with or without a box
         self.assertEqual(self.read("/api/usage?project=shop&route=/users")["never_clicked"], ["a#help", "b", "button#new", "span.x"])
+        # what a click opened (a dialog) is an addition: it joins the drawing and outlives the next whole picture
+        self.send([{"type": "inventory", "route": "/users", "targets": ["input#email"], "labels": ["E-mail"],
+                    "layout": {"vw": 1440, "vh": 800, "dw": 1440, "dh": 1600, "boxes": [[500, 300, 200, 30]], "partial": True,
+                               "landmarks": [{"kind": "dialog", "box": [450, 250, 400, 200]}]}}], session="dlg")
+        self.send([inv(1440, [[10, 20, 80, 32], [100, 10, 60, 20], None])], session="closed")
+        lay = self.read("/api/usage?project=shop&route=/users")["layout"]
+        self.assertEqual(lay["boxes"], {"input#email": [500, 300, 200, 30], "button#new": [10, 20, 80, 32], "a#help": [100, 10, 60, 20]})
+        self.assertEqual(lay["landmarks"], [{"kind": "dialog", "box": [450, 250, 400, 200]}])
         with t.connect() as con:
             t.apply_retention(con, now=time.time() + 400 * 86400)
             self.assertEqual(con.execute("SELECT COUNT(*) FROM layouts").fetchone()[0], 0)
@@ -848,8 +856,21 @@ class Server(unittest.TestCase):
         screens = self.read("/api/usage?project=shop")["screens"]
         self.assertEqual([(s["route"], s["visits"], s["clicks"], s["users"]) for s in screens], [("/t", 2, 3, 1), ("/c", 1, 0, 1)])
         screen = self.read("/api/usage?project=shop&route=/t")
-        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "retry": 0, "near_miss": 0, "label": "", "before": None})
+        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "retry": 0, "near_miss": 0, "label": "", "before": None,
+                                                 "causes": [{"kind": "dead", "n": 1}]})
         self.assertEqual(screen["never_clicked"], ["button#delete"])
+
+    def test_usage_says_why_an_element_irritates(self):
+        self.send([{"type": "page", "route": "/u"}, {"type": "click", "route": "/u", "target": "button#save"},
+                   *[{"type": "rage", "route": "/u", "target": "button#save", "detail": "waiting"}] * 3,
+                   {"type": "rage", "route": "/u", "target": "button#save", "detail": "nothing"},
+                   *[{"type": "slow", "route": "/u", "target": "button#save", "detail": "POST /api/users", "duration_ms": ms} for ms in (4000, 6000, 5000)],
+                   *[{"type": "http_5xx", "route": "/u", "target": "button#save", "detail": "POST /api/users 500"}] * 2])
+        causes = self.read("/api/usage?project=shop&route=/u")["elements"][0]["causes"]
+        self.assertEqual(causes, [
+            {"kind": "rage_waiting", "n": 3, "slow": "POST /api/users", "slow_n": 3, "slow_ms": 5000},
+            {"kind": "failed", "n": 2, "detail": "POST /api/users 500"},
+            {"kind": "rage_nothing", "n": 1}])
 
     def test_clicks_and_actions_do_not_weigh(self):
         self.send([{"type": "page", "route": "/x"}, {"type": "click", "route": "/x", "target": "b"},
