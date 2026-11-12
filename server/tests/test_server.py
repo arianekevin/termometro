@@ -605,6 +605,43 @@ class Server(unittest.TestCase):
         self.assertEqual([(p["from"], p["to"], p["n"]) for p in u["paths"]],
                          [("button#new", "input#email", 3), ("input#email", "button#save", 3)])
 
+    def test_usage_of_a_screen_carries_its_latest_layout_per_kind_of_window(self):
+        def inv(vw, boxes, targets=("button#new", "a#help", "span.x"), **extra):
+            return {"type": "inventory", "route": "/users", "targets": list(targets), "labels": ["Novo", "Ajuda", ""],
+                    "layout": {"vw": vw, "vh": 800, "dw": vw, "dh": 1600, "boxes": boxes, **extra}}
+        self.assertEqual(self.read("/api/usage?project=shop&route=/users")["layout"], None)  # an older collector: no preview
+        self.send([{"type": "page", "route": "/users"}, inv(1280, [[10.4, 20, 80, 32], None, [1, 1, 0, 5]],
+                   landmarks=[{"kind": "main", "box": [0, 60, 1280, 700]}, {"kind": "script", "box": [0, 0, 1, 1]}, {"kind": "nav"}])])
+        self.send([inv(390, [[5, 5, 40, 40], [5, 50, 40, 40], None])], session="m")
+        self.send([inv(1280, "junk"), inv(1280, [["a", 1, 2, 3]] * 3), {"type": "inventory", "route": "/users", "targets": ["b"], "layout": {"vw": "x"}}],
+                  session="bad")  # no box to draw: the earlier picture stays
+        u = self.read("/api/usage?project=shop&route=/users")
+        self.assertEqual(u["layouts"], ["desktop", "mobile"])
+        lay = u["layout"]
+        self.assertEqual((lay["viewport"], lay["vw"], lay["vh"], lay["dw"], lay["dh"]), ("desktop", 1280, 800, 1280, 1600))
+        self.assertEqual(lay["boxes"], {"button#new": [10, 20, 80, 32]})  # hidden and empty boxes left out, whole pixels
+        self.assertEqual(lay["landmarks"], [{"kind": "main", "box": [0, 60, 1280, 700]}])  # only known region kinds
+        self.assertEqual(lay["labels"], {"button#new": "Novo"})
+        m = self.read("/api/usage?project=shop&route=/users&viewport=mobile")["layout"]
+        self.assertEqual((m["viewport"], m["boxes"]), ("mobile", {"button#new": [5, 5, 40, 40], "a#help": [5, 50, 40, 40]}))
+        # the most recent picture replaces the one before, whole: never a mix of two layouts
+        self.send([inv(1440, [None, [100, 10, 60, 20], None])], session="later")
+        lay = self.read("/api/usage?project=shop&route=/users")["layout"]
+        self.assertEqual((lay["vw"], lay["boxes"]), (1440, {"a#help": [100, 10, 60, 20]}))
+        # the inventory still lists every target, with or without a box
+        self.assertEqual(self.read("/api/usage?project=shop&route=/users")["never_clicked"], ["a#help", "b", "button#new", "span.x"])
+        with t.connect() as con:
+            t.apply_retention(con, now=time.time() + 400 * 86400)
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM layouts").fetchone()[0], 0)
+
+    def test_usage_of_a_screen_says_why_each_element_irritated(self):
+        self.send([{"type": "page", "route": "/u"}, {"type": "click", "route": "/u", "target": "button#s"},
+                   {"type": "rage", "route": "/u", "target": "button#s", "detail": "waiting"},
+                   {"type": "rage", "route": "/u", "target": "button#s", "detail": "waiting"},
+                   {"type": "rage", "route": "/u", "target": "button#s", "detail": "error"}])
+        e = self.read("/api/usage?project=shop&route=/u")["elements"][0]
+        self.assertEqual((e["rage"], e["reasons"]), (3, {"waiting": 2, "error": 1}))
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

@@ -103,6 +103,10 @@ FACTOR, CAP = 20, 100
 MAX_BODY = 256 * 1024
 MAX_EVENTS = 100
 MAX_INVENTORY = 300
+# The preview of a screen: where its controls and regions sit, kept per screen and kind of window (wide or narrow).
+MAX_BOXES, MAX_LANDMARKS, MAX_PX = 300, 12, 100_000
+WIDE_PX = 900
+LANDMARK_KINDS = ("main", "nav", "header", "aside", "footer", "dialog")
 MAX_PER_MINUTE = 1200
 MAX_LOGINS_PER_MINUTE = 10
 SESSION_SECONDS = 7 * 86400
@@ -212,6 +216,10 @@ def connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS dictionary (
             project TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, kind, key));
+        CREATE TABLE IF NOT EXISTS layouts (
+            project TEXT NOT NULL, route TEXT NOT NULL, viewport TEXT NOT NULL, vw INTEGER NOT NULL, vh INTEGER NOT NULL,
+            dw INTEGER NOT NULL, dh INTEGER NOT NULL, boxes TEXT NOT NULL, landmarks TEXT NOT NULL, at INTEGER NOT NULL,
+            PRIMARY KEY (project, route, viewport));
         CREATE TABLE IF NOT EXISTS alerts (
             project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, version, key));
@@ -397,8 +405,45 @@ def moment(value) -> int | None:
     return int(value) if isinstance(value, (int, float)) and 0 < value < 10**14 else None
 
 
-def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[tuple], list[tuple]]:
-    """A collector batch -> (project, event rows, inventory rows). Raises ValueError or PermissionError."""
+def box_of(value) -> list[int] | None:
+    """[x, y, width, height] in whole pixels, or None when it is not one."""
+    if not isinstance(value, list) or len(value) != 4 or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value):
+        return None
+    x, y, w, h = (int(round(v)) for v in value)
+    if w <= 0 or h <= 0 or not (-MAX_PX < x < MAX_PX and -MAX_PX < y < MAX_PX):
+        return None
+    return [x, y, min(w, MAX_PX), min(h, MAX_PX)]
+
+
+def layout_of(raw, targets: list[str]) -> tuple | None:
+    """An inventory's layout -> (viewport, vw, vh, dw, dh, boxes JSON, landmarks JSON), or None. Numbers and region kinds only."""
+    if not isinstance(raw, dict):
+        return None
+    size = [raw.get(k) for k in ("vw", "vh", "dw", "dh")]
+    size[3] = size[3] if size[3] is not None else size[1]  # dh came later than vw/vh/dw
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and 0 < v < MAX_PX for v in size):
+        return None
+    vw, vh, dw, dh = (int(round(v)) for v in size)
+    raw_boxes = raw.get("boxes") if isinstance(raw.get("boxes"), list) else []
+    boxes = {}
+    for target, value in zip(targets, raw_boxes):
+        box = box_of(value)
+        if target and box and target not in boxes and len(boxes) < MAX_BOXES:
+            boxes[target] = box
+    landmarks = []
+    for x in raw.get("landmarks") if isinstance(raw.get("landmarks"), list) else []:
+        box = box_of(x.get("box")) if isinstance(x, dict) else None
+        if box and x.get("kind") in LANDMARK_KINDS and len(landmarks) < MAX_LANDMARKS:
+            landmarks.append({"kind": x["kind"], "box": box})
+    if not boxes:
+        return None
+    return ("desktop" if vw >= WIDE_PX else "mobile", vw, vh, max(dw, vw), max(dh, vh),
+            json.dumps(boxes, separators=(",", ":")), json.dumps(landmarks, separators=(",", ":")))
+
+
+def parse_batch(batch, origin: str | None, agent: str = "", layouts: list | None = None) -> tuple[str, list[tuple], list[tuple]]:
+    """A collector batch -> (project, event rows, inventory rows). Raises ValueError or PermissionError. With a `layouts`
+    list, the inventories' layouts are added to it as rows for the layouts table."""
     if not isinstance(batch, dict):
         raise ValueError("batch is not an object")
     project = CONFIG.projects.get(str(batch.get("key", "")))
@@ -427,6 +472,9 @@ def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[t
             labels = (labels + [""] * len(targets))[:len(targets)]
             elements += [(project["name"], route, text(t, "target"), now, text(l, "label"))
                          for t, l in zip(targets[:MAX_INVENTORY], labels) if t]
+            layout = layout_of(e.get("layout"), [text(t, "target") for t in targets[:MAX_INVENTORY]])
+            if layout and layouts is not None:
+                layouts.append((project["name"], route, *layout, now))
             continue
         # The browser's clock only says how long before sending it happened; the server's says when that was.
         t = moment(e.get("t"))
@@ -687,9 +735,31 @@ def usage(con, f: Filter) -> dict:
         e["label"] = labels.get(route + "\t" + e["target"], "")
     paths = [{"from": a, "to": b, "n": n, "from_label": labels.get(route + "\t" + a, ""), "to_label": labels.get(route + "\t" + b, "")}
              for (a, b), n in sorted(steps.items(), key=lambda kv: -kv[1])[:PATHS_MAX]]
+    # Why each element's rage happened, as the collector guessed it (waiting, error, nothing...).
+    for target, detail, n in con.execute(f"""SELECT target, detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'rage'
+            AND target != '' AND detail != '' GROUP BY target, detail""", f.args):
+        if target in elements:
+            elements[target].setdefault("reasons", {})[detail] = n
     return {"route": route, "visits": visits, "visits_before": visits_before, "paths": paths,
+            **layout_read(con, f.q.get("project", ""), route, f.q.get("viewport"), labels),
             "elements": sorted(elements.values(), key=lambda e: -e["clicks"]),
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}
+
+
+def layout_read(con, project: str, route: str, viewport: str | None, labels: dict) -> dict:
+    """The screen's preview: `layouts` lists the kinds of window there is one for; `layout` is the one asked for (desktop by
+    default, else the one there is), with each box's label."""
+    rows = {r[0]: r for r in con.execute("SELECT viewport, vw, vh, dw, dh, boxes, landmarks, at FROM layouts WHERE project = ? AND route = ?",
+                                         (project, route))}
+    kinds = [k for k in ("desktop", "mobile") if k in rows]
+    pick = viewport if viewport in rows else kinds[0] if kinds else None
+    if not pick:
+        return {"layouts": [], "layout": None}
+    _, vw, vh, dw, dh, boxes, landmarks, at = rows[pick]
+    boxes = json.loads(boxes)
+    return {"layouts": kinds, "layout": {"viewport": pick, "vw": vw, "vh": vh, "dw": dw, "dh": dh, "at": at, "boxes": boxes,
+                                         "landmarks": json.loads(landmarks),
+                                         "labels": {t: labels.get(route + "\t" + t, "") for t in boxes}}}
 
 
 def people(con, f: Filter) -> dict:
@@ -1988,6 +2058,7 @@ def apply_retention(con, now: float | None = None) -> int:
         ON CONFLICT (day, project, version, route, type) DO UPDATE SET n = n + excluded.n""", (cutoff,))
     removed = con.execute("DELETE FROM events WHERE at < ?", (cutoff,)).rowcount
     con.execute("DELETE FROM elements WHERE last_seen < ?", (cutoff,))
+    con.execute("DELETE FROM layouts WHERE at < ?", (cutoff,))
     con.execute("DELETE FROM people WHERE last_seen < ?", (cutoff,))  # a name leaves with the person's last event
     return removed
 
@@ -2412,7 +2483,8 @@ class Handler(BaseHTTPRequestHandler):
             batch = json.loads(self.body())
             project = CONFIG.projects.get(str(batch.get("key", ""))) if isinstance(batch, dict) else None
             headers = self.cors_for(project)
-            name, rows, elements = parse_batch(batch, origin, agent_of(self.headers.get("User-Agent", "")))
+            layouts = []
+            name, rows, elements = parse_batch(batch, origin, agent_of(self.headers.get("User-Agent", "")), layouts)
         except PermissionError as error:
             return self.json(403, {"error": str(error)})
         except (ValueError, UnicodeDecodeError) as error:
@@ -2431,6 +2503,9 @@ class Handler(BaseHTTPRequestHandler):
                             "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen, "
                             "label = CASE WHEN excluded.label != '' THEN excluded.label ELSE elements.label END",
                             [e + (e[3],) for e in elements])  # first_seen: kept from the first insert
+            # The screen as the last person saw it, per kind of window: one coherent picture, replaced whole.
+            con.executemany("INSERT OR REPLACE INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", layouts)
         self.send(204, headers=headers)
 
     def login(self):
