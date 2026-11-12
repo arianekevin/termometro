@@ -20,8 +20,10 @@
  * the control it nearly hit), typed (once per field per visit: someone typed there — never what) and enter (Enter
  * pressed in a field) and away (left the browser in the middle of something on the screen — clicked or typed, not saved yet — and
  * came back: its duration).
- * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen per
- * session) and action (a write the backend accepted, with the clicks and time it took since the previous one).
+ * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen and screen
+ * size — wide or narrow — per session, with where each visible control sits: its box in whole pixels, the window's and
+ * the page's size, and the boxes of the main regions — never what they show) and action (a write the backend accepted,
+ * with the clicks and time it took since the previous one).
  *
  * Opened with `?termometro_map=<token>` (the dashboard's "Open heat map" button), it loads the server's heat
  * map over the page.
@@ -108,6 +110,18 @@ interface TrackedEvent {
   t?: number
   /** js_error only: where in the code, as `function @ /path/file.js:line:col` lines — never the page's query or data. */
   stack?: string
+  /** inventory only: where things sit, for the dashboard's preview of the screen. */
+  layout?: Layout
+}
+/** `[x, y, width, height]` relative to the page, in whole pixels. */
+type Box = [number, number, number, number]
+export interface Layout {
+  /** The window's width and height and the page's width and height, in px. */
+  vw: number; vh: number; dw: number; dh: number
+  /** One per target, in the same order: its box, or null when it is not visible (or past the cap). */
+  boxes: Array<Box | null>
+  /** The page's regions — main, nav, header, aside, footer, dialog — as boxes: the screen's skeleton. */
+  landmarks: Array<{ kind: string; box: Box }>
 }
 interface Who { account: string; user: string; role: string; user_name?: string }
 interface Queued { event: TrackedEvent; who: Who }
@@ -123,6 +137,12 @@ const AFTER_CLICK_MS = 2000
 const ACTION_IDLE_MS = 120_000
 const INVENTORY_DELAY_MS = 1500
 const MAX_INVENTORY = 300
+const MAX_BOXES = 150
+const MAX_LANDMARKS = 12
+// Wide and narrow screens are laid out apart: the preview keeps one of each, so a change of size sends another inventory.
+const WIDE_PX = 900
+const LANDMARKS: Array<[string, string]> = [['main', 'main,[role="main"]'], ['nav', 'nav,[role="navigation"]'], ['header', 'header,[role="banner"]'],
+  ['aside', 'aside,[role="complementary"]'], ['footer', 'footer,[role="contentinfo"]'], ['dialog', 'dialog[open],[role="dialog"],[role="alertdialog"]']]
 const MAX_QUEUE = 500
 const MAX_BATCH = 100
 const MAX_SAME_ERROR = 3
@@ -167,6 +187,29 @@ export function stackOf(err: Error): string {
 function device(): string {
   const w = typeof innerWidth === 'number' ? innerWidth : 0
   return !w ? '' : w < 640 ? 'phone' : w < 1024 ? 'tablet' : 'desktop'
+}
+
+/** Where an element sits on the page, in whole pixels — or null when it takes no room (hidden, collapsed). */
+export function boxOf(el: Element): Box | null {
+  const r = el.getBoundingClientRect()
+  if (!(r.width > 0 && r.height > 0)) return null
+  const sx = typeof scrollX === 'number' ? scrollX : 0, sy = typeof scrollY === 'number' ? scrollY : 0
+  return [Math.round(r.left + sx), Math.round(r.top + sy), Math.round(r.width), Math.round(r.height)]
+}
+
+/** The window's and page's size and the boxes of its main regions: the skeleton the preview draws, no content. */
+function frame(): Omit<Layout, 'boxes'> {
+  const root = document.documentElement
+  const landmarks: Layout['landmarks'] = []
+  for (const [kind, selector] of LANDMARKS) {
+    for (const el of Array.from(document.querySelectorAll(selector))) {
+      if (landmarks.length >= MAX_LANDMARKS) break
+      const box = el.closest(OVERLAY) ? null : boxOf(el)
+      if (box) landmarks.push({ kind, box })
+    }
+  }
+  return { vw: Math.round(innerWidth), vh: Math.round(innerHeight), dw: Math.round(Math.max(root.scrollWidth, innerWidth)),
+    dh: Math.round(Math.max(root.scrollHeight, innerHeight)), landmarks }
 }
 
 /** URL path with the segments that look like ids replaced by `:id`. */
@@ -456,22 +499,34 @@ export function start(options: Options): Termometro {
     filling = null
   }
 
-  // What can be clicked on this screen, once per screen per session: the base for "never clicked".
+  // What can be clicked on this screen and where it sits, once per screen and screen size per session: the base for
+  // "never clicked" and the dashboard's preview of the screen.
+  const inventoryKey = (route: string) => route + '\t' + (innerWidth >= WIDE_PX ? 'wide' : 'narrow')
   function scheduleInventory() {
     clearTimeout(inventoryTimer)
     const route = currentRoute
-    if (inventoried.has(route)) return
+    if (inventoried.has(inventoryKey(route))) return
     inventoryTimer = setTimeout(() => {
-      if (route !== currentRoute || inventoried.has(route)) return
-      inventoried.add(route)
-      const seen = new Map<string, string>()
+      const key = inventoryKey(route)
+      if (route !== currentRoute || inventoried.has(key)) return
+      inventoried.add(key)
+      const seen = new Map<string, { label: string; box: Box | null }>()
+      let boxes = 0
       for (const el of Array.from(document.querySelectorAll(CLICKABLE))) {
         if (el.closest(OVERLAY) || !el.getClientRects().length) continue
         const selector = selectorOf(el)
-        if (!seen.get(selector)) seen.set(selector, labelOf(el))
-        if (seen.size >= MAX_INVENTORY) break
+        const kept = seen.get(selector)
+        if (kept?.label && kept.box) continue
+        if (!kept && seen.size >= MAX_INVENTORY) break
+        // The same selector many times (a menu's items): the first label and the first visible box stand for it.
+        const box = kept?.box ?? (boxes < MAX_BOXES ? boxOf(el) : null)
+        if (box && !kept?.box) boxes++
+        seen.set(selector, { label: kept?.label || labelOf(el), box })
       }
-      if (seen.size) record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: Array.from(seen.values()) })
+      if (!seen.size) return
+      const items = Array.from(seen.values())
+      record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: items.map((x) => x.label),
+        layout: { ...frame(), boxes: items.map((x) => x.box) } })
     }, INVENTORY_DELAY_MS)
   }
 
@@ -601,6 +656,9 @@ export function start(options: Options): Termometro {
     if (place && !field.closest('[role="search"]')) filling = selectorOf(place)
   })
   listen(document, 'submit', () => { filling = null })
+
+  // A window resized from wide to narrow (or back) lays the screen out anew: its inventory goes again, once.
+  listen(window, 'resize', () => { if (!inventoried.has(inventoryKey(currentRoute))) scheduleInventory() })
 
   listen(window, 'popstate', () => {
     if (Date.now() - arrivedAt < BOUNCE_MS) record({ type: 'bounce', route: currentRoute })

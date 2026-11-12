@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fieldLabelOf, labelOf, routeFromPath, scrub, screenOf, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
+import { fieldLabelOf, labelOf, routeFromPath, scrub, screenOf, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity, type Layout } from '../src/index'
 
-interface SentEvent { type: string; route: string; label?: string; labels?: string[]; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string }
+interface SentEvent { type: string; route: string; label?: string; labels?: string[]; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string; layout?: Layout }
 interface SentBatch { key: string; version: string; session: string; account: string; user: string; role: string; device?: string; sent?: number; events: SentEvent[] }
 
 describe('termometro', () => {
@@ -466,6 +466,75 @@ describe('termometro', () => {
     await vi.advanceTimersByTimeAsync(1500)
     const inventories = (await events()).filter((e) => e.type === 'inventory')
     expect(inventories.map((e) => [e.route, e.targets])).toEqual([['/a', ['button#save', 'a#help']]])
+  })
+
+  // happy-dom lays nothing out: each element gets the box the test gives it (none = takes no room).
+  function place(boxOf: (el: Element) => number[] | undefined) {
+    return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const [x, y, width, height] = (boxOf(this) ?? [0, 0, 0, 0]) as [number, number, number, number]
+      return { x, y, left: x, top: y, width, height, right: x + width, bottom: y + height, toJSON: () => ({}) } as DOMRect
+    })
+  }
+
+  it('sends where each visible control and the main regions sit, in whole pixels and nothing else', async () => {
+    const t = start()
+    document.body.innerHTML = `<nav><a href="/a" class="item">Pedidos</a></nav>
+      <main><button id="save">Salvar</button><button id="hidden">Oculto</button>
+      <div class="menu"><a href="/1" class="opt"></a><a href="/2" class="opt">Abrir</a></div></main>`
+    const [, second] = Array.from(document.querySelectorAll('a.opt'))
+    const boxes: Record<string, number[]> = { save: [10.4, 20.6, 80.2, 32], main: [0, 60, 1200, 700.4], nav: [0, 0, 1200, 56], A: [3, 3, 60, 20] }
+    // two links with the same selector: the first one takes no room, so the box is the second's; the label is the first with words
+    const spy = place((el) => el === second ? [5, 130, 40, 20] : el.classList.contains('opt') ? undefined : boxes[el.id || el.tagName.toLowerCase()] ?? boxes[el.tagName])
+    try {
+      t.page('/orders')
+      await vi.advanceTimersByTimeAsync(1500)
+      const inv = (await events()).find((e) => e.type === 'inventory')!
+      const at = (target: string) => inv.layout!.boxes[inv.targets!.indexOf(target)]
+      expect(inv.targets).toEqual(['nav > a.item', 'button#save', 'button#hidden', 'main > div.menu > a.opt'])
+      expect(inv.labels).toEqual(['Pedidos', 'Salvar', 'Oculto', 'Abrir'])
+      expect(at('nav > a.item')).toEqual([3, 3, 60, 20])
+      expect(at('button#save')).toEqual([10, 21, 80, 32])
+      expect(at('button#hidden')).toBeNull()
+      expect(at('main > div.menu > a.opt')).toEqual([5, 130, 40, 20])
+      expect(inv.layout!.landmarks).toEqual([{ kind: 'main', box: [0, 60, 1200, 700] }, { kind: 'nav', box: [0, 0, 1200, 56] }])
+      // sizes, boxes and region kinds: no text of the page
+      expect(Object.keys(inv.layout!).sort()).toEqual(['boxes', 'dh', 'dw', 'landmarks', 'vh', 'vw'])
+      expect(inv.layout!.vw).toBe(innerWidth)
+      expect(JSON.stringify(inv.layout)).not.toMatch(/Pedidos|Salvar|Abrir/)
+    } finally { spy.mockRestore() }
+  })
+
+  it('caps the boxes it sends', async () => {
+    const spy = place(() => [1, 1, 10, 10])
+    try {
+      const t = start()
+      document.body.innerHTML = Array.from({ length: 200 }, (_, i) => `<button class="b${'x'.repeat(i % 26)}${String.fromCharCode(97 + (i % 26))}${i < 26 ? '' : String.fromCharCode(97 + Math.floor(i / 26))}">b</button>`).join('')
+      t.page('/many')
+      await vi.advanceTimersByTimeAsync(1500)
+      const inv = (await events()).find((e) => e.type === 'inventory')!
+      expect(inv.targets!.length).toBe(200)
+      expect(inv.layout!.boxes.filter(Boolean).length).toBe(150)
+    } finally { spy.mockRestore() }
+  })
+
+  it('lists a screen again only when the window goes from wide to narrow', async () => {
+    const width = innerWidth
+    const resize = (w: number) => { Object.defineProperty(window, 'innerWidth', { value: w, configurable: true }); window.dispatchEvent(new Event('resize')) }
+    try {
+      resize(1280)
+      const t = start()
+      document.body.innerHTML = '<button id="save">s</button>'
+      t.page('/a')
+      await vi.advanceTimersByTimeAsync(1500)
+      resize(1000) // still wide: nothing new
+      await vi.advanceTimersByTimeAsync(1500)
+      resize(390)
+      await vi.advanceTimersByTimeAsync(1500)
+      resize(420)
+      await vi.advanceTimersByTimeAsync(1500)
+      const inventories = (await events()).filter((e) => e.type === 'inventory')
+      expect(inventories.map((e) => e.layout!.vw)).toEqual([1280, 390])
+    } finally { Object.defineProperty(window, 'innerWidth', { value: width, configurable: true }) }
   })
 
   it('ignores clicks on its own heat map', async () => {
