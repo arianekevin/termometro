@@ -240,6 +240,12 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .seg { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .seg button { height: 32px; font-size: 13px; border-radius: 8px; }
 .seg button[aria-pressed="true"] { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+.mroutes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.mroutes li { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.mstep { display: flex; align-items: flex-start; gap: 10px; min-width: 0; } .mstep > span:not(.arrow) { min-width: 0; flex: 1; }
+.mstep .arrow { font-size: 18px; color: var(--accent); flex: none; }
+.mbar { display: flex; align-items: center; gap: 8px; } .mbar i { display: block; height: 8px; border-radius: 999px; background: var(--fill); }
+@media (max-width: 640px) { .mroutes li { grid-template-columns: 1fr; } }
 .psec { margin-top: 22px; } .psec > .meta { margin-bottom: 2px; font-size: 13px; color: var(--fg); }
 .why { font-size: 12px; line-height: 16px; color: var(--fg2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
@@ -326,6 +332,7 @@ const HELP_PT = {
   accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
   kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
+  map: ['O que é', 'O mapa abre o próprio app numa aba nova, com o uso desenhado por cima da tela real: no Calor, cada elemento pintado pelo quanto é clicado (tracejado é o que ninguém clica); nas Rotas, setas de um clique para o próximo, mais grossas e quentes nas mais feitas. O link vale por uma hora.', 'Rotas que vão e voltam entre os mesmos dois pontos, ou que atravessam a tela de ponta a ponta, sugerem aproximar os elementos ou mudar a ordem.'],
   detours: ['O que é', 'Tarefas começadas numa tela (clicou ou digitou, sem salvar) em que a pessoa sai e volta para concluir: para outra tela do sistema, ou para fora do navegador. Vale para formulário, filtro, modal, configuração — qualquer coisa. Nada do que foi digitado é coletado.', 'Saída frequente para a mesma tela é informação que falta aqui: trazer, buscar ou preencher automaticamente. Saída do navegador é informação que vem de fora: integração ou importação.'],
   ways: ['O que é', 'Por quais telas as pessoas passam, desde a última coisa que salvaram, antes de usar cada botão ou ação, comparado com o normal do app. A tela inicial e os menus estão no caminho de tudo, por isso só se destaca a tela que aparece bem mais do que o normal.', 'Uma tela que aparece no caminho muito mais do que o normal, e onde a pessoa clicou por lá, é onde ela procura aquilo primeiro: um atalho ali, ou mudar o recurso de lugar.'],
   patterns: ['O que é', 'O que as pessoas fazem sempre do mesmo jeito: o campo em que clicam primeiro ao abrir uma tela, o clique que quase sempre vem depois de outro, o botão que clicam depois de digitar em vez de usar Enter, o botão que precisou de dois cliques e o clique que quase acertou um botão. Só clique de pessoa conta; nada do que é digitado sai do navegador.', 'Cada padrão é um atrito pequeno e repetido: foco automático, Enter que funciona, área de clique maior. Somados, viram minutos por dia de quem usa muito.'],
@@ -359,6 +366,7 @@ const HELP_EN = {
   accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
   kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
+  map: ['What it is', 'The map opens the app itself in a new tab, with use drawn over the real screen: Heat paints each element by how much it is clicked (dashed is what nobody clicks); Routes draws arrows from one click to the next, thicker and hotter the more taken. The link lasts an hour.', 'Routes going back and forth between the same two points, or crossing the screen end to end, suggest bringing the elements closer or changing their order.'],
   detours: ['What it is', 'Tasks started on a screen (clicked or typed, not saved) that people leave and come back to finish: for another screen of the system, or outside the browser. Forms, filters, dialogs, settings — anything. Nothing typed is collected.', 'A frequent trip to the same screen is information missing here: bring it, search it or fill it in. Leaving the browser is information from outside: integration or import.'],
   ways: ['What it is', 'Which screens people go through, since the last thing they saved, before using each button or action, against the app\'s usual. Home and menus are on the way to everything, so only a screen that shows up far more than usual stands out.', 'A screen that is on the way far more than usual, where people clicked around, is where they look for that thing first: a shortcut there, or moving the feature.'],
   patterns: ['What it is', 'What people always do the same way: the field they click first on opening a screen, the click that nearly always follows another, the button they click after typing instead of pressing Enter, the button that needed two clicks and the click that nearly hit a button. Only a person\'s clicks count; nothing typed leaves the browser.', 'Each pattern is a small, repeated friction: auto focus, Enter that works, a bigger click area. Added up, they are minutes a day for heavy users.'],
@@ -458,7 +466,7 @@ const L = PT ? {
     addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
     reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
   },
-  tabs: { overview: 'Início', product: 'Produto', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
+  tabs: { overview: 'Início', product: 'Produto', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', map: 'Mapa', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
   prod: { areas: 'Áreas do produto', areasHint: 'Telas agrupadas por área. Clique numa área para ver as telas dela.', area: 'Área', screens: 'Telas', share: 'das visitas',
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
     seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
@@ -476,6 +484,9 @@ const L = PT ? {
     firstClick: 'Primeiro clique', share: 'Quanto', ofVisits: (n) => `de ${num(n)} visitas`, follows: 'Clique que quase sempre vem depois de outro', after: 'Depois de',
     then: 'Clicam em', field: 'campo', ofClicks: (n) => `de ${num(n)} cliques`, noEnter: 'Digitam e clicam num botão em vez de Enter', typedIn: 'Digitaram em',
     thenClicked: 'E clicaram em', retry: 'Precisou de um segundo clique', near: 'Cliques que quase acertaram', times: 'Vezes', none: 'Nenhum padrão forte neste período.' },
+  mapTab: { title: 'Mapa de uso', hint: 'Escolha a tela e abra o app com o mapa por cima: Calor mostra o quanto cada elemento é clicado; Rotas, as setas de um clique para o próximo.',
+    openHeat: 'Abrir com o calor', openRoutes: 'Abrir com as rotas', recordPage: 'Tela de um registro: o app abre no início; navegue até um registro e o mapa acompanha.',
+    routes: 'Rotas de clique nesta tela', routesHint: 'De um clique para o próximo, na mesma visita: as mais feitas primeiro.', noRoutes: 'Nenhuma sequência de cliques nesta tela no período.' },
   rageWhy: { waiting: 'esperando resposta', error: 'deu erro', nothing: 'nada aconteceu', not_clickable: 'parece clicável, mas não é',
     disabled: 'botão desabilitado', unclear: 'sem retorno claro' },
   rageFix: { waiting: 'Mostrar que está carregando logo no primeiro clique e travar o botão até a resposta; ver se a requisição pode ser mais rápida.',
@@ -628,7 +639,7 @@ const L = PT ? {
     addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
     reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
   },
-  tabs: { overview: 'Overview', product: 'Product', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
+  tabs: { overview: 'Overview', product: 'Product', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', map: 'Map', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
   prod: { areas: 'Product areas', areasHint: 'Screens grouped by area. Click an area to see its screens.', area: 'Area', screens: 'Screens', share: 'of the visits',
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
     seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
@@ -646,6 +657,9 @@ const L = PT ? {
     firstClick: 'First click', share: 'How often', ofVisits: (n) => `of ${num(n)} visits`, follows: 'A click that nearly always follows another', after: 'After',
     then: 'They click', field: 'field', ofClicks: (n) => `of ${num(n)} clicks`, noEnter: 'They type and click a button instead of Enter', typedIn: 'Typed in',
     thenClicked: 'Then clicked', retry: 'Needed a second click', near: 'Clicks that nearly hit', times: 'Times', none: 'No strong pattern in this period.' },
+  mapTab: { title: 'Usage map', hint: 'Pick the screen and open the app with the map over it: Heat shows how much each element is clicked; Routes, the arrows from one click to the next.',
+    openHeat: 'Open with the heat', openRoutes: 'Open with the routes', recordPage: 'A record\'s screen: the app opens at its start; go to a record and the map follows.',
+    routes: 'Click routes on this screen', routesHint: 'From one click to the next, in the same visit: the most taken first.', noRoutes: 'No click sequence on this screen in the period.' },
   rageWhy: { waiting: 'waiting for an answer', error: 'it failed', nothing: 'nothing happened', not_clickable: 'looks clickable, is not',
     disabled: 'disabled button', unclear: 'no clear feedback' },
   rageFix: { waiting: 'Show it is loading on the first click and lock the button until the answer; see whether the request can be faster.',
@@ -917,7 +931,7 @@ function shell() {
     if (e.target.matches('.dict-name')) saveName(e.target)
     if (e.target.id === 'rule-kind') { state.featureEdit.kind = e.target.value; state.featureEdit.name = $('#feat-name').value; render() }
     if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
-    if (e.target.id === 'flow-screen') { state.route = e.target.value; render() }
+    if (e.target.id === 'flow-screen' || e.target.id === 'map-screen') { state.route = e.target.value; render() }
     if (e.target.id === 'funnel-add' && e.target.value) { state.funnel = JSON.stringify([...funnelSteps(), e.target.value]); render() }
   })
   $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
@@ -1500,12 +1514,14 @@ async function usage() {
       ${d.never_clicked.length ? `<ul>${d.never_clicked.map((a) => `<li>${named(controlLabel(d.route, a), a)}</li>`).join('')}</ul>` : `<p class="meta">${L.allClicked}</p>`}</section>`
 }
 
-async function openMap() {
+async function openMap(route = '', mode = 'heat') {
   const res = await fetch('/api/map-token?project=' + encodeURIComponent($('#project').value), { method: 'POST' })
   if (!res.ok) return
   const { token, url } = await res.json()
-  const target = new URL(url)
+  // Straight to the screen when its route is a plain path (a record's page, /x/:id, needs a real id: the app's home).
+  const target = new URL(route && !route.includes(':') ? route.replace(/^\//, '') : '', url.endsWith('/') ? url : url + '/')
   target.searchParams.set('termometro_map', token)
+  if (mode === 'routes') target.searchParams.set('termometro_mode', 'routes')
   window.open(target.href, '_blank', 'noopener')
 }
 
@@ -1781,6 +1797,29 @@ function accountDetail(e, id) {
           <td>${spark(days.map((d) => d.features[f.id] ?? 0), `${f.name}: ${FT().usesByDay}`)}</td></tr>` }).join(''))}</section>` : `<section class="card"><p class="meta">${AC().noFeatures}</p></section>`}`
 }
 
+// Map ---------------------------------------------------------------------------------------------------------
+const MP = () => L.mapTab
+async function map() {
+  const { screens } = await read('/api/usage')
+  if (!screens.length) return empty(L.noVisits)
+  if (!screens.some((x) => x.route === state.route)) state.route = screens[0].route
+  const d = await read('/api/usage', { route: state.route })
+  const project = state.me.projects.find((p) => p.name === $('#project').value)
+  const max = Math.max(1, ...d.paths.map((p) => p.n))
+  const nameOf = (t, label) => `${screenText(d.route) || d.route} › ${label || L.unnamed}`
+  return `<section class="card"><div class="head"><div><div class="label">${MP().title}${help('map')}</div><div class="meta">${MP().hint}</div></div>
+      <select id="map-screen" aria-label="${L.screen}">${screens.map((x) => `<option value="${esc(x.route)}" ${x.route === state.route ? 'selected' : ''}>${esc(screenText(x.route) ? `${screenText(x.route)} (${x.route})` : x.route)} · ${num(x.visits)}</option>`).join('')}</select></div>
+    <div class="actions-row" style="margin-top:12px">${project?.url
+      ? `<button class="primary" data-open-map="heat">${MP().openHeat}</button><button data-open-map="routes">${MP().openRoutes}</button>
+         ${state.route.includes(':') ? `<span class="meta">${MP().recordPage}</span>` : ''}`
+      : `<span class="meta">${L.mapNoUrl}</span>`}</div></section>
+    <section class="card"><div class="label">${MP().routes}</div><div class="meta">${MP().routesHint}</div>
+      ${d.paths.length ? `<ol class="mroutes">${d.paths.slice(0, 15).map((p) => `<li>
+        <div class="mstep"><span>${named(nameOf(p.from, p.from_label), p.from)}</span><span class="arrow" aria-hidden="true">→</span><span>${named(nameOf(p.to, p.to_label), p.to)}</span></div>
+        <div class="mbar"><i style="width:${p.n / max * 100}%"></i><b>${num(p.n)}</b></div></li>`).join('')}</ol>` : `<p class="meta">${MP().noRoutes}</p>`}
+    </section>`
+}
+
 // Dictionary ---------------------------------------------------------------------------------------------------
 const D = () => L.dict
 async function dictionary() {
@@ -1821,7 +1860,7 @@ async function saveName(input) {
   input.classList.add('saved'); setTimeout(() => input.classList.remove('saved'), 1200)
 }
 
-const TABS = { overview, product, frustration, failures, usage, journeys, people, actions, versions, features, accounts, dictionary }
+const TABS = { overview, product, frustration, failures, usage, journeys, map, people, actions, versions, features, accounts, dictionary }
 
 async function render() {
   clearTimeout(waitTimer)
@@ -1846,7 +1885,8 @@ async function render() {
   markChip()
   try {
     $('#content').innerHTML = await TABS[state.tab]()
-    $('#open-map')?.addEventListener('click', openMap)
+    $('#open-map')?.addEventListener('click', () => openMap(state.route))
+    document.querySelectorAll('[data-open-map]').forEach((b) => b.addEventListener('click', () => openMap(state.route, b.dataset.openMap)))
     addCsvButtons()
     paginate()
     writeHash()

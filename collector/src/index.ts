@@ -681,14 +681,17 @@ export function start(options: Options): Termometro {
   const fromUrl = params.get('termometro_map')
   if (fromUrl) {
     storage('termometro.map', fromUrl)
+    storage('termometro.mapMode', params.get('termometro_mode') === 'routes' ? 'routes' : 'heat')
     params.delete('termometro_map')
+    params.delete('termometro_mode')
     const rest = params.toString()
     history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash)
   }
   const mapToken = storage('termometro.map')
   if (mapToken) {
     const w = window as unknown as { termometroMap?: unknown }
-    w.termometroMap = { url: base, token: mapToken, route: () => currentRoute, onClose: () => storage('termometro.map', null) }
+    w.termometroMap = { url: base, token: mapToken, route: () => currentRoute, mode: storage('termometro.mapMode') ?? 'heat',
+      onClose: () => { storage('termometro.map', null); storage('termometro.mapMode', null) } }
     const script = document.createElement('script')
     script.src = `${base}/map.js`
     script.async = true

@@ -1,6 +1,6 @@
 // Termometro heat map, drawn over the app's own screen. The collector loads this file when the page was
 // opened with `?termometro_map=<token>` (the dashboard's "Open heat map" button makes that link) and leaves
-// window.termometroMap = { url, token, route(), onClose() }. Each element of the current screen is painted by
+// window.termometroMap = { url, token, route(), mode, onClose() }. Each element of the current screen is painted by
 // how much it is clicked, with a badge for rage clicks, dead clicks and errors after it; what can be clicked
 // and never was is dashed. In "Routes" mode, arrows link each click to the next one on this screen, thicker and
 // hotter the more often that step was taken. Esc or "Close" turn it off.
@@ -43,7 +43,7 @@
 
   let days = 30
   let showNever = true
-  let mode = 'heat'
+  let mode = cfg.mode === 'routes' ? 'routes' : 'heat' // the dashboard's Map tab may open it straight in Routes
   let routesShown = 5
   const SVG = 'http://www.w3.org/2000/svg'
   let data = null
