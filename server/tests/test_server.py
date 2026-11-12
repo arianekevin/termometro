@@ -243,6 +243,54 @@ class Server(unittest.TestCase):
         self.assertEqual(name("bogus", "/opp", "x"), 400)
         self.assertEqual(call(self.base, "/api/names?project=shop", {"kind": "screen", "key": "/opp", "name": "x"})[0], 401)
 
+    def feature(self, body):
+        status, _, out = call(self.base, "/api/features?project=shop", body, cookie=self.cookie)
+        self.assertEqual(status, 200, out)
+        return json.loads(out)["id"]
+
+    def test_a_watched_feature_counts_its_uses_and_narrows_every_read(self):
+        create = {"type": "action", "route": "/opp", "detail": "POST /api/opps", "clicks": 2}
+        self.send([{"type": "page", "route": "/opp"}, create, create,
+                   {"type": "rage", "route": "/opp", "target": "button#save"},
+                   {"type": "http_5xx", "route": "/opp", "detail": "POST /api/opps 500"},
+                   {"type": "page", "route": "/home"}], user="u1", account="a1")
+        self.send([{"type": "page", "route": "/home"}], user="u2", account="a2")
+        fid = self.feature({"name": "Criar oportunidade", "rules": [{"kind": "action", "key": "POST /api/opps"},
+                                                                   {"kind": "screen", "key": "/opp"}]})
+        [ft] = self.read("/api/features?project=shop&days=7")["features"]
+        self.assertEqual({k: ft[k] for k in ("id", "name", "uses", "users", "accounts", "adoption", "failures")},
+                         {"id": fid, "name": "Criar oportunidade", "uses": 2, "users": 1, "accounts": 1, "adoption": 0.5, "failures": 1})
+        # 2: with an action in it, a use is the write; the visit to its screen is not counted again
+        s = self.read(f"/api/summary?project=shop&days=7&feature={fid}")
+        self.assertEqual([r["key"] for r in s["routes"]], ["/opp"])  # /home is outside the feature
+        self.assertEqual(call(self.base, "/api/features?project=shop", {"name": "x", "rules": []}, cookie=self.cookie)[0], 400)
+        self.assertEqual(call(self.base, "/api/features?project=shop", {"name": "criar oportunidade", "rules": [{"kind": "screen", "key": "/x"}]},
+                              cookie=self.cookie)[0], 400)  # the same name twice would read as one feature
+        self.feature({"id": fid, "delete": True})
+        self.assertEqual(self.read("/api/features?project=shop&days=7")["features"], [])
+
+    def test_engagement_shows_an_account_fading_in_people_and_in_a_feature(self):
+        create = {"type": "action", "route": "/opp", "detail": "POST /api/opps", "clicks": 1}
+        for u in ("u1", "u2", "u3"):  # the month before: 3 people, 12 creations
+            self.send([{"type": "page", "route": "/opp"}] + [create] * 4, user=u, account="a1", session=u)
+        self.age(25)
+        self.send([{"type": "page", "route": "/opp"}, create], user="u1", account="a1", session="now")
+        self.send([{"type": "page", "route": "/home"}], user="u9", account="a2", session="other")
+        self.age(10)  # before: 35 days ago; now: 10 days ago and today; 20-day windows
+        self.send([{"type": "page", "route": "/home"}], user="u9", account="a2", session="today")
+        fid = self.feature({"name": "Criar oportunidade", "rules": [{"kind": "action", "key": "POST /api/opps"}]})
+        e = self.read("/api/engagement?project=shop&days=20")
+        self.assertTrue(e["comparable"])
+        a1 = next(r for r in e["accounts"] if r["account"] == "a1")
+        self.assertEqual(e["accounts"][0]["account"], "a1")  # drops first
+        self.assertEqual([d["what"] for d in a1["drops"]], ["feature"])
+        self.assertEqual((a1["drops"][0]["before"], a1["drops"][0]["now"]), (12, 1))
+        self.assertEqual(a1["features"], [{"id": fid, "now": 1, "before": 12}])
+        daily = self.read("/api/engagement?project=shop&days=40&account=a1")["daily"]
+        self.assertEqual(sum(d["features"].get(fid, 0) for d in daily), 13)
+        kinds = [i["kind"] for i in self.read("/api/overview?project=shop&days=20")["insights"]]
+        self.assertIn("account_feature_drop", kinds)
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

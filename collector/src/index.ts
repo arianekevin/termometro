@@ -65,6 +65,10 @@ export interface Options {
 export interface Termometro {
   /** Call on every screen change, e.g. from the router's `afterEach`, with the route pattern. */
   page(route?: string): void
+  /** Something that matters to the business and has no click or request of its own on this screen (an import that
+   *  created opportunities, a step finished in the background): `track('opportunity_created')`. The name only — up to
+   *  60 characters, scrubbed — never a value or a record. Watch it as a feature on the dashboard. */
+  track(name: string): void
   /** An error your framework swallowed before `window.onerror` (Vue's `app.config.errorHandler`, React's error boundary). */
   error(error: unknown): void
   /** Sets who is using it, when there is no `identity` function. `null` on sign-out. */
@@ -74,7 +78,7 @@ export interface Termometro {
 }
 
 type EventType = 'page' | 'rage' | 'dead' | 'js_error' | 'http_4xx' | 'http_5xx' | 'abandon' | 'bounce' | 'slow' |
-  'click' | 'action' | 'inventory'
+  'click' | 'action' | 'inventory' | 'track'
 interface TrackedEvent {
   type: EventType
   route: string
@@ -563,6 +567,10 @@ export function start(options: Options): Termometro {
   return {
     page,
     error,
+    track(name) {
+      const detail = scrub(String(name ?? '').trim()).slice(0, 60)
+      if (detail) record({ type: 'track', route: currentRoute, detail })
+    },
     identify(identity) {
       identified = identity
       // What this tab recorded before sign-in (the first visit, with a <script> tag) is the same person.

@@ -499,6 +499,18 @@ describe('termometro', () => {
     expect(sent.map((b) => [b.account, b.user, b.role])).toEqual([['9', 'u-2', 'admin'], ['', '', '']])
   })
 
+  it('tracks a business event by name only', async () => {
+    const t = start()
+    t.page('/import')
+    t.track('opportunity_created')
+    t.track('  ')
+    t.track('sent to ana@x.com')
+    expect((await events()).filter((e) => e.type === 'track')).toEqual([
+      { type: 'track', route: '/import', detail: 'opportunity_created' },
+      { type: 'track', route: '/import', detail: 'sent to :email' }
+    ])
+  })
+
   it('restores fetch on stop', () => {
     const before = window.fetch
     start().stop()

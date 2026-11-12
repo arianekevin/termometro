@@ -28,6 +28,11 @@ and the API:
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
+  GET  /api/features   each watched feature: uses against before, people, accounts, adoption, frustration, per day
+  GET  /api/engagement per account: people and sessions a day, uses of each feature, now against before, drops first
+                       (with ?account=, also that account's day by day)
+  POST /api/features   {id?, name, rules: [{kind: screen|control|action|track, key}]} or {id, delete: true}
+                       ?feature=<id> on any read above narrows it to what belongs to that feature
   POST /api/mark       start the project afresh from now (?project=), or ?clear=1 to undo ┘
                        every read above sees only what came after the mark, unless ?all=1
   GET  /  /map.js  /termometro.js
@@ -53,6 +58,7 @@ Configuration (environment) — at least one way in, Google or a password, unles
 `python termometro.py new-key` prints a fresh project key.
 """
 import base64
+import datetime
 import hashlib
 import urllib.parse
 import urllib.request
@@ -78,7 +84,7 @@ VERSION = "0.2.2"
 # measure usage and effort and weigh nothing; "inventory" lists what can be clicked on a screen.
 WEIGHTS = {"rage": 3, "dead": 2, "js_error": 5, "http_5xx": 5, "http_4xx": 2, "abandon": 2, "bounce": 1, "slow": 1}
 FAILURES = "('js_error', 'http_5xx', 'http_4xx', 'slow')"
-TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory"}
+TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory", "track"}
 FACTOR, CAP = 20, 100
 
 MAX_BODY = 256 * 1024
@@ -176,6 +182,9 @@ def connect() -> sqlite3.Connection:
             day TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL, route TEXT NOT NULL, type TEXT NOT NULL,
             n INTEGER NOT NULL, PRIMARY KEY (day, project, version, route, type));
         CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS features (
+            project TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, rules TEXT NOT NULL, at INTEGER NOT NULL,
+            PRIMARY KEY (project, id));
         CREATE TABLE IF NOT EXISTS dictionary (
             project TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, kind, key));
@@ -194,7 +203,66 @@ def connect() -> sqlite3.Connection:
     con.execute("CREATE INDEX IF NOT EXISTS events_session ON events (project, session, at)")
     MARKS.clear()
     MARKS.update({k[5:]: int(v) for k, v in con.execute("SELECT k, v FROM meta WHERE k LIKE 'mark:%'")})
+    FEATURES.clear()
+    for project, fid, name, rules in con.execute("SELECT project, id, name, rules FROM features ORDER BY name"):
+        FEATURES.setdefault(project, {})[fid] = {"id": fid, "name": name, "rules": json.loads(rules)}
     return con
+
+
+# Watched features, per project: a name and the screens, controls, actions and app events that make it up. Read from
+# the features table on every connect(), like the marks.
+FEATURES: dict[str, dict[str, dict]] = {}
+RULE_KINDS = ("screen", "control", "action", "track")
+
+
+def feature_sql(rules: list[dict], uses_only: bool = False) -> tuple[str, list]:
+    """The events that belong to a feature (its scope: everything on its screens, on its controls, its requests and
+    their failures, its app events) or, with uses_only, the ones that count as one use of it (a visit to its screen,
+    a click on its control, its accepted write, its app event)."""
+    parts, args = [], []
+    if uses_only:  # one use is counted once: by its write or app event if it has one, else its click, else its visit
+        kinds = {r.get("kind") for r in rules}
+        strongest = ({"action", "track"} & kinds) or ({"control"} & kinds) or {"screen"}
+        rules = [r for r in rules if r.get("kind") in strongest]
+    for r in rules:
+        kind, key = r.get("kind"), str(r.get("key", ""))
+        if kind == "screen":
+            parts.append("(type = 'page' AND route = ?)" if uses_only else "route = ?")
+            args.append(key)
+        elif kind == "control":
+            route, _, target = key.partition("\t")
+            parts.append(("(type = 'click' AND " if uses_only else "(") + "route = ? AND target = ?)")
+            args += [route, target]
+        elif kind == "action":
+            if uses_only:
+                parts.append("(type = 'action' AND detail = ?)")
+                args.append(key)
+            else:
+                parts.append("(detail = ? OR detail LIKE ?)")  # the write itself, and its failures ("POST /x 500")
+                args += [key, key + " %"]
+        elif kind == "track":
+            parts.append("(type = 'track' AND detail = ?)")
+            args.append(key)
+    return ("(" + " OR ".join(parts) + ")", args) if parts else ("0", [])
+
+
+def save_feature(con, project: str, item: dict) -> str:
+    """Creates, changes ({id, name, rules}) or removes ({id, delete: true}) a watched feature. Returns its id."""
+    fid = str(item.get("id") or "")[:40]
+    if item.get("delete"):
+        con.execute("DELETE FROM features WHERE project = ? AND id = ?", (project, fid))
+        return fid
+    name = " ".join(str(item.get("name", "")).split())[:MAX_NAME]
+    rules = [{"kind": r["kind"], "key": str(r.get("key", ""))[:400]} for r in item.get("rules") or []
+             if isinstance(r, dict) and r.get("kind") in RULE_KINDS and r.get("key")][:50]
+    if not name or not rules:
+        raise ValueError("a feature needs a name and at least one screen, control, action or event")
+    if any(other["name"].lower() == name.lower() and other["id"] != fid for other in FEATURES.get(project, {}).values()):
+        raise ValueError("there is already a feature with this name")
+    fid = fid or secrets.token_hex(4)
+    con.execute("INSERT OR REPLACE INTO features (project, id, name, rules, at) VALUES (?, ?, ?, ?, ?)",
+                (project, fid, name, json.dumps(rules, ensure_ascii=False), int(time.time() * 1000)))
+    return fid
 
 
 # A project's fresh start: reads see only what came after it (unless they ask for all=1); nothing is deleted, and
@@ -352,16 +420,23 @@ class Filter:
         self.mark = mark_of(q)
         self.since = max(self.mark, int((time.time() - self.days * 86400) * 1000))
         self.sql, self.args = "project = ? AND at >= ?", [q.get("project", ""), self.since]
+        self.until = int(time.time() * 1000)
         if before:  # the same length of time just before: what "now" is compared with, never before the mark
             end = int((time.time() - self.days * 86400) * 1000)
             self.since = max(self.mark, end - self.days * 86400 * 1000)
             self.sql += " AND at < ?"
             self.args = [q.get("project", ""), self.since, end]
+            self.until = end
         for field, column in (("version", "version"), ("account", "account"), ("role", "role"),
                               ("user", "user_id"), ("route", "route")):
             if q.get(field):
                 self.sql += f" AND {column} = ?"
                 self.args.append(q[field])
+        self.feature = FEATURES.get(q.get("project", ""), {}).get(q.get("feature", ""))
+        if self.feature:  # every read sees only what belongs to the feature
+            sql, args = feature_sql(self.feature["rules"])
+            self.sql += " AND " + sql
+            self.args += args
         self.q = q
 
 
@@ -648,10 +723,132 @@ def overview(con, f: Filter) -> dict:
     for p in [p for p in j["pairs"] if p["linked"]][:2]:
         add("pair_linked", "idea", 60 + p["share"] * 10, {"tab": "journeys", "params": {}}, a=p["a"], b=p["b"],
             share=p["share"], n=p["n"], clicks=p["clicks_median"], screens=p["screens_median"])
+    if not f.q.get("account"):  # one account picked: its own drops are on the Accounts tab
+        for r in engagement(con, f)["accounts"][:20]:
+            for d in r["drops"]:
+                link = {"tab": "accounts", "params": {"account": r["account"]}}
+                if d["what"] == "users_day":
+                    add("account_fading", "warn", 150 + (d["before"] - d["now"]) * 10, link, account=r["account"],
+                        before=d["before"], now=d["now"])
+                else:
+                    add("account_feature_drop", "warn", 140 + min(d["before"] - d["now"], 99), link, account=r["account"],
+                        feature=d["name"], before=d["before"], now=d["now"])
     insights.sort(key=lambda i: -i["weight"])
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
             "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f),
             "insights": insights[:15]}
+
+
+def covered_days(con, f: Filter) -> float:
+    """How many days of the window the project was sending (since its first event and the mark): the divisor of a
+    per-day average, so a project that started last week is not averaged over a month."""
+    first = con.execute("SELECT MIN(at) FROM events WHERE project = ? AND at >= ?", (f.q.get("project", ""), f.mark)).fetchone()[0]
+    if first is None:
+        return 0
+    return max(0, f.until - max(f.since, first)) / 86400000
+
+
+DROP = 0.6           # now at or below 60% of before is a drop...
+
+
+def dropped(before: float, now: float) -> bool:
+    """...and only when the fall is bigger than the usual ups and downs of counts that size (three Poisson deviations: many accounts times many features would otherwise cry wolf):
+    22 → 11 uses in a small account is chance; 210 → 60 people-days is not."""
+    return now <= before * DROP and before - now >= 3 * (before + now) ** 0.5
+DROP_MIN_USERS = 2   # an account needs this many people a day before, for a drop of people to mean something
+DROP_MIN_USES = 10   # and a feature this many uses in the period before
+
+
+def engagement(con, f: Filter) -> dict:
+    """Per account: people a day and sessions a day (averages over the days covered), and the uses of each watched
+    feature, now against the period before; drops first. What tells a customer is fading before they say so."""
+    prev = Filter(f.q, before=True)
+    feats = list(FEATURES.get(f.q.get("project", ""), {}).values())
+    days_now, days_before = covered_days(con, f), covered_days(con, prev)
+    comparable = days_before >= max(1, days_now / 2)
+
+    def per_account(fl, days):
+        out = {}
+        for account, users_days, sessions, visits in con.execute(f"""
+                SELECT account, SUM(u), SUM(s), SUM(v)
+                FROM (SELECT account, date(at / 1000, 'unixepoch') d, COUNT(DISTINCT NULLIF(user_id, '')) u,
+                             COUNT(DISTINCT session) s, SUM(type = 'page') v
+                      FROM events WHERE {fl.sql} AND account != '' GROUP BY account, d) GROUP BY account""", fl.args):
+            out[account] = {"users_day": round(users_days / days, 1) if days else 0,
+                            "sessions_day": round(sessions / days, 1) if days else 0, "users": 0, "visits": visits}
+        for account, users in con.execute(f"""SELECT account, COUNT(DISTINCT NULLIF(user_id, '')) FROM events
+                WHERE {fl.sql} AND account != '' GROUP BY account""", fl.args):
+            out[account]["users"] = users
+        for ft in feats:
+            sql, args = feature_sql(ft["rules"], uses_only=True)
+            for account, n in con.execute(f"SELECT account, COUNT(*) FROM events WHERE {fl.sql} AND account != '' AND {sql} GROUP BY account",
+                                          fl.args + args):
+                out.setdefault(account, {"users_day": 0, "sessions_day": 0, "users": 0, "visits": 0}).setdefault("features", {})[ft["id"]] = n
+        return out
+
+    now, before = per_account(f, days_now), per_account(prev, days_before)
+    rows = []
+    for account in set(now) | set(before):
+        a, b = now.get(account, {}), before.get(account, {})
+        drops = []
+        if comparable and b.get("users_day", 0) >= DROP_MIN_USERS and dropped(b["users_day"] * days_now, a.get("users_day", 0) * days_now):
+            drops.append({"what": "users_day", "before": b["users_day"], "now": a.get("users_day", 0)})
+        feats_row = []
+        for ft in feats:
+            n, m = (a.get("features") or {}).get(ft["id"], 0), (b.get("features") or {}).get(ft["id"], 0)
+            feats_row.append({"id": ft["id"], "now": n, "before": m if comparable else None})
+            if comparable and m >= DROP_MIN_USES and dropped(m * days_now / days_before, n):
+                drops.append({"what": "feature", "feature": ft["id"], "name": ft["name"], "before": m, "now": n})
+        rows.append({"account": account, "now": {k: a.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")},
+                     "before": {k: b.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")} if comparable else None,
+                     "features": feats_row, "drops": drops})
+    rows.sort(key=lambda r: (-len(r["drops"]), -r["now"]["visits"]))
+    return {"days": f.days, "covered": round(days_now, 1), "comparable": comparable,
+            "features": [{"id": x["id"], "name": x["name"]} for x in feats], "accounts": rows}
+
+
+def account_daily(con, f: Filter) -> list[dict]:
+    """People and sessions per day, and the uses of each watched feature per day: one account's pulse."""
+    feats = list(FEATURES.get(f.q.get("project", ""), {}).values())
+    # Every day of the window, the quiet ones too: a day nobody came is the news.
+    first = con.execute(f"SELECT MIN(at) FROM events WHERE project = ? AND at >= ?", (f.q.get("project", ""), f.since)).fetchone()[0]
+    start = datetime.datetime.fromtimestamp(max(f.since, first or f.until) / 1000, datetime.timezone.utc).date()  # SQLite days are UTC
+    end = datetime.datetime.fromtimestamp(f.until / 1000, datetime.timezone.utc).date()
+    days = {(start + datetime.timedelta(n)).isoformat(): {"day": (start + datetime.timedelta(n)).isoformat(), "users": 0, "sessions": 0,
+                                                         "features": {}} for n in range((end - start).days + 1)}
+    days.update({d: {"day": d, "users": u, "sessions": s, "features": {}} for d, u, s in con.execute(f"""
+        SELECT date(at / 1000, 'unixepoch') d, COUNT(DISTINCT NULLIF(user_id, '')), COUNT(DISTINCT session) FROM events
+        WHERE {f.sql} GROUP BY d ORDER BY d""", f.args)})
+    for ft in feats:
+        sql, args = feature_sql(ft["rules"], uses_only=True)
+        for d, n in con.execute(f"SELECT date(at / 1000, 'unixepoch') d, COUNT(*) FROM events WHERE {f.sql} AND {sql} GROUP BY d",
+                                f.args + args):
+            if d in days:
+                days[d]["features"][ft["id"]] = n
+    return sorted(days.values(), key=lambda d: d["day"])
+
+
+def features_report(con, f: Filter) -> dict:
+    """Each watched feature in the period: its uses against the period before, who uses it (people, accounts, and
+    the share of the people active in the product), its uses per day, how much it frustrates and fails."""
+    project = f.q.get("project", "")
+    prev = Filter(f.q, before=True)
+    active = con.execute(f"SELECT COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE {f.sql}", f.args).fetchone()[0]
+    out = []
+    for ft in FEATURES.get(project, {}).values():
+        uses_sql, uses_args = feature_sql(ft["rules"], uses_only=True)
+        scope_sql, scope_args = feature_sql(ft["rules"])
+        n, users, accounts, first_at, first_version = con.execute(f"""SELECT COUNT(*), COUNT(DISTINCT NULLIF(user_id, '')),
+            COUNT(DISTINCT NULLIF(account, '')), MIN(at), version FROM events WHERE {f.sql} AND {uses_sql}""", f.args + uses_args).fetchone()
+        before = con.execute(f"SELECT COUNT(*) FROM events WHERE {prev.sql} AND {uses_sql}", prev.args + uses_args).fetchone()[0]
+        points, fails = con.execute(f"""SELECT COALESCE(SUM({WEIGHT_CASE}), 0), COALESCE(SUM(type IN {FAILURES}), 0) FROM events
+            WHERE {f.sql} AND {scope_sql}""", f.args + scope_args).fetchone()
+        daily_uses = [{"day": d, "n": c} for d, c in con.execute(f"""SELECT date(at / 1000, 'unixepoch') d, COUNT(*) FROM events
+            WHERE {f.sql} AND {uses_sql} GROUP BY d ORDER BY d""", f.args + uses_args)]
+        out.append({**ft, "uses": n, "before": before, "users": users, "accounts": accounts,
+                    "adoption": round(users / active, 2) if active else 0, "score": score(points, n), "failures": fails,
+                    "daily": daily_uses})
+    return {"days": f.days, "active_users": active, "features": out}
 
 
 SEARCH_LIMIT = 8
@@ -1059,6 +1256,7 @@ def names(con, project: str) -> dict:
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
         AND label != '' GROUP BY detail, label""", (project,)))
     out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {},
+           "features": [{"id": x["id"], "name": x["name"], "rules": x["rules"]} for x in FEATURES.get(project, {}).values()],
            "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions)}}
     # What the product team wrote in the dictionary wins over what the collector saw.
     for kind, key, name in con.execute("SELECT kind, key, name FROM dictionary WHERE project = ?", (project,)):
@@ -1223,7 +1421,14 @@ def google_email(code: str) -> str:
     return str(claims["email"])
 
 
-READS = {"/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
+def engagement_read(con, f: Filter) -> dict:
+    out = engagement(con, f)
+    if f.q.get("account"):
+        out["daily"] = account_daily(con, f)
+    return out
+
+
+READS = {"/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
          "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
          "/api/report": report}
@@ -1370,6 +1575,22 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, AttributeError, UnicodeDecodeError) as error:
                 return self.json(400, {"error": str(error)})
             return self.json(200, {"ok": True})
+        if path == "/api/features":
+            who = self.session()
+            if not who or who["email"] == "api":
+                return self.json(401, {"error": "sign in"})
+            project = parse_qs(urlparse(self.path).query).get("project", [""])[0]
+            if project not in CONFIG.by_name:
+                return self.json(404, {"error": "project"})
+            try:
+                item = json.loads(self.body())
+                if not isinstance(item, dict):
+                    raise ValueError("not an object")
+                with connect() as con:
+                    fid = save_feature(con, project, item)
+            except (ValueError, UnicodeDecodeError) as error:
+                return self.json(400, {"error": str(error)})
+            return self.json(200, {"id": fid})
         if path == "/api/mark":
             if not self.signed_in():
                 return self.json(401, {"error": "sign in"})

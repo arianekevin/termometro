@@ -127,14 +127,26 @@ button.small { height: 28px; font-size: 12px; }
 .fhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 500; overflow-wrap: anywhere; }
 .bar.big { height: 12px; border-radius: 4px; }
 /* Overview */
-.delta { font-size: 12px; font-weight: 600; margin-left: 4px; }
+.delta { white-space: nowrap; font-size: 12px; font-weight: 600; margin-left: 4px; }
 .insights { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
 .insights li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
 .insights li:first-child { border-top: 0; }
 .insights .text { flex: 1; min-width: 0; }
 .insights a { white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
 .insights a:hover { text-decoration: underline; }
-#dict-body { display: grid; gap: 16px; } #account { max-width: 220px; text-overflow: ellipsis; }
+#dict-body { display: grid; gap: 16px; } #account, #feature { max-width: 220px; text-overflow: ellipsis; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.feature { display: grid; gap: 10px; } .feature .row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.fname { font-size: 16px; font-weight: 600; } .big-name { font-size: 22px; line-height: 28px; margin-top: 6px; }
+.actions-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.adopt .bar { margin-top: 4px; }
+button.link { border: 0; background: none; padding: 0; height: auto; color: var(--accent); font-weight: 500; }
+.rules { display: grid; gap: 6px; margin-top: 10px; } .rules > div { display: flex; gap: 8px; align-items: flex-start; }
+.feditor { display: grid; gap: 14px; max-width: 860px; } .feditor .stack { display: grid; gap: 4px; } .feditor input#feat-name { max-width: 420px; }
+.rules-edit { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; } .rules-edit li { display: flex; gap: 8px; align-items: flex-start; }
+.addrule { display: flex; gap: 8px; flex-wrap: wrap; } .addrule select#rule-key, .addrule input#rule-key { flex: 1; min-width: 240px; }
+.chart.small { height: 110px; margin-right: 0; } .cols i.acc { background: var(--accent); }
+.error { color: var(--bad); margin: 0; }
 .dict-name { width: 100%; min-width: 180px; } .dict-name.saved { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .nm { display: block; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
 code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); overflow-wrap: anywhere; }
@@ -227,7 +239,21 @@ const L = PT ? {
     addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
     reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
   },
-  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', dictionary: 'Dicionário' },
+  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
+  feature: 'Feature',
+  feat: { title: 'Features vigiadas', hint: 'O que importa para o negócio, acompanhado de perto: uso, quem usa, adoção, frustração e falhas. Analise uma para filtrar o painel inteiro por ela.',
+    none: 'Nenhuma feature vigiada ainda. Crie a primeira: dê um nome e diga quais telas, botões ou ações formam a feature.', create: 'Nova feature', edit: 'Editar', remove: 'Remover',
+    confirmRemove: (n) => `Remover a feature ${n}? O que foi medido continua guardado.`, analyse: 'Analisar', uses: 'Usos', people: 'Pessoas', accounts: 'Contas',
+    adoption: 'Adoção', adoptionHint: (n) => `das ${n} pessoas ativas no período`, name: 'Nome', namePh: 'ex.: Criar oportunidade', parts: 'O que forma a feature',
+    partsHint: 'Uma visita à tela, um clique no botão, uma gravação aceita ou um evento do app contam como um uso. Para contar criações, escolha a ação (gravação).',
+    kinds: { screen: 'Tela', control: 'Botão', action: 'Ação', track: 'Evento do app' }, pick: 'escolha…', trackPh: 'nome passado a termometro.track()', add: 'Adicionar',
+    save: 'Salvar feature', cancel: 'Cancelar', needs: 'Dê um nome e adicione pelo menos uma parte.', duplicate: 'Já existe uma feature com esse nome.', usesByDay: 'Usos por dia', byAccount: 'Por conta',
+    byAccountHint: 'Usos da feature em cada conta, agora contra o período anterior.', back: 'Todas as features', before: (b) => `antes: ${b}`, failures: 'Falhas', score: 'Frustração',
+    dayTip: (d, n) => `${d}: ${n} usos` },
+  acc: { title: 'Engajamento por conta', hint: (d) => `Pessoas e sessões por dia (média dos ${d} dias com dados) e o uso das features vigiadas, agora contra o período anterior. Quem caiu aparece primeiro.`,
+    noCompare: 'Ainda não há período anterior com dados para comparar.', account: 'Conta', usersDay: 'Pessoas/dia', sessionsDay: 'Sessões/dia', people: 'Pessoas no período', fell: 'caiu',
+    none: 'Nenhuma conta com id neste período.', noFeatures: 'Vigie features na aba Features para ver o uso delas por conta.', pulse: 'Pessoas por dia',
+    open: 'Clique numa conta para ver o pulso dela; o painel inteiro passa a mostrar só ela.', back: 'Todas as contas', dayTip: (d, n) => `${d}: ${n} pessoas`, featureUses: 'Uso das features' },
   dict: { title: 'Dicionário', hint: 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra. O nome de uma conta fica só neste servidor.',
     filter: 'Filtrar por nome ou chave…', screens: 'Telas', controls: 'Botões e elementos', actions: 'Ações (gravações)', accounts: 'Contas',
     key: 'Chave técnica', auto: 'Nome no app', name: 'Nome', used: 'Uso', users: 'Usuários', placeholder: 'dar nome…', accountPlaceholder: 'ex.: Contrato Acme Saúde',
@@ -242,13 +268,15 @@ const L = PT ? {
     ok: 'Tudo tranquilo neste período', okHint: 'Nenhuma falha nova, nenhuma tela piorou ou passou de 50.' },
   short: { version_worse: (i) => `${i.route} piorou na ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} piorou (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} com nota ${i.now}`, failure_new: (i) => `falha nova em ${i.route} (${i.n}×)`, failure_recurring: (i) => `falha recorrente em ${i.route}` },
-  groups: { bugs: 'Bugs', irritation: 'Irritação', ideas: 'Sugestões', better: 'Melhorou' },
+  groups: { bugs: 'Bugs', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestões', better: 'Melhorou' },
   record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
   bands: { ok: 'tranquilo (até 19)', warn: 'atenção (20–49)', bad: 'muita frustração (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
   heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, pior a nota daquele dia. Clique na tela para ver os detalhes.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: nota ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Nota do dia',
   forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
+    account_fading: (i) => `A conta <b>${i.account}</b> está esfriando: ${i.before} → ${i.now} pessoas por dia.`,
+    account_feature_drop: (i) => `A conta <b>${i.account}</b> usa menos <b>${i.feature}</b>: ${i.before} → ${i.now} usos no período.`,
     version_worse: (i) => `<b>${i.route}</b> piorou na ${i.b}: nota ${i.before} → ${i.now} contra a ${i.a} (${i.visits} visitas na ${i.b}).`,
     screen_worse: (i, s) => `<b>${i.route}</b> piorou: nota ${i.before} → ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> está frustrante: nota ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
@@ -323,7 +351,21 @@ const L = PT ? {
     addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
     reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
   },
-  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', dictionary: 'Dictionary' },
+  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
+  feature: 'Feature',
+  feat: { title: 'Watched features', hint: 'What matters to the business, watched closely: use, who uses it, adoption, frustration and failures. Analyse one to narrow the whole dashboard to it.',
+    none: 'No watched feature yet. Create the first: give it a name and say which screens, buttons or actions make it up.', create: 'New feature', edit: 'Edit', remove: 'Remove',
+    confirmRemove: (n) => `Remove the feature ${n}? What was measured stays stored.`, analyse: 'Analyse', uses: 'Uses', people: 'People', accounts: 'Accounts',
+    adoption: 'Adoption', adoptionHint: (n) => `of the ${n} people active in the period`, name: 'Name', namePh: 'e.g. Create opportunity', parts: 'What makes up the feature',
+    partsHint: 'A visit to the screen, a click on the button, an accepted write or an app event each count as one use. To count creations, pick the action (write).',
+    kinds: { screen: 'Screen', control: 'Button', action: 'Action', track: 'App event' }, pick: 'pick…', trackPh: 'name given to termometro.track()', add: 'Add',
+    save: 'Save feature', cancel: 'Cancel', needs: 'Give it a name and add at least one part.', duplicate: 'There is already a feature with this name.', usesByDay: 'Uses per day', byAccount: 'By account',
+    byAccountHint: 'The feature\'s uses in each account, now against the period before.', back: 'All features', before: (b) => `before: ${b}`, failures: 'Failures', score: 'Frustration',
+    dayTip: (d, n) => `${d}: ${n} uses` },
+  acc: { title: 'Engagement by account', hint: (d) => `People and sessions a day (average of the ${d} days with data) and the use of the watched features, now against the period before. Who dropped comes first.`,
+    noCompare: 'No previous period with data to compare with yet.', account: 'Account', usersDay: 'People/day', sessionsDay: 'Sessions/day', people: 'People in the period', fell: 'dropped',
+    none: 'No account with an id in this period.', noFeatures: 'Watch features on the Features tab to see their use per account.', pulse: 'People per day',
+    open: 'Click an account to see its pulse; the whole dashboard then shows only it.', back: 'All accounts', dayTip: (d, n) => `${d}: ${n} people`, featureUses: 'Use of the features' },
   dict: { title: 'Dictionary', hint: 'The name people use for each screen, control, action and account. Empty uses the name the app shows. An account\'s name stays on this server.',
     filter: 'Filter by name or key…', screens: 'Screens', controls: 'Buttons and elements', actions: 'Actions (writes)', accounts: 'Accounts',
     key: 'Technical key', auto: 'Name in the app', name: 'Name', used: 'Use', users: 'Users', placeholder: 'give it a name…', accountPlaceholder: 'e.g. Acme Health contract',
@@ -338,13 +380,15 @@ const L = PT ? {
     ok: 'All calm in this period', okHint: 'No new failure, no screen got worse or went past 50.' },
   short: { version_worse: (i) => `${i.route} got worse in ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} got worse (${i.before} → ${i.now})`,
     screen_frustrating: (i) => `${i.route} at score ${i.now}`, failure_new: (i) => `new failure on ${i.route} (${i.n}×)`, failure_recurring: (i) => `recurring failure on ${i.route}` },
-  groups: { bugs: 'Bugs', irritation: 'Irritation', ideas: 'Suggestions', better: 'Improved' },
+  groups: { bugs: 'Bugs', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestions', better: 'Improved' },
   record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
   bands: { ok: 'calm (up to 19)', warn: 'attention (20–49)', bad: 'very frustrating (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
   heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the worse that day\'s score. Click a screen for the details.',
   heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Score of the day',
   forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
+    account_fading: (i) => `Account <b>${i.account}</b> is cooling down: ${i.before} → ${i.now} people a day.`,
+    account_feature_drop: (i) => `Account <b>${i.account}</b> uses <b>${i.feature}</b> less: ${i.before} → ${i.now} uses in the period.`,
     version_worse: (i) => `<b>${i.route}</b> got worse in ${i.b}: score ${i.before} → ${i.now} against ${i.a} (${i.visits} visits on ${i.b}).`,
     screen_worse: (i, s) => `<b>${i.route}</b> got worse: score ${i.before} → ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> is frustrating: score ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
@@ -429,6 +473,7 @@ function nameFields(i, raw = false) {
   if (i.action) out.action = pick(actionText(i.action), i.action)
   if (i.key) out.key = pick(i.kind_of === 'action' ? actionText(i.key) : controlLabel(i.route, i.key), i.key)
   if (i.kind === 'pair_linked') { out.a = pick(actionText(i.a), i.a); out.b = pick(actionText(i.b), i.b) }
+  if (i.account) out.account = e(accountText(i.account))
   return out
 }
 const techOf = (i) => [...new Set([i.route, i.target, i.action, i.key, i.kind === 'pair_linked' && i.a, i.kind === 'pair_linked' && i.b].filter(Boolean))]
@@ -441,7 +486,7 @@ const signals = (s) => {
 const state = { me: null, tab: 'overview', user: '', all: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
 
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
-const FILTERS = ['project', 'days', 'version', 'account', 'role']
+const FILTERS = ['project', 'days', 'version', 'account', 'role', 'feature']
 const PARAMS = ['user', 'all', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
@@ -498,6 +543,7 @@ function shell() {
         <label class="field"><span class="meta">${L.version}</span><select id="version"></select></label>
         <label class="field"><span class="meta">${L.account}</span><select id="account"></select></label>
         <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
+        <label class="field"><span class="meta">${L.feature}</span><select id="feature"></select></label>
         <span id="mark-chip"></span>
         <span id="user-chip"></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
@@ -511,7 +557,7 @@ function shell() {
     keep('project', $('#project').value); for (const k of PARAMS) state[k] = ''
     state.hash = new URLSearchParams(); await loadFilters(); render()
   })
-  for (const id of ['days', 'version', 'account', 'role']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
+  for (const id of ['days', 'version', 'account', 'role', 'feature']) $('#' + id).addEventListener('change', () => { keep(id, $('#' + id).value); render() })
   $('nav.tabs').addEventListener('click', (e) => {
     const a = e.target.closest('a[data-tab]'); if (!a) return
     e.preventDefault(); go(a.dataset.tab, { route: state.route, a: state.a, b: state.b, funnel: state.funnel })
@@ -519,11 +565,16 @@ function shell() {
   wireSearch()
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
+  $('#content').addEventListener('click', (e) => {
+    if (e.target.closest('[data-feat="no-account"]')) { $('#account').value = ''; keep('account', ''); return render() }
+    if (state.tab === 'features' || state.tab === 'accounts') onFeatureClick(e)
+  })
   $('#content').addEventListener('input', (e) => {
     if (e.target.id === 'dict-filter') { state.dictFilter = e.target.value; $('#dict-body').innerHTML = dictBody() }
   })
   $('#content').addEventListener('change', (e) => {
     if (e.target.matches('.dict-name')) saveName(e.target)
+    if (e.target.id === 'rule-kind') { state.featureEdit.kind = e.target.value; state.featureEdit.name = $('#feat-name').value; render() }
     if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
     if (e.target.id === 'flow-screen') { state.route = e.target.value; render() }
     if (e.target.id === 'funnel-add' && e.target.value) { state.funnel = JSON.stringify([...funnelSteps(), e.target.value]); render() }
@@ -554,21 +605,23 @@ async function onMark(action) {
   render()
 }
 
+const featureName = (id) => (NM().features ?? []).find((x) => x.id === id)?.name ?? id
 const accountText = (id) => { const n = NM().accounts?.[id]; return n ? (n.includes(id) ? n : `${n} (${id})`) : id }
 async function loadFilters(keepNames = false) {
   const f = await (await fetch('/api/filters?project=' + encodeURIComponent($('#project').value))).json()
   const fill = (id, values, all) => {
     const current = state.hash.has(id) ? state.hash.get(id) : state.hash.toString() ? '' : $('#' + id).value || recall(id) || ''
-    $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option value="${esc(v)}">${esc(id === 'account' ? accountText(v) : v)}</option>`).join('')
+    $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option value="${esc(v)}">${esc(id === 'account' ? accountText(v) : id === 'feature' ? featureName(v) : v)}</option>`).join('')
     $('#' + id).value = values.includes(current) ? current : ''
   }
   if (!keepNames) state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json().catch(() => null)
   fill('version', f.versions, L.allf); fill('account', f.accounts, L.all); fill('role', f.roles, L.all)
+  fill('feature', (NM().features ?? []).map((x) => x.id), L.allf)
 }
 
 function query(extra = {}) {
   const q = new URLSearchParams({ project: $('#project').value, days: $('#days').value })
-  for (const k of ['version', 'account', 'role']) if ($('#' + k).value) q.set(k, $('#' + k).value)
+  for (const k of ['version', 'account', 'role', 'feature']) if ($('#' + k).value) q.set(k, $('#' + k).value)
   if (state.user) q.set('user', state.user)
   if (state.all) q.set('all', '1')
   for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v)
@@ -620,7 +673,7 @@ function wireSearch() {
 
 // Overview -------------------------------------------------------------------------------------------------
 const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['version_worse', 'screen_worse', 'screen_frustrating', 'element_irritating', 'action_laborious'],
-  ideas: ['reach_far', 'pair_linked'], better: ['screen_better'] }
+  engagement: ['account_fading', 'account_feature_drop'], ideas: ['reach_far', 'pair_linked'], better: ['screen_better'] }
 const groupOf = (kind) => Object.keys(GROUPS).find((g) => GROUPS[g].includes(kind)) ?? 'ideas'
 const num = (n) => Number(n).toLocaleString(PT ? 'pt-BR' : 'en')
 
@@ -1069,6 +1122,166 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
+// Features & accounts --------------------------------------------------------------------------------------------
+const FT = () => L.feat, AC = () => L.acc
+// Columns of a magnitude per day, in the accent colour, with a tooltip per day.
+function barsChart(title, days, value, tip) {
+  if (days.length < 2) return ''
+  const top = Math.max(1, ...days.map(value)) * 1.1
+  return `<section class="card"><div class="label">${title}</div><div class="meta">${esc(days[0].day)} → ${esc(days[days.length - 1].day)}</div>
+    <div class="chart small"><div class="cols">${days.map((d) => `<div class="c" tabindex="0" data-tip="${esc(tip(d))}">
+      <i class="acc" style="height:${Math.max(1.5, value(d) / top * 100)}%"></i></div>`).join('')}</div></div></section>`
+}
+// Now against before, where down is the bad direction (engagement): ▼ red, ▲ green.
+const change = (now, before) => before === null || before === undefined ? '' : now === before ? '<span class="delta meta">=</span>'
+  : `<span class="delta ${now < before ? 'bad' : 'ok'}">${now < before ? '▼' : '▲'}&nbsp;${FT().before(num(before))}</span>`
+const ruleText = (r) => {
+  if (r.kind === 'screen') return screenText(r.key) || r.key
+  if (r.kind === 'control') { const [route, target] = r.key.split('\t'); return controlText(route, target) || `${screenText(route) || route} › ${target}` }
+  if (r.kind === 'action') return actionText(r.key) || r.key
+  return r.key
+}
+const ruleHtml = (r) => `<span class="pill idea">${FT().kinds[r.kind]}</span> ${named(ruleText(r) === r.key ? '' : ruleText(r), r.key.replace('\t', ' · '))}`
+
+async function features() {
+  if (state.featureEdit) return featureEditor()
+  const r = await read('/api/features')
+  const fid = $('#feature').value
+  const head = `<section class="card"><div class="head"><div><div class="label">${FT().title}</div><div class="meta">${FT().hint}</div></div>
+    <button class="primary" data-feat="new">${FT().create}</button></div></section>`
+  if (fid) {
+    const ft = r.features.find((x) => x.id === fid)
+    if (ft) return featureDetail(ft, r)
+  }
+  if (!r.features.length) return head + empty(FT().none)
+  return head + `<div class="fgrid">${r.features.map((ft) => `<section class="card feature">
+      <div class="head"><div class="fname">${esc(ft.name)}</div><span class="pill ${band(ft.score)}">${FT().score} ${ft.score}</span></div>
+      <div class="row"><div><div class="big">${num(ft.uses)}</div><div class="meta">${FT().uses} ${change(ft.uses, ft.before)}</div></div>
+        ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`)}</div>
+      <div class="adopt"><div class="meta">${FT().adoption} ${Math.round(ft.adoption * 100)}% · ${FT().adoptionHint(r.active_users)}</div>
+        <div class="bar"><i style="width:${ft.adoption * 100}%;background:var(--accent)"></i></div></div>
+      <div class="meta">${num(ft.users)} ${FT().people.toLowerCase()} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}</div>
+      <div class="actions-row"><button class="primary small" data-feat="open" data-id="${esc(ft.id)}">${FT().analyse}</button>
+        <button class="small" data-feat="edit" data-id="${esc(ft.id)}">${FT().edit}</button></div>
+    </section>`).join('')}</div>`
+}
+
+async function featureDetail(ft, r) {
+  const e = await read('/api/engagement')
+  const rows = e.accounts.map((a) => ({ ...a, f: a.features.find((x) => x.id === ft.id) ?? { now: 0, before: null } }))
+    .filter((a) => a.f.now || a.f.before).sort((a, b) => (b.f.before ?? 0) - b.f.now - ((a.f.before ?? 0) - a.f.now))
+  return `<section class="card"><div class="head"><div><button class="link" data-feat="all">← ${FT().back}</button>
+      <div class="fname big-name">${esc(ft.name)}</div><div class="rules">${ft.rules.map((x) => `<div>${ruleHtml(x)}</div>`).join('')}</div></div>
+      <div class="actions-row"><button class="small" data-feat="edit" data-id="${esc(ft.id)}">${FT().edit}</button>
+        <button class="small" data-feat="remove" data-id="${esc(ft.id)}">${FT().remove}</button></div></div></section>
+    <section class="numbers">
+      <div class="card"><div class="label">${FT().uses}</div><div class="big">${num(ft.uses)}${change(ft.uses, ft.before)}</div></div>
+      <div class="card"><div class="label">${FT().adoption}</div><div class="big">${Math.round(ft.adoption * 100)}%</div><div class="meta">${FT().adoptionHint(r.active_users)}</div></div>
+      <div class="card"><div class="label">${FT().people}</div><div class="big">${num(ft.users)}</div><div class="meta">${num(ft.accounts)} ${FT().accounts.toLowerCase()}</div></div>
+      <div class="card"><div class="label">${FT().score}</div><div class="big ${band(ft.score)}">${ft.score}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}</div></div>
+    </section>
+    ${barsChart(FT().usesByDay, ft.daily, (d) => d.n, (d) => FT().dayTip(d.day, d.n))}
+    <section class="card"><div class="label">${FT().byAccount}</div><div class="meta">${FT().byAccountHint}</div>
+      ${rows.length ? table(`<th>${AC().account}</th><th class="n">${FT().uses}</th><th class="n">${AC().usersDay}</th>`,
+        rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0"><td>${esc(accountText(a.account))}${a.drops.some((d) => d.feature === ft.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td>
+          <td class="n">${num(a.f.now)}${change(a.f.now, a.f.before)}</td><td class="n">${num(a.now.users_day)}</td></tr>`).join('')) : `<p class="meta">${AC().none}</p>`}
+    </section>`
+}
+
+async function featureEditor() {
+  const ed = state.featureEdit
+  if (!state.dict) state.dict = await read('/api/dictionary')
+  const d = state.dict
+  const opts = (kind, list, text) => `<option value="">${FT().pick}</option>` + list.slice(0, 600).map((x) =>
+    `<option value="${esc(x.key)}">${esc(text(x))}</option>`).join('')
+  const pickers = {
+    screen: opts('screen', d.screens, (x) => (screenText(x.key) ? `${screenText(x.key)} — ${x.key}` : x.key)),
+    control: opts('control', d.controls, (x) => `${controlText(x.route, x.target) || (screenText(x.route) || x.route) + ' › ' + L.unnamed} — ${x.target}`),
+    action: opts('action', d.actions, (x) => (actionText(x.key) ? `${actionText(x.key)} — ${x.key}` : x.key)),
+  }
+  return `<section class="card feditor"><div class="label">${ed.id ? FT().edit : FT().create}</div>
+    <label class="stack"><span class="meta">${FT().name}</span><input id="feat-name" value="${esc(ed.name ?? '')}" placeholder="${FT().namePh}"></label>
+    <div><div class="meta">${FT().parts}</div><div class="meta">${FT().partsHint}</div>
+      <ul class="rules-edit">${(ed.rules ?? []).map((x, i) => `<li>${ruleHtml(x)}<button class="small" data-feat="drop-rule" data-i="${i}" aria-label="${FT().remove}">×</button></li>`).join('')}</ul>
+      <div class="addrule"><select id="rule-kind">${Object.entries(FT().kinds).map(([k, v]) => `<option value="${k}" ${k === (ed.kind ?? 'action') ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        ${(ed.kind ?? 'action') === 'track' ? `<input id="rule-key" placeholder="${FT().trackPh}">` : `<select id="rule-key">${pickers[ed.kind ?? 'action']}</select>`}
+        <button data-feat="add-rule">${FT().add}</button></div></div>
+    <p class="error" id="feat-error" hidden>${FT().needs}</p>
+    <div class="actions-row"><button class="primary" data-feat="save">${FT().save}</button><button data-feat="cancel">${FT().cancel}</button></div></section>`
+}
+
+async function onFeatureClick(e) {
+  const b = e.target.closest('[data-feat]')
+  const row = e.target.closest('tr[data-account]')
+  if (row) { $('#account').value = row.dataset.account; keep('account', row.dataset.account); return go('accounts', {}) }
+  if (!b) return
+  const what = b.dataset.feat, ed = state.featureEdit
+  if (what === 'new') { state.featureEdit = { rules: [] }; return render() }
+  if (what === 'edit') { const ft = NM().features.find((x) => x.id === b.dataset.id); state.featureEdit = { ...ft, rules: [...ft.rules] }; return render() }
+  if (what === 'open') { $('#feature').value = b.dataset.id; keep('feature', b.dataset.id); return render() }
+  if (what === 'all') { $('#feature').value = ''; keep('feature', ''); return render() }
+  if (what === 'cancel') { state.featureEdit = null; return render() }
+  if (what === 'add-rule') {
+    const key = $('#rule-key').value.trim(), kind = $('#rule-kind').value
+    if (key && !ed.rules.some((x) => x.kind === kind && x.key === key)) ed.rules.push({ kind, key })
+    ed.name = $('#feat-name').value; return render()
+  }
+  if (what === 'drop-rule') { ed.rules.splice(+b.dataset.i, 1); ed.name = $('#feat-name').value; return render() }
+  const send = async (body) => {
+    const res = await fetch('/api/features?project=' + encodeURIComponent($('#project').value), { method: 'POST', body: JSON.stringify(body) })
+    if (res.status === 401) { boot(); return null }
+    if (res.ok) return res.json()
+    const why = (await res.json().catch(() => ({}))).error ?? ''
+    const box = $('#feat-error'); if (box) { box.textContent = why.includes('already') ? FT().duplicate : FT().needs; box.hidden = false }
+    return null
+  }
+  if (what === 'save') {
+    ed.name = $('#feat-name').value.trim()
+    if (!ed.name || !ed.rules.length) { $('#feat-error').hidden = false; return }
+    const out = await send({ id: ed.id, name: ed.name, rules: ed.rules })
+    if (!out) return
+    state.featureEdit = null; await loadFilters(); $('#feature').value = out.id; keep('feature', out.id); return render()
+  }
+  if (what === 'remove' && confirm(FT().confirmRemove(featureName(b.dataset.id)))) {
+    await send({ id: b.dataset.id, delete: true })
+    await loadFilters(); $('#feature').value = ''; keep('feature', ''); return render()
+  }
+}
+
+async function accounts() {
+  const e = await read('/api/engagement')
+  const id = $('#account').value
+  if (id) return accountDetail(e, id)
+  if (!e.accounts.length) return empty(AC().none)
+  const feats = e.features
+  return `<section class="card"><div class="label">${AC().title}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
+    ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
+    ${table(`<th>${AC().account}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}`,
+      e.accounts.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
+        <td><span class="nm">${esc(accountText(a.account))}</span>${a.drops.length ? `<span class="pill bad">${AC().fell}</span>` : ''}</td>
+        <td class="n">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</td>
+        <td class="n">${num(a.now.sessions_day)}${a.before ? change(a.now.sessions_day, a.before.sessions_day) : ''}</td>
+        <td class="n">${num(a.now.users)}</td>
+        ${a.features.map((f) => `<td class="n">${num(f.now)}${change(f.now, f.before)}</td>`).join('')}</tr>`).join(''))}</section>`
+}
+
+function accountDetail(e, id) {
+  const a = e.accounts.find((x) => x.account === id)
+  const days = e.daily ?? []
+  const head = `<section class="card"><button class="link" data-feat="no-account">← ${AC().back}</button><div class="fname big-name">${esc(accountText(id))}</div></section>`
+  if (!a) return head + empty(L.noVisits)
+  return head + `<section class="numbers">
+      <div class="card"><div class="label">${AC().usersDay}</div><div class="big">${num(a.now.users_day)}${a.before ? change(a.now.users_day, a.before.users_day) : ''}</div></div>
+      <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)}${a.before ? change(a.now.sessions_day, a.before.sessions_day) : ''}</div></div>
+      <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
+    </section>
+    ${barsChart(AC().pulse, days, (d) => d.users, (d) => AC().dayTip(d.day, d.users))}
+    ${e.features.length ? `<section class="card"><div class="label">${AC().featureUses}</div>
+      ${table(`<th>Feature</th><th class="n">${FT().uses}</th><th>${FT().usesByDay}</th>`, e.features.map((f) => { const x = a.features.find((y) => y.id === f.id)
+        return `<tr><td>${esc(f.name)}${a.drops.some((d) => d.feature === f.id) ? ` <span class="pill bad">${AC().fell}</span>` : ''}</td><td class="n">${num(x.now)}${change(x.now, x.before)}</td>
+          <td>${spark(days.map((d) => d.features[f.id] ?? 0), `${f.name}: ${FT().usesByDay}`)}</td></tr>` }).join(''))}</section>` : `<section class="card"><p class="meta">${AC().noFeatures}</p></section>`}`
+}
+
 // Dictionary ---------------------------------------------------------------------------------------------------
 const D = () => L.dict
 const DICT_SHOW = 60
@@ -1108,7 +1321,7 @@ async function saveName(input) {
   input.classList.add('saved'); setTimeout(() => input.classList.remove('saved'), 1200)
 }
 
-const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions, dictionary }
+const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions, features, accounts, dictionary }
 
 async function render() {
   clearTimeout(waitTimer)
@@ -1184,7 +1397,7 @@ addEventListener('hashchange', async () => {
   if (want && [...$('#project').options].some((o) => o.value === want)) $('#project').value = want
   $('#days').value = state.hash.get('days') || '7'
   if ($('#project').value !== project) await loadFilters()
-  for (const k of ['version', 'account', 'role']) {
+  for (const k of ['version', 'account', 'role', 'feature']) {
     const v = state.hash.get(k) || ''
     $('#' + k).value = [...$('#' + k).options].some((o) => o.value === v) ? v : ''
   }
