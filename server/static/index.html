@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z' fill='%23e5484d'/%3E%3C/svg%3E">
 <style>
 /* No web fonts and no third-party requests: the dashboard of a privacy tool should not call anyone. */
-/* Palettes: Nectar is the default; the viewer may pick warm, cold or high contrast (kept in the browser). Each has its
+/* Palettes: warm tones (Nectar's) open the page; the viewer may pick cool tones or high contrast (kept in the browser). Each has its
    light and dark steps; --k1..--k5 are the kinds of frustration, validated for colour blindness in both modes. */
 :root {
   --canvas: #faf7f0; --surface: #ffffff; --sunken: #f7f2e7; --line: #e6dfd0; --line-strong: #cfc6b2;
@@ -16,13 +16,6 @@
   --ok: #1d6b45; --ok-soft: #e2f2e9; --warn: #b3400a; --warn-soft: #fde8dc; --bad: #a81c3f; --bad-soft: #fbe3ea;
   --k1: #2a78d6; --k2: #eb6834; --k3: #1baf7a; --k4: #eda100; --k5: #e87ba4;
   --brand: #e5484d; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04); --ease: cubic-bezier(.16,1,.3,1);
-}
-:root[data-palette="warm"] {
-  --canvas: #fbf5ef; --surface: #ffffff; --sunken: #f6ece3; --line: #ecdccd; --line-strong: #d9c2ad;
-  --fg: #2a1a12; --fg2: #5a4034; --faint: #7a5f50;
-  --accent: #b3400a; --accent-hover: #8f330a; --accent-soft: #fde8dc; --on-accent: #ffffff; --fill: #c2410c; --on-fill: #ffffff;
-  --ok: #1d6b45; --ok-soft: #e2f2e9; --warn: #a15c07; --warn-soft: #fdf0dc; --bad: #a81c3f; --bad-soft: #fbe3ea;
-  --k1: #c2410c; --k2: #e87ba4; --k3: #eda100; --k4: #a8326e; --k5: #b45309;
 }
 :root[data-palette="cold"] {
   --canvas: #f4f7fb; --surface: #ffffff; --sunken: #eef2f8; --line: #e1e7f0; --line-strong: #c9d3e2;
@@ -46,13 +39,6 @@
   --ok: #7fd1a5; --ok-soft: #173327; --warn: #ff9a6b; --warn-soft: #3d2215; --bad: #ff8fab; --bad-soft: #3d1a26;
   --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
   --brand: #ff6b70; --shadow: none; color-scheme: dark;
-}
-  :root[data-palette="warm"] {
-  --canvas: #17110e; --surface: #201713; --sunken: #1a1310; --line: #3b2a22; --line-strong: #5a4033;
-  --fg: #f5e9e1; --fg2: #dbc6b8; --faint: #b39a8a;
-  --accent: #ff9a6b; --accent-hover: #ffb48f; --accent-soft: #3d2215; --on-accent: #1f1410; --fill: #ea6a2a; --on-fill: #1f1410;
-  --ok: #7fd1a5; --ok-soft: #173327; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8fab; --bad-soft: #3d1a26;
-  --k1: #d95926; --k2: #c75b9b; --k3: #c98500; --k4: #b8407a; --k5: #b86a12;
 }
   :root[data-palette="cold"] {
   --canvas: #0f131a; --surface: #161a22; --sunken: #12161d; --line: #262d3a; --line-strong: #384254;
@@ -354,10 +340,11 @@ const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><p
 const PT = /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
 // The colours: Nectar by default, or the viewer's pick, kept in this browser.
-const PALETTES = PT ? { nectar: 'Nectar', warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' }
-  : { nectar: 'Nectar', warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }
-const palette = () => { try { return localStorage.getItem('termometro.palette') || 'nectar' } catch { return 'nectar' } }
-const usePalette = (k) => { if (k === 'nectar') delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = k }
+// Warm tones are Nectar's palette, the one a page opens with.
+const PALETTES = PT ? { warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' }
+  : { warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }
+const palette = () => { try { const k = localStorage.getItem('termometro.palette'); return k in PALETTES ? k : 'warm' } catch { return 'warm' } }
+const usePalette = (k) => { if (k === 'warm') delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = k }
 usePalette(palette())
 document.addEventListener('change', (e) => {
   if (e.target.id !== 'palette') return
