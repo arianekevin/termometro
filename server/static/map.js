@@ -1,197 +1,516 @@
-// Termometro heat map, drawn over the app's own screen. The collector loads this file when the page was
-// opened with `?termometro_map=<token>` (the dashboard's "Open heat map" button makes that link) and leaves
-// window.termometroMap = { url, token, route(), mode, onClose() }. Each element of the current screen is painted by
-// how much it is clicked, with a badge for rage clicks, dead clicks and errors after it; what can be clicked
-// and never was is dashed. In "Routes" mode, arrows link each click to the next one on this screen, thicker and
-// hotter the more often that step was taken. Esc or "Close" turn it off.
+// Termometro usage map, drawn over the app's own screen. The collector loads this file when the page was opened with
+// `?termometro_map=<token>` (the dashboard's Map tab makes that link) and leaves
+// window.termometroMap = { url, token, route(), mode, onClose() }. Three lenses:
+//  - Routes: for each element, its most common next click when it is at least 15% of what comes next, as a curved
+//    arrow from edge to edge, wider the bigger the share; a pair strong both ways is a "back and forth". Picking an
+//    element (from the panel) shows all its next steps with % and, faint and dashed, where people come from;
+//  - Problems: only what irritates — rage, dead clicks, errors right after, a second click, near misses — tinted by
+//    the share of its clicks that went wrong, with that share in words;
+//  - Usage: how much each element is clicked.
+// The panel says what to look at on this screen. Marks never take a click (the app stays usable underneath), follow
+// their elements every frame (transitions, animations, scrolling containers) and are left out where the element is
+// hidden, clipped or covered (a modal, a menu).
 ;(() => {
   const cfg = window.termometroMap
   if (!cfg || window.__termometroMapOpen) return
   window.__termometroMapOpen = true
 
   const pt = /^pt\b/i.test(navigator.language)
-  const T = pt
-    ? { title: 'Termometro · mapa de uso', close: 'Fechar', loading: 'Carregando…', visits: 'visitas', clicks: 'cliques',
-        inView: (n, total) => `${n} de ${total} elementos com dados estão à vista`, never: 'nunca clicados',
-        neverCount: (n) => `${n} elementos nunca clicados`, days: 'dias', expired: 'o link do mapa expirou: abra de novo pelo painel',
-        down: 'o Termometro não respondeu', less: 'pouco → muito clicado', heat: 'Calor', routes: 'Rotas',
-        routesInfo: (shown, total) => `${shown} das ${total} rotas mais feitas nesta tela`, routesLess: 'pouco → muito feita',
-        noRoutes: 'nenhuma sequência de cliques nesta tela ainda', top: (n) => `${n} mais feitas`, step: (a, b, n) => `${a} → ${b}\n${n} vezes`,
-        tip: (e, n) => `${e.target}\n${e.clicks} cliques de ${e.users} usuários\nrage ${e.rage} · sem resposta ${e.dead} · erros depois ${e.errors}` +
-          (n > 1 ? `\n${n} elementos com este seletor; o número é a soma` : '') }
-    : { title: 'Termometro · usage map', close: 'Close', loading: 'Loading…', visits: 'visits', clicks: 'clicks',
-        inView: (n, total) => `${n} of ${total} elements with data are in view`, never: 'never clicked',
-        neverCount: (n) => `${n} elements never clicked`, days: 'days', expired: 'the map link expired: open it again from the dashboard',
-        down: 'Termometro did not answer', less: 'few → many clicks', heat: 'Heat', routes: 'Routes',
-        routesInfo: (shown, total) => `${shown} of the ${total} most taken routes on this screen`, routesLess: 'rarely → often taken',
-        noRoutes: 'no click sequence on this screen yet', top: (n) => `top ${n}`, step: (a, b, n) => `${a} → ${b}\n${n} times`,
-        tip: (e, n) => `${e.target}\n${e.clicks} clicks by ${e.users} users\nrage ${e.rage} · dead ${e.dead} · errors after ${e.errors}` +
-          (n > 1 ? `\n${n} elements share this selector; the number is their sum` : '') }
+  const fmt = (n) => Number(n || 0).toLocaleString(pt ? 'pt-BR' : 'en-US')
+  const pc = (f) => `${Math.round(Math.min(1, f) * 100)}%`
+  const T = pt ? {
+    title: 'Termometro · mapa', close: 'Fechar', collapse: 'Recolher', expand: 'Abrir', loading: 'Carregando…',
+    days: 'dias', expired: 'O link do mapa expirou: abra de novo pelo painel.', down: 'O Termometro não respondeu.',
+    lenses: { routes: 'Rotas', problems: 'Problemas', usage: 'Uso' },
+    help: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Só acende o que irrita.', usage: 'Quanto cada elemento é clicado.',
+      picked: (n) => `Só as rotas de ${n}.` },
+    look: 'O que olhar nesta tela', lookLead: 'Os passos que mais dizem algo, primeiro o mais forte.',
+    irritTitle: 'O que irrita nesta tela', irritLead: 'Parte dos cliques que viraram irritação, clique sem resposta ou erro.',
+    usageTitle: 'O que é mais usado', usageLead: (d) => `Cliques nos últimos ${d} dias.`,
+    back: '← Todas as rotas', times: (n) => `${fmt(n)} ${n === 1 ? 'vez' : 'vezes'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'clique' : 'cliques'}`,
+    irritates: (p) => `${p} irrita`, backForth: 'vai e volta', after: (n) => `Depois: ${n}`, before: (n) => `Antes: ${n}`,
+    arrivals: (n, total) => `${fmt(n)} das ${fmt(total)} chegadas`,
+    noSteps: 'Ainda não há sequências de cliques nesta tela.', noStrong: 'Nenhum passo chega a 15% do que vem depois: as pessoas se espalham.',
+    noProblems: 'Nada nesta tela irrita quem usa neste período.', noClicks: 'Nenhum clique nesta tela neste período.',
+    kinds: { rage: 'cliques repetidos de irritação', dead: 'clicou e nada aconteceu', errors: 'erro logo depois',
+      retry: 'precisou clicar de novo', near_miss: 'clicou do lado, quase acertou' },
+    why: { rage: 'na maioria, cliques repetidos de irritação', dead: 'parece clicável e não faz nada', errors: 'na maioria, erro logo depois',
+      retry: 'o primeiro clique não pega', near_miss: 'as pessoas erram o alvo por pouco' },
+    advice: { rage: 'Mostre que está trabalhando (carregando, desabilitado) e responda mais rápido.',
+      dead: 'Ou vira botão de verdade, ou deixa de parecer clicável.', errors: 'Veja os erros em Falhas: algo quebra logo depois do clique.',
+      retry: 'O primeiro clique precisa responder: confira o que acontece nele.', near_miss: 'Aumente a área de clique ou afaste o que está em volta.' },
+    noteDominant: (p, a, b) => `${p} de quem clica em ${a} vai direto para ${b}: é o caminho esperado e pode encurtar.`,
+    notePairs: (names) => `${names} ficam em vai e volta: sinal de que as pessoas não acham o que fazer em seguida.`,
+    noteSpread: 'Nenhum passo domina: se existe um caminho esperado, ele não está evidente na tela.',
+    pickedDominant: (a, b) => `Quase todo mundo vai de ${a} para ${b}: vale abrir ${b} já com o foco, ou juntar os dois passos.`,
+    pickedSpread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
+    pickedNone: (a) => `Não há clique seguinte registrado depois de ${a}.`,
+    noteProblem: (n, p, why, advice) => `${n} irrita ${p} das vezes que é clicado: ${why}. ${advice}`,
+    noteUsage: (n, share) => `${n} leva ${share} dos cliques desta tela.`,
+    legend: { next: 'próximo passo mais comum', back: 'vai e volta', wider: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais',
+      in: 'de onde chegam', bad: 'cor mais forte = mais cliques que irritam', none: 'sem cor = nenhum problema',
+      usage: 'amarelo mais forte = mais cliques', never: 'tracejado = pode ser clicado e ninguém clicou' },
+    never: 'nunca clicados', offscreen: (names) => `Fora da vista agora (menu fechado, janela, rolagem ou outra tela): ${names}.`,
+    offTag: 'fora da vista', many: (n) => `Aparece ${n} vezes nesta tela; os números são de todas juntas.`, notHere: 'Não está na tela agora.',
+    total: (v, c) => `${fmt(v)} visitas · ${fmt(c)} cliques`
+  } : {
+    title: 'Termometro · map', close: 'Close', collapse: 'Collapse', expand: 'Open', loading: 'Loading…',
+    days: 'days', expired: 'The map link expired: open it again from the dashboard.', down: 'Termometro did not answer.',
+    lenses: { routes: 'Routes', problems: 'Problems', usage: 'Usage' },
+    help: { routes: 'The most common path after each element.', problems: 'Lights up only what irritates.', usage: 'How much each element is clicked.',
+      picked: (n) => `Only the routes of ${n}.` },
+    look: 'What to look at on this screen', lookLead: 'The steps that say the most, strongest first.',
+    irritTitle: 'What irritates on this screen', irritLead: 'Share of the clicks that turned into rage, no response or an error.',
+    usageTitle: 'What is used the most', usageLead: (d) => `Clicks in the last ${d} days.`,
+    back: '← All routes', times: (n) => `${fmt(n)} ${n === 1 ? 'time' : 'times'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'click' : 'clicks'}`,
+    irritates: (p) => `${p} irritate`, backForth: 'back and forth', after: (n) => `Next: ${n}`, before: (n) => `Before: ${n}`,
+    arrivals: (n, total) => `${fmt(n)} of ${fmt(total)} arrivals`,
+    noSteps: 'No click sequences on this screen yet.', noStrong: 'No step reaches 15% of what comes next: people scatter.',
+    noProblems: 'Nothing on this screen irritates people in this period.', noClicks: 'No clicks on this screen in this period.',
+    kinds: { rage: 'angry repeated clicks', dead: 'clicked and nothing happened', errors: 'error right after',
+      retry: 'had to click again', near_miss: 'clicked beside it, nearly hit' },
+    why: { rage: 'mostly angry repeated clicks', dead: 'looks clickable and does nothing', errors: 'mostly an error right after',
+      retry: 'the first click does not take', near_miss: 'people narrowly miss it' },
+    advice: { rage: 'Show it is working (loading, disabled) and answer faster.', dead: 'Make it a real button, or stop it looking clickable.',
+      errors: 'See the errors in Failures: something breaks right after the click.', retry: 'The first click has to respond: check what it does.',
+      near_miss: 'Make the click area bigger or move what is around it.' },
+    noteDominant: (p, a, b) => `${p} of those who click ${a} go straight to ${b}: the expected path, and it can be shortened.`,
+    notePairs: (names) => `${names} go back and forth: a sign people do not find what to do next.`,
+    noteSpread: 'No step dominates: if there is an expected path, the screen does not make it clear.',
+    pickedDominant: (a, b) => `Almost everyone goes from ${a} to ${b}: open ${b} already focused, or merge the two steps.`,
+    pickedSpread: (a) => `After ${a} people scatter: no next step dominates. If there is an expected path, the screen does not make it clear.`,
+    pickedNone: (a) => `No next click recorded after ${a}.`,
+    noteProblem: (n, p, why, advice) => `${n} irritates ${p} of the times it is clicked: ${why}. ${advice}`,
+    noteUsage: (n, share) => `${n} takes ${share} of this screen's clicks.`,
+    legend: { next: 'most common next step', back: 'back and forth', wider: 'thicker arrow = bigger share', min: 'only steps of 15% or more',
+      in: 'where they come from', bad: 'stronger colour = more irritating clicks', none: 'no colour = no problem',
+      usage: 'stronger yellow = more clicks', never: 'dashed = clickable and nobody clicked' },
+    never: 'never clicked', offscreen: (names) => `Out of view now (closed menu, dialog, scrolling or another screen): ${names}.`,
+    offTag: 'out of view', many: (n) => `Appears ${n} times on this screen; the numbers are for all of them.`, notHere: 'Not on the screen now.',
+    total: (v, c) => `${fmt(v)} visits · ${fmt(c)} clicks`
+  }
+
+  // Nectar warm palette (the approved reference's light theme).
+  const C = { fg: '#2a2418', fg2: '#6b5f48', faint: '#8f8370', surface: '#ffffff', sunken: '#f1ece0', line: '#e4dccb',
+    fill: '#fec10d', accent: '#8a5e00', warn: '#b3400a', bad: '#a81c3f', never: '#6b5f48', halo: 'rgba(255,255,255,.95)' }
+  const MIN = 0.15 // a step is worth an arrow from this share of what comes next
+  const DOMINANT = 0.6
+  const MIN_IRR = 3 // fewer irritations than this is noise, not a problem
+  const KINDS = ['rage', 'dead', 'errors', 'retry', 'near_miss']
+
+  const ss = (key, value) => {
+    try {
+      if (value === null) sessionStorage.removeItem(key)
+      else if (value !== undefined) sessionStorage.setItem(key, value)
+      return sessionStorage.getItem(key)
+    } catch { return null }
+  }
+  // An older collector (before 0.2.5) leaves `termometro_mode` in the address and never passes it on: read it here.
+  const params = new URLSearchParams(location.search)
+  const urlMode = params.get('termometro_mode')
+  if (urlMode) {
+    params.delete('termometro_mode')
+    const rest = params.toString()
+    try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash) } catch {}
+  }
+  const kept = (ss('termometro.mapLens') || '').split('|')
+  let lens = urlMode ? (urlMode === 'routes' ? 'routes' : 'problems')
+    : kept[0] === cfg.token && T.lenses[kept[1]] ? kept[1] : cfg.mode === 'routes' ? 'routes' : 'problems'
+  const keepLens = () => ss('termometro.mapLens', cfg.token + '|' + lens)
+  keepLens()
 
   // The project comes inside the token: m.<project>.<expiry>.<signature>
   const project = cfg.token.split('.').slice(1, -2).join('.')
 
   const root = document.createElement('div')
   root.setAttribute('data-termometro', '')
-  root.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:12px/16px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif'
+  root.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:13px/18px Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:${C.fg}`
   const layer = document.createElement('div')
   const panel = document.createElement('div')
-  panel.style.cssText = 'position:fixed;right:12px;bottom:12px;max-width:min(360px,calc(100vw - 24px));pointer-events:auto;' +
-    'background:#1d1b22;color:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35)'
+  panel.setAttribute('role', 'dialog')
+  panel.setAttribute('aria-label', T.title)
   root.append(layer, panel)
   document.body.appendChild(root)
 
   let days = 30
   let showNever = true
-  let mode = cfg.mode === 'routes' ? 'routes' : 'heat' // the dashboard's Map tab may open it straight in Routes
-  let routesShown = 5
+  let collapsed = false
+  let data = null, loadedRoute = null, message = null
+  let hovered = null, picked = null // element targets (selectors)
   const SVG = 'http://www.w3.org/2000/svg'
-  let data = null
-  let loadedRoute = null
-  let frame = 0
-
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
-  // Cold to hot: blue, yellow, orange, red — the fraction of the most clicked element.
-  function heat(f, alpha) {
-    const stops = [[59, 130, 246], [250, 204, 21], [249, 115, 22], [220, 38, 38]]
-    const x = Math.min(1, Math.max(0, f)) * (stops.length - 1)
-    const i = Math.min(stops.length - 2, Math.floor(x)), k = x - i
-    const [r, g, b] = stops[i].map((v, j) => Math.round(v + (stops[i + 1][j] - v) * k))
-    return `rgba(${r},${g},${b},${alpha})`
-  }
-
-  function visible(el) {
-    const r = el.getBoundingClientRect()
-    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth
-  }
-
+  // ---------- what is on screen ----------
+  const found = new Map() // selector → elements
+  let queryDirty = true, lastQuery = 0
   function find(selector) {
     try { return Array.from(document.querySelectorAll(selector)).filter((el) => !root.contains(el)) } catch { return [] }
   }
-
-  function box(r, style) {
-    const div = document.createElement('div')
-    div.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:4px;${style}`
-    layer.appendChild(div)
+  function tracked() {
+    if (!data) return []
+    const s = new Set(data.elements.map((e) => e.target))
+    for (const t of data.never_clicked || []) s.add(t)
+    for (const p of data.paths || []) { s.add(p.from); s.add(p.to) }
+    return [...s]
+  }
+  function requery() {
+    found.clear()
+    for (const t of tracked()) found.set(t, find(t))
+    queryDirty = false
+    lastQuery = performance.now()
   }
 
-  const center = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r } }
-  const svgEl = (tag, attrs) => { const el = document.createElementNS(SVG, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el }
-
-  // Routes: the most taken steps from one click to the next, as curved arrows between the elements.
-  function drawRoutes() {
-    const paths = data.paths ?? []
-    const shown = []
-    for (const p of paths) {
-      if (shown.length >= routesShown) break
-      const a = find(p.from).find(visible), b = find(p.to).find(visible)
-      if (a && b) shown.push({ ...p, a: center(a), b: center(b) })
-    }
-    const svg = svgEl('svg', { width: innerWidth, height: innerHeight })
-    svg.style.cssText = 'position:fixed;inset:0;overflow:visible'
-    const defs = svgEl('defs', {})
-    svg.appendChild(defs)
-    const max = Math.max(1, ...shown.map((p) => p.n))
-    const outlined = new Set()
-    // Least taken first, so the most taken are drawn on top.
-    shown.slice().reverse().forEach((p, i) => {
-      const f = p.n / max, color = heat(f, 0.95), width = 2 + f * 6, id = `tm-arrow-${i}`
-      const marker = svgEl('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 3, markerHeight: 3, orient: 'auto-start-reverse' })
-      marker.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: color }))
-      defs.appendChild(marker)
-      // A bend to one side, so A→B and B→A do not overlap; the end stops at the target's edge.
-      const dx = p.b.x - p.a.x, dy = p.b.y - p.a.y, len = Math.hypot(dx, dy) || 1
-      const bend = Math.min(80, len * 0.25), cx = (p.a.x + p.b.x) / 2 - (dy / len) * bend, cy = (p.a.y + p.b.y) / 2 + (dx / len) * bend
-      const stop = Math.min(len / 3, Math.max(p.b.r.width, p.b.r.height) / 2 + 4)
-      const ex = p.b.x - ((p.b.x - cx) / Math.hypot(p.b.x - cx, p.b.y - cy)) * stop, ey = p.b.y - ((p.b.y - cy) / Math.hypot(p.b.x - cx, p.b.y - cy)) * stop
-      svg.appendChild(svgEl('path', { d: `M${p.a.x},${p.a.y} Q${cx},${cy} ${ex},${ey}`, fill: 'none', stroke: color, 'stroke-width': width,
-        'stroke-linecap': 'round', 'marker-end': `url(#${id})`, opacity: 0.85 }))
-      const mx = 0.25 * p.a.x + 0.5 * cx + 0.25 * ex, my = 0.25 * p.a.y + 0.5 * cy + 0.25 * ey
-      const badge = document.createElement('div')
-      badge.style.cssText = `position:fixed;left:${mx - 14}px;top:${my - 10}px;pointer-events:auto;cursor:help;background:${heat(f, 1)};color:#fff;` +
-        'font-weight:700;border-radius:999px;padding:1px 7px;font-size:11px;border:2px solid #fff;white-space:nowrap'
-      badge.textContent = String(p.n)
-      badge.title = T.step(p.from_label || p.from, p.to_label || p.to, p.n)
-      for (const [sel, c] of [[p.from, p.a], [p.to, p.b]]) {
-        if (outlined.has(sel)) continue
-        outlined.add(sel)
-        box(c.r, 'outline:2px solid rgba(29,27,34,.55);background:rgba(255,255,255,.12)')
+  // The part of the element a person can see now: not display:none, visibility:hidden or transparent, inside the
+  // viewport and every scrolling/clipping ancestor, and not covered by something else (a modal, a menu).
+  function seen(el) {
+    const r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) return null
+    if (el.checkVisibility) { if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return null }
+    else if (getComputedStyle(el).visibility === 'hidden') return null
+    let l = Math.max(0, r.left), t = Math.max(0, r.top), rr = Math.min(innerWidth, r.right), b = Math.min(innerHeight, r.bottom)
+    let fixed = getComputedStyle(el).position === 'fixed'
+    for (let a = el.parentElement; a && a !== document.body && a !== document.documentElement && !fixed; a = a.parentElement) {
+      const cs = getComputedStyle(a)
+      if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+        const ar = a.getBoundingClientRect(), al = ar.left + a.clientLeft, at = ar.top + a.clientTop
+        if (cs.overflowX !== 'visible') { l = Math.max(l, al); rr = Math.min(rr, al + a.clientWidth) }
+        if (cs.overflowY !== 'visible') { t = Math.max(t, at); b = Math.min(b, at + a.clientHeight) }
       }
-      layer.appendChild(badge)
-    })
-    layer.prepend(svg)
-    const counter = panel.querySelector('[data-in-view]')
-    if (counter) counter.textContent = paths.length ? T.routesInfo(shown.length, paths.length) : T.noRoutes
+      if (cs.position === 'fixed') fixed = true
+    }
+    if (rr - l < 2 || b - t < 2) return null
+    for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+      // The first thing under that point that is the app's (the map's own panel does not count as a cover).
+      const hit = document.elementsFromPoint(l + (rr - l) * fx, t + (b - t) * fy).find((h) => !root.contains(h))
+      if (hit && (hit === el || el.contains(hit) || hit.contains(el))) return { left: l, top: t, right: rr, bottom: b, width: rr - l, height: b - t }
+    }
+    return null
   }
 
-  function draw() {
-    frame = 0
-    layer.replaceChildren()
-    if (!data) return
-    if (mode === 'routes') return drawRoutes()
-    const max = Math.max(1, ...data.elements.map((e) => e.clicks))
-    let inView = 0
+  let geo = new Map() // selector → visible rects
+  function measure() {
+    geo = new Map()
+    for (const [t, list] of found) {
+      const rects = []
+      for (const el of list) { const r = seen(el); if (r) rects.push(r) }
+      if (rects.length) geo.set(t, rects)
+    }
+  }
+  const shown = (t) => geo.has(t)
+
+  // ---------- the data, in people's words ----------
+  let els = new Map(), outTotal = new Map(), inTotal = new Map()
+  function model() {
+    els = new Map(); outTotal = new Map(); inTotal = new Map()
     for (const e of data.elements) {
-      const els = find(e.target)
-      if (els.length) inView++
-      els.filter(visible).forEach((el, i) => {
-        const r = el.getBoundingClientRect()
-        const f = e.clicks / max
-        box(r, `background:${heat(f, 0.18 + f * 0.37)};outline:2px solid ${heat(f, 0.9)}`)
-        if (i > 0) return // several elements with one selector (table rows): one badge
-        const problems = e.rage + e.dead + e.errors
-        const badge = document.createElement('div')
-        badge.style.cssText = `position:fixed;left:${Math.max(0, r.left)}px;top:${Math.max(0, r.top - 18)}px;pointer-events:auto;` +
-          `background:${heat(f, 1)};color:#fff;font-weight:700;border-radius:999px;padding:1px 6px;font-size:11px;white-space:nowrap;cursor:help`
-        badge.textContent = `${e.clicks}${problems ? ' ⚠' + problems : ''}${els.length > 1 ? ' ×' + els.length : ''}`
-        badge.title = T.tip(e, els.length)
-        layer.appendChild(badge)
-      })
+      const irr = KINDS.reduce((s, k) => s + (e[k] || 0), 0)
+      const main = KINDS.filter((k) => e[k]).sort((a, b) => e[b] - e[a])[0]
+      els.set(e.target, { ...e, irr, main, pain: e.clicks ? Math.min(1, irr / e.clicks) : irr ? 1 : 0 })
     }
-    if (showNever) {
-      for (const selector of data.never_clicked) {
-        for (const el of find(selector).filter(visible)) box(el.getBoundingClientRect(), 'outline:2px dashed rgba(120,120,130,.9)')
+    for (const p of paths()) {
+      outTotal.set(p.from, (outTotal.get(p.from) || 0) + p.n)
+      inTotal.set(p.to, (inTotal.get(p.to) || 0) + p.n)
+    }
+  }
+  function nameOf(t) {
+    const e = els.get(t)
+    if (e?.label) return e.label
+    for (const p of data?.paths || []) { if (p.from === t && p.from_label) return p.from_label; if (p.to === t && p.to_label) return p.to_label }
+    const el = (found.get(t) || [])[0]
+    const own = el && (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') ||
+      (el.innerText || '').trim().split('\n')[0].slice(0, 30))
+    if (own && /\p{L}/u.test(own)) return own
+    const m = /([#.])([\w-]+)[^#.]*$/.exec(t) // button#novo-ticket → "novo ticket"
+    return m ? m[2].replace(/[-_]+/g, ' ') : t
+  }
+  // A step's share: of everything that came right after `from`, how much went to `to`.
+  const share = (p) => p.n / (outTotal.get(p.from) || 1)
+  const MIN_N = 5 // a step taken fewer times than this is an accident, not a route
+  const paths = () => (data?.paths || []).filter((p) => p.n >= MIN_N)
+  const step = (a, b) => paths().find((p) => p.from === a && p.to === b)
+  const backAndForth = (p) => { const r = step(p.to, p.from); return share(p) >= MIN && !!r && share(r) >= MIN }
+  function bestSteps() { // each element's single most common next step, when it is a real share
+    const best = new Map()
+    for (const p of paths()) if (!best.has(p.from) || p.n > best.get(p.from).n) best.set(p.from, p)
+    return [...best.values()].filter((p) => share(p) >= MIN).sort((a, b) => share(b) - share(a))
+  }
+  const problems = () => [...els.values()].filter((e) => e.irr >= MIN_IRR).sort((a, b) => b.pain - a.pain || b.irr - a.irr)
+  const used = () => [...els.values()].filter((e) => e.clicks > 0).sort((a, b) => b.clicks - a.clicks)
+
+  // ---------- drawing ----------
+  let placed = []
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+  function mark(r, color, { width = 2, fill = 'transparent', dashed = false, dim = false } = {}) {
+    const d = document.createElement('div')
+    d.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;box-sizing:border-box;` +
+      `border-radius:6px;background:${fill};border:${width}px ${dashed ? 'dashed' : 'solid'} ${color};` +
+      `box-shadow:0 0 0 1px ${C.halo};opacity:${dim ? 0.3 : 1}`
+    layer.appendChild(d)
+  }
+  function pill(text, bg, fg) {
+    const b = document.createElement('div')
+    b.textContent = text
+    b.style.cssText = `position:fixed;left:0;top:0;background:${bg};color:${fg};font-weight:600;font-size:12px;line-height:16px;` +
+      `border-radius:999px;padding:2px 8px;white-space:nowrap;border:2px solid ${C.surface};box-shadow:0 1px 3px rgba(0,0,0,.25);` +
+      'max-width:240px;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums'
+    layer.appendChild(b)
+    return b
+  }
+  // A pill above the element, or below, or at its right end — wherever it covers no other pill and not the panel.
+  function badge(r, text, bg, fg, force) {
+    const b = pill(text, bg, fg)
+    const w = b.offsetWidth, h = b.offsetHeight
+    const pr = panel.getBoundingClientRect()
+    for (const [x0, y0] of [[r.left, r.top - h - 3], [r.left, r.bottom + 3], [r.right - w, r.top - h - 3], [r.right - w, r.bottom + 3]]) {
+      const x = Math.max(2, Math.min(innerWidth - w - 2, x0)), y = Math.max(2, Math.min(innerHeight - h - 2, y0))
+      const box = { left: x, top: y, right: x + w, bottom: y + h }
+      if (!force && (placed.some((p) => overlaps(p, box)) || overlaps(pr, box))) continue
+      b.style.left = x + 'px'; b.style.top = y + 'px'; placed.push(box)
+      return
+    }
+    b.remove() // no free spot: the element keeps its colour and is in the panel's list
+  }
+  const focusOn = () => hovered || picked
+  const dimOf = (t) => !!focusOn() && focusOn() !== t
+
+  function drawHeat() {
+    const list = lens === 'problems' ? problems() : used()
+    const max = Math.max(1, ...used().map((e) => e.clicks))
+    for (const e of list) {
+      const rects = geo.get(e.target)
+      if (!rects) continue
+      const dim = dimOf(e.target), big = e.target === focusOn()
+      if (lens === 'problems') {
+        rects.forEach((r) => mark(r, C.bad, { width: big ? 4 : 2 + Math.round(e.pain * 2), fill: `rgba(168,28,63,${(0.06 + e.pain * 0.3).toFixed(2)})`, dim }))
+      } else {
+        const f = e.clicks / max
+        rects.forEach((r) => mark(r, big ? C.fg : C.accent, { width: big ? 4 : 1 + Math.round(f * 2), fill: `rgba(254,193,13,${(0.08 + f * 0.32).toFixed(2)})`, dim }))
       }
     }
-    // The app's screen changes after the map opens (loading, tabs): the count follows every repaint.
-    const counter = panel.querySelector('[data-in-view]')
-    if (counter) counter.textContent = T.inView(inView, data.elements.length)
+    if (showNever) for (const t of data.never_clicked || []) for (const r of geo.get(t) || []) mark(r, C.never, { dashed: true, dim: !!focusOn() })
+    // Pills: the focused one first, then by rank, each where it covers no other.
+    const order = list.filter((e) => geo.has(e.target) && !dimOf(e.target))
+    order.sort((a, b) => (b.target === focusOn()) - (a.target === focusOn()))
+    for (const e of order) {
+      const r = geo.get(e.target)[0]
+      if (lens === 'problems') badge(r, T.irritates(pc(e.pain)), C.bad, '#fff', e.target === focusOn())
+      else badge(r, T.clicksN(e.clicks), C.fg, C.surface, e.target === focusOn())
+    }
   }
 
-  const schedule = () => { if (!frame) frame = requestAnimationFrame(draw) }
+  const svgEl = (tag, attrs, parent) => { const el = document.createElementNS(SVG, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); parent?.appendChild(el); return el }
+  const mid = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
+  // Where the line from the centre of r towards (x, y) leaves r, a few pixels out.
+  function edge(r, x, y, gap) {
+    const c = mid(r), dx = x - c.x, dy = y - c.y, len = Math.hypot(dx, dy) || 1
+    const k = Math.min(dx ? (r.width / 2) / Math.abs(dx) : Infinity, dy ? (r.height / 2) / Math.abs(dy) : Infinity, 1)
+    return { x: c.x + dx * k + (dx / len) * gap, y: c.y + dy * k + (dy / len) * gap }
+  }
+  function drawRoutes() {
+    const svg = svgEl('svg', { width: innerWidth, height: innerHeight })
+    svg.style.cssText = 'position:fixed;inset:0;overflow:visible;pointer-events:none'
+    const defs = svgEl('defs', {}, svg)
+    for (const [id, color] of [['main', C.accent], ['warn', C.warn]]) {
+      const m = svgEl('marker', { id: 'tm-ar-' + id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 5, markerHeight: 5, orient: 'auto-start-reverse' }, defs)
+      svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: color }, m)
+    }
+    layer.appendChild(svg)
+    const ends = new Set(), missing = new Set(), labels = []
+    function arrow(p, { faint = false } = {}) {
+      const a = geo.get(p.from)?.[0], b = geo.get(p.to)?.[0]
+      if (!a || !b) { if (!a) missing.add(p.from); if (!b) missing.add(p.to); return }
+      ends.add(p.from); ends.add(p.to)
+      const A = mid(a), B = mid(b), dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1
+      // A bend to one side, so A→B and B→A do not overlap; from the edge of one to the edge of the other.
+      const bend = Math.min(90, len * 0.28), cx = (A.x + B.x) / 2 - (dy / len) * bend, cy = (A.y + B.y) / 2 + (dx / len) * bend
+      const s = edge(a, cx, cy, 3), e = edge(b, cx, cy, 5)
+      const d = `M${s.x},${s.y} Q${cx},${cy} ${e.x},${e.y}`
+      if (faint) {
+        svgEl('path', { d, fill: 'none', stroke: C.surface, 'stroke-width': 4, 'stroke-linecap': 'round', opacity: 0.8 }, svg)
+        svgEl('path', { d, fill: 'none', stroke: C.faint, 'stroke-width': 1.5, 'stroke-dasharray': '4 5', opacity: 0.9 }, svg)
+        return
+      }
+      const f = share(p), loop = backAndForth(p), color = loop ? C.warn : C.accent, w = 2 + f * 7
+      svgEl('path', { d, fill: 'none', stroke: C.surface, 'stroke-width': w + 4, 'stroke-linecap': 'round', opacity: 0.85 }, svg)
+      svgEl('path', { d, fill: 'none', stroke: color, 'stroke-width': w, 'stroke-linecap': 'round', opacity: 0.92,
+        'marker-end': `url(#tm-ar-${loop ? 'warn' : 'main'})`, 'data-step': '' }, svg)
+      labels.push({ x: 0.25 * s.x + 0.5 * cx + 0.25 * e.x, y: 0.25 * s.y + 0.5 * cy + 0.25 * e.y, text: pc(f), loop })
+    }
+    if (picked) {
+      for (const p of paths().filter((p) => p.to === picked && share(p) >= MIN)) arrow(p, { faint: true })
+      for (const p of paths().filter((p) => p.from === picked)) arrow(p)
+      if (!shown(picked)) missing.add(picked)
+    } else {
+      for (const p of bestSteps()) arrow(p)
+    }
+    for (const t of ends) for (const r of geo.get(t) || []) {
+      const on = t === picked || t === hovered
+      mark(r, on ? C.fg : C.accent, { width: on ? 3 : 1.5, fill: on ? 'rgba(254,193,13,.22)' : 'transparent', dim: picked && t !== picked && !on ? false : false })
+    }
+    if (hovered && !ends.has(hovered)) for (const r of geo.get(hovered) || []) mark(r, C.fg, { width: 3, fill: 'rgba(254,193,13,.22)' })
+    for (const l of labels) {
+      const b = pill(l.text, l.loop ? C.warn : C.accent, '#fff')
+      b.style.left = Math.max(2, Math.min(innerWidth - b.offsetWidth - 2, l.x - b.offsetWidth / 2)) + 'px'
+      b.style.top = Math.max(2, Math.min(innerHeight - b.offsetHeight - 2, l.y - b.offsetHeight / 2)) + 'px'
+    }
+    return [...missing].filter((t) => !shown(t))
+  }
 
-  function renderPanel(message) {
-    const d = data
-    const clicks = d ? d.elements.reduce((s, e) => s + e.clicks, 0) : 0
-    const button = 'background:none;border:1px solid #555;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer'
-    panel.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <b style="font-size:13px">${esc(T.title)}</b>
-        <button data-act="close" style="margin-left:auto;${button}">${esc(T.close)}</button>
-      </div>
-      <div style="color:#d4d4d8;overflow-wrap:anywhere">${esc(loadedRoute ?? '')}</div>
-      ${message ? `<div style="margin-top:6px;color:#fca5a5">${esc(message)}</div>` : d ? `
-        <div style="margin-top:6px">${d.visits} ${T.visits} · ${clicks} ${T.clicks}</div>
-        <div data-in-view style="margin-top:2px"></div>
-        <div style="margin-top:2px;color:#a1a1aa">${esc(T.neverCount(d.never_clicked.length))}</div>` : `<div style="margin-top:6px">${T.loading}</div>`}
-      <div style="display:flex;gap:4px;margin-top:8px">${['heat', 'routes'].map((m) => `<button data-mode="${m}" style="${button};${mode === m ? 'background:#fff;color:#1d1b22;font-weight:600' : ''}">${esc(T[m])}</button>`).join('')}</div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
-        <select data-act="days" style="background:#27252d;color:#fff;border:1px solid #555;border-radius:6px;padding:2px 4px">
-          ${[7, 30, 90].map((n) => `<option value="${n}" ${n === days ? 'selected' : ''}>${n} ${T.days}</option>`).join('')}
-        </select>
-        ${mode === 'heat' ? `<label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" data-act="never" ${showNever ? 'checked' : ''}>${esc(T.never)}</label>`
-          : `<select data-act="shown" aria-label="${esc(T.routes)}" style="background:#27252d;color:#fff;border:1px solid #555;border-radius:6px;padding:2px 4px">
-              ${[5, 10, 15].map((n) => `<option value="${n}" ${n === routesShown ? 'selected' : ''}>${esc(T.top(n))}</option>`).join('')}</select>`}
-        <span title="${esc(mode === 'heat' ? T.less : T.routesLess)}" style="margin-left:auto;display:inline-block;width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,${heat(0, 1)},${heat(0.5, 1)},${heat(1, 1)})"></span>
-      </div>`
+  let lastDrawn = ''
+  function draw(force) {
+    const sig = [lens, hovered, picked, showNever, collapsed, innerWidth, innerHeight,
+      ...[...geo].map(([t, rs]) => t + rs.map((r) => `${r.left | 0},${r.top | 0},${r.width | 0},${r.height | 0}`).join(';'))].join('|')
+    if (!force && sig === lastDrawn) return
+    lastDrawn = sig
+    layer.replaceChildren()
+    placed = []
+    if (!data || collapsed) return
+    let off
+    if (lens === 'routes') off = drawRoutes()
+    else {
+      drawHeat()
+      off = (lens === 'problems' ? problems() : used()).slice(0, 5).map((e) => e.target).filter((t) => !shown(t))
+    }
+    const note = panel.querySelector('[data-off]')
+    const text = off.length ? T.offscreen([...new Set(off.map(nameOf))].slice(0, 5).join(', ')) : ''
+    if (note && note.textContent !== text) { note.textContent = text; note.hidden = !text }
+    for (const row of panel.querySelectorAll('[data-t]')) {
+      const tag = row.querySelector('[data-offtag]')
+      if (tag) tag.hidden = shown(row.dataset.t)
+    }
+  }
+
+  // Every frame: a cheap rect check of what the map follows; a full pass (visibility, clipping, cover) when something
+  // moved, or every 300 ms for what CSS changes on its own (hover menus, fades). The DOM changing re-finds the elements.
+  let lastSig = '', lastFull = 0, raf = 0
+  function tick(now) {
+    raf = requestAnimationFrame(tick)
+    if (!data) return
+    if (queryDirty || now - lastQuery > 1000) requery()
+    let sig = ''
+    for (const list of found.values()) for (const el of list) { const r = el.getBoundingClientRect(); sig += `${r.left | 0},${r.top | 0},${r.width | 0},${r.height | 0};` }
+    if (sig !== lastSig || now - lastFull > 300) {
+      lastSig = sig; lastFull = now
+      measure()
+      draw(false)
+    }
+  }
+  const redraw = () => { measure(); draw(true) }
+
+  // ---------- panel ----------
+  const btn = `font:inherit;font-size:12px;background:${C.surface};border:1px solid ${C.line};color:${C.fg};border-radius:8px;padding:3px 10px;cursor:pointer`
+  const chip = (text, color) => `<span style="display:inline-block;font-size:11px;font-weight:600;padding:0 8px;border-radius:999px;color:${color};background:${color}22">${esc(text)}</span>`
+  const code = (s) => `<code style="font:11px ui-monospace,'SF Mono',Menlo,monospace;color:${C.faint};overflow-wrap:anywhere">${esc(s)}</code>`
+  function item(t, name, num, say, { dim = false } = {}) {
+    return `<li style="list-style:none"><button data-t="${esc(t)}" style="width:100%;text-align:left;font:inherit;color:inherit;border:0;border-radius:10px;` +
+      `padding:7px 10px;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;opacity:${dim ? 0.55 : 1};` +
+      `background:${picked === t && !name.includes(':') ? C.sunken : 'none'}">` +
+      `<span style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span>` +
+      `<span style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right">${esc(num)}</span>` +
+      `<span style="grid-column:1/-1;color:${C.fg2};font-size:12px">${say}<span data-offtag ${shown(t) ? 'hidden' : ''} style="color:${C.faint}"> · ${esc(T.offTag)}</span></span></button></li>`
+  }
+  // Title, lead, items and the reading note for the current lens.
+  function reading() {
+    if (picked) {
+      const e = els.get(picked) || { clicks: 0, pain: 0, irr: 0 }
+      const count = (found.get(picked) || []).length
+      const go = paths().filter((p) => p.from === picked).sort((a, b) => b.n - a.n)
+      const come = paths().filter((p) => p.to === picked).sort((a, b) => b.n - a.n).slice(0, 3)
+      const name = nameOf(picked)
+      return {
+        title: name,
+        lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}` +
+          (count > 1 ? `<br>${esc(T.many(count))}` : count ? '' : `<br><span style="color:${C.bad}">${esc(T.notHere)}</span>`),
+        items: go.map((p) => item(p.to, T.after(nameOf(p.to)), pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''), { dim: share(p) < MIN })).join('') +
+          come.map((p) => item(p.from, T.before(nameOf(p.from)), pc(p.n / (inTotal.get(picked) || 1)), esc(T.arrivals(p.n, inTotal.get(picked) || 0)))).join(''),
+        note: !go.length ? T.pickedNone(name) : share(go[0]) >= DOMINANT ? T.pickedDominant(name, nameOf(go[0].to)) : T.pickedSpread(name)
+      }
+    }
+    if (lens === 'routes') {
+      const best = bestSteps()
+      const pairs = []
+      for (const p of best) if (backAndForth(p)) for (const t of [p.from, p.to]) if (!pairs.includes(nameOf(t))) pairs.push(nameOf(t))
+      const dominant = best.find((p) => share(p) >= DOMINANT)
+      const notes = []
+      if (dominant) notes.push(T.noteDominant(pc(share(dominant)), nameOf(dominant.from), nameOf(dominant.to)))
+      if (pairs.length) notes.push(T.notePairs(pairs.join(', ')))
+      if (!notes.length && best.length) notes.push(T.noteSpread)
+      return {
+        title: T.look, lead: esc(T.lookLead),
+        items: best.map((p) => item(p.from, `${nameOf(p.from)} → ${nameOf(p.to)}`, pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''))).join(''),
+        empty: !paths().length ? T.noSteps : !best.length ? T.noStrong : '', note: notes.join(' ')
+      }
+    }
+    if (lens === 'problems') {
+      const list = problems()
+      const top = list[0]
+      return {
+        title: T.irritTitle, lead: esc(T.irritLead),
+        items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), pc(e.pain), esc(T.why[e.main] || ''))).join(''),
+        empty: list.length ? '' : T.noProblems, note: top ? T.noteProblem(nameOf(top.target), pc(top.pain), T.why[top.main], T.advice[top.main]) : ''
+      }
+    }
+    const list = used(), total = list.reduce((s, e) => s + e.clicks, 0)
+    return {
+      title: T.usageTitle, lead: esc(T.usageLead(days)),
+      items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), fmt(e.clicks), code(e.target))).join(''),
+      empty: list.length ? '' : T.noClicks, note: list.length ? T.noteUsage(nameOf(list[0].target), pc(list[0].clicks / (total || 1))) : ''
+    }
+  }
+  function legendHtml() {
+    const line = (color, dashed) => `<i style="display:inline-block;width:22px;height:0;border-top:3px ${dashed ? 'dashed' : 'solid'} ${color};vertical-align:middle;margin-right:6px"></i>`
+    const box = (style) => `<i style="display:inline-block;width:16px;height:11px;border-radius:3px;vertical-align:middle;margin-right:6px;${style}"></i>`
+    const L = T.legend
+    const never = showNever ? `<span>${box(`border:2px dashed ${C.never}`)}${esc(L.never)}</span>` : ''
+    if (lens === 'routes') return `<span>${line(C.accent)}${esc(L.next)}</span><span>${line(C.warn)}${esc(L.back)}</span><span>${esc(L.wider)}</span>` +
+      `<span>${esc(L.min)}</span>${picked ? `<span>${line(C.faint, true)}${esc(L.in)}</span>` : ''}`
+    if (lens === 'problems') return `<span>${box(`border:2px solid ${C.bad};background:linear-gradient(90deg,rgba(168,28,63,.12),rgba(168,28,63,.55))`)}${esc(L.bad)}</span><span>${esc(L.none)}</span>${never}`
+    return `<span>${box(`border:2px solid ${C.accent};background:linear-gradient(90deg,rgba(254,193,13,.15),rgba(254,193,13,.75))`)}${esc(L.usage)}</span>${never}`
+  }
+  function renderPanel() {
+    panel.style.cssText = `position:fixed;right:12px;bottom:12px;box-sizing:border-box;pointer-events:auto;background:${C.surface};color:${C.fg};` +
+      `border:1px solid ${C.line};border-radius:14px;box-shadow:0 10px 30px rgba(42,36,24,.22);padding:${collapsed ? '8px 10px' : '14px 16px'};` +
+      `width:${collapsed ? 'auto' : 'min(360px,calc(100vw - 24px))'};max-height:${innerWidth < 600 ? '42vh' : 'min(72vh,620px)'};overflow:auto;overscroll-behavior:contain`
+    const head = `<div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:${C.faint};font-weight:600;white-space:nowrap">${esc(T.title)}</span>
+        <span style="color:${C.faint};font:11px ui-monospace,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(collapsed ? '' : loadedRoute ?? '')}</span>
+        <button data-act="collapse" style="margin-left:auto;${btn}">${esc(collapsed ? T.expand : T.collapse)}</button>
+        <button data-act="close" style="${btn}">${esc(T.close)}</button></div>`
+    if (collapsed) { panel.innerHTML = head; lastDrawn = ''; return }
+    const tabs = Object.keys(T.lenses).map((m) => `<button data-lens="${m}" aria-pressed="${lens === m}" style="font:inherit;border:0;border-radius:999px;` +
+      `padding:4px 12px;cursor:pointer;${lens === m ? `background:${C.fill};color:${C.fg};font-weight:600` : `background:none;color:${C.fg2}`}">${esc(T.lenses[m])}</button>`).join('')
+    let body
+    if (message) body = `<p style="color:${C.bad};margin:10px 0 0">${esc(message)}</p>`
+    else if (!data) body = `<p style="color:${C.fg2};margin:10px 0 0">${esc(T.loading)}</p>`
+    else {
+      const r = reading()
+      body = `
+        <div style="color:${C.faint};font-size:12px;margin-top:6px">${esc(picked ? T.help.picked(nameOf(picked)) : T.help[lens])}</div>
+        ${picked ? `<button data-act="unpick" style="${btn};margin-top:10px">${esc(T.back)}</button>` : ''}
+        <h2 style="margin:10px 0 0;font-size:15px;line-height:20px">${esc(r.title)}</h2>
+        <p style="margin:4px 0 8px;color:${C.fg2}">${r.lead}</p>
+        ${r.empty ? `<p style="color:${C.fg2};margin:0">${esc(r.empty)}</p>` : ''}
+        <ol style="margin:0;padding:0;display:grid;gap:2px">${r.items}</ol>
+        ${r.note ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:${C.sunken};color:${C.fg2};font-size:12.5px">${esc(r.note)}</div>` : ''}
+        <div data-off hidden style="margin-top:8px;color:${C.warn};font-size:12px"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:11.5px;color:${C.fg2}">${legendHtml()}</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;font-size:12px;color:${C.fg2}">
+          <select data-act="days" aria-label="${esc(T.days)}" style="${btn};padding:2px 4px">
+            ${[7, 30, 90].map((n) => `<option value="${n}" ${n === days ? 'selected' : ''}>${n} ${esc(T.days)}</option>`).join('')}</select>
+          ${lens !== 'routes' ? `<label style="display:flex;gap:5px;align-items:center;cursor:pointer;white-space:nowrap"><input type="checkbox" data-act="never" ${showNever ? 'checked' : ''}>${esc(T.never)}</label>` : ''}
+          <span style="margin-left:auto">${esc(T.total(data.visits, data.elements.reduce((s, e) => s + e.clicks, 0)))}</span>
+        </div>`
+    }
+    panel.innerHTML = `${head}
+      <div role="group" style="display:inline-flex;margin-top:10px;border:1px solid ${C.line};border-radius:999px;padding:2px;background:${C.sunken}">${tabs}</div>${body}`
+    lastDrawn = ''
   }
 
   async function load() {
     loadedRoute = cfg.route()
-    data = null
+    data = null; message = null; picked = null; hovered = null
     renderPanel()
-    schedule()
+    layer.replaceChildren()
     const q = new URLSearchParams({ project, route: loadedRoute, days: String(days) })
     try {
       const res = await fetch(`${cfg.url}/api/usage?${q}`, { headers: { Authorization: 'Bearer ' + cfg.token }, credentials: 'omit' })
@@ -200,43 +519,65 @@
       const read = await res.json()
       if (read.route !== cfg.route()) return // the screen changed while loading
       data = read
-      renderPanel()
+      model()
+      requery(); measure()
     } catch (error) {
-      renderPanel(error instanceof TypeError ? T.down : error.message)
+      message = error instanceof TypeError ? T.down : error.message
     }
-    schedule()
+    renderPanel()
+    redraw()
   }
 
   function close() {
     root.remove()
+    cancelAnimationFrame(raf)
     clearInterval(watch)
     observer.disconnect()
-    removeEventListener('scroll', schedule, true)
-    removeEventListener('resize', schedule)
     removeEventListener('keydown', onKey, true)
+    removeEventListener('popstate', onRoute)
     window.__termometroMapOpen = false
+    ss('termometro.mapLens', null)
     cfg.onClose?.()
   }
+  // Esc closes the map only from its own panel: in the app, Esc belongs to the app (closing its dialogs and menus).
+  function onKey(e) { if (e.key === 'Escape' && panel.contains(document.activeElement)) close() }
 
-  function onKey(e) { if (e.key === 'Escape') close() }
-
+  // Picking an element shows its routes; one that is not in view is scrolled to.
+  function pick(t) {
+    picked = picked === t ? null : t
+    if (picked) {
+      lens = 'routes'; keepLens()
+      const el = (found.get(t) || [])[0]
+      if (el && !shown(t)) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    }
+    hovered = null
+    renderPanel(); redraw()
+  }
   panel.addEventListener('click', (e) => {
-    if (e.target.closest('[data-act="close"]')) return close()
-    const m = e.target.closest('[data-mode]')
-    if (m) { mode = m.dataset.mode; renderPanel(); schedule() }
+    const b = e.target.closest('button')
+    if (!b) return
+    if (b.dataset.act === 'close') return close()
+    if (b.dataset.act === 'collapse') { collapsed = !collapsed; renderPanel(); return redraw() }
+    if (b.dataset.act === 'unpick') { picked = null; renderPanel(); return redraw() }
+    if (b.dataset.lens) { lens = b.dataset.lens; picked = null; hovered = null; keepLens(); renderPanel(); return redraw() }
+    if (b.dataset.t) pick(b.dataset.t)
   })
   panel.addEventListener('change', (e) => {
     if (e.target.matches('[data-act="days"]')) { days = Number(e.target.value); load() }
-    if (e.target.matches('[data-act="never"]')) { showNever = e.target.checked; schedule() }
-    if (e.target.matches('[data-act="shown"]')) { routesShown = Number(e.target.value); schedule() }
+    if (e.target.matches('[data-act="never"]')) { showNever = e.target.checked; renderPanel(); redraw() }
   })
-  addEventListener('scroll', schedule, true)
-  addEventListener('resize', schedule)
+  panel.addEventListener('mouseover', (e) => {
+    const t = e.target.closest('[data-t]')?.dataset.t ?? null
+    if (t !== hovered) { hovered = t; redraw() }
+  })
+  panel.addEventListener('mouseleave', () => { if (hovered) { hovered = null; redraw() } })
   addEventListener('keydown', onKey, true)
-  const observer = new MutationObserver((changes) => { if (changes.some((m) => !root.contains(m.target))) schedule() })
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+  const observer = new MutationObserver((changes) => { if (changes.some((m) => !root.contains(m.target))) queryDirty = true })
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true })
   // A screen change inside the app (SPA): reload when the collector's route changes.
-  const watch = setInterval(() => { if (cfg.route() !== loadedRoute) load() }, 500)
-
+  const onRoute = () => { if (cfg.route() !== loadedRoute) load() }
+  addEventListener('popstate', onRoute)
+  const watch = setInterval(onRoute, 400)
+  raf = requestAnimationFrame(tick)
   load()
 })()

@@ -703,10 +703,13 @@ def usage(con, f: Filter) -> dict:
         return {"screens": sorted(screens, key=lambda s: -s["visits"]), "comparable": bool(before)}
     rows = con.execute(f"""
         SELECT target, SUM(type = 'click'), COUNT(DISTINCT NULLIF(user_id, '')), SUM(type = 'rage'), SUM(type = 'dead'),
-               SUM(type IN ('js_error', 'http_5xx', 'http_4xx'))
-        FROM events WHERE {f.sql} AND target != '' AND type IN ('click', 'rage', 'dead', 'js_error', 'http_5xx', 'http_4xx')
+               SUM(type IN ('js_error', 'http_5xx', 'http_4xx')), SUM(type = 'retry'), SUM(type = 'near_miss')
+        FROM events WHERE {f.sql} AND target != ''
+            AND type IN ('click', 'rage', 'dead', 'js_error', 'http_5xx', 'http_4xx', 'retry', 'near_miss')
         GROUP BY target""", f.args).fetchall()
-    elements = {t: {"target": t, "clicks": c, "users": u, "rage": r, "dead": d, "errors": e} for t, c, u, r, d, e in rows}
+    # retry (the first click did not take) and near_miss (a click just beside it) feed the map's "Problems" lens.
+    elements = {t: {"target": t, "clicks": c, "users": u, "rage": r, "dead": d, "errors": e, "retry": rt, "near_miss": nm}
+                for t, c, u, r, d, e, rt, nm in rows}
     visits = con.execute(f"SELECT COUNT(*) FROM events WHERE {f.sql} AND type = 'page'", f.args).fetchone()[0]
     prev = Filter(f.q, before=True)
     visits_before = None
@@ -2558,6 +2561,9 @@ class Handler(BaseHTTPRequestHandler):
             project = self.map_token_project()
             if url.path != "/api/usage" or not project or q.get("project") != project:
                 return self.json(401, {"error": "sign in"})
+            headers = self.cors_for(CONFIG.by_name.get(project))
+        elif url.path == "/api/usage" and (project := self.map_token_project()) and q.get("project") == project:
+            # Signed in anyway (TERMOMETRO_NO_AUTH): the map in the app still needs CORS to read the answer.
             headers = self.cors_for(CONFIG.by_name.get(project))
         with connect() as con:
             if url.path == "/api/filters":

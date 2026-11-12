@@ -847,7 +847,7 @@ class Server(unittest.TestCase):
         screens = self.read("/api/usage?project=shop")["screens"]
         self.assertEqual([(s["route"], s["visits"], s["clicks"], s["users"]) for s in screens], [("/t", 2, 3, 1), ("/c", 1, 0, 1)])
         screen = self.read("/api/usage?project=shop&route=/t")
-        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "label": "", "before": None})
+        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "retry": 0, "near_miss": 0, "label": "", "before": None})
         self.assertEqual(screen["never_clicked"], ["button#delete"])
 
     def test_clicks_and_actions_do_not_weigh(self):
@@ -919,6 +919,10 @@ class Server(unittest.TestCase):
     def test_no_auth_mode_and_missing_password(self):
         setup_config(TERMOMETRO_PASSWORD="", TERMOMETRO_NO_AUTH="1")
         self.assertEqual(call(self.base, "/api/summary?project=shop")[0], 200)
+        # The map inside the app still gets CORS for its reads (without it the browser drops the answer).
+        token = json.loads(call(self.base, "/api/map-token?project=shop", {}, method="POST")[2])["token"]
+        status, headers, _ = call(self.base, "/api/usage?project=shop&route=/t", origin=ORIGIN, token=token)
+        self.assertEqual((status, headers.get("Access-Control-Allow-Origin")), (200, ORIGIN))
         setup_config(TERMOMETRO_PASSWORD="")
         with self.assertRaises(SystemExit):
             t.CONFIG.check()
