@@ -77,6 +77,17 @@
   --ok: #6ee7a0; --ok-soft: #0c2416; --warn: #ffd166; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
   --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
 }
+/* The screen map's scales, one hue each and light→dark (dark mode: dark→light), checked with the dataviz validator
+   (monotone lightness, visible steps, the lightest clears the surface); the ink on each step is ≥ 4.5:1. --mu: clicks; --ms: how
+   much of an element's clicks irritate. High contrast keeps the warm steps. */
+:root { --mu1: #d9a12b; --mu2: #b07c00; --mu3: #835a00; --mu4: #563a00; --mu-ink1: #1f1a14; --mu-ink2: #1f1a14; --mu-ink3: #ffffff; --mu-ink4: #ffffff; --ms1: #ec8a76; --ms2: #c4452f; --ms3: #9a2416; --ms-ink1: #1f1a14; --ms-ink2: #ffffff; --ms-ink3: #ffffff; }
+:root[data-palette="cold"] { --mu1: #6f9be6; --mu2: #3a6dcc; --mu3: #1f4fb0; --mu4: #14326f; --mu-ink1: #1f1a14; --mu-ink2: #ffffff; --mu-ink3: #ffffff; --mu-ink4: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --mu1: #7a5a12; --mu2: #b08419; --mu3: #e3ad2c; --mu4: #ffd56b; --mu-ink1: #f1ebe0; --mu-ink2: #1f1a14; --mu-ink3: #1f1a14; --mu-ink4: #1f1a14; --ms1: #8f3a2c; --ms2: #dc6a52; --ms3: #ff9a83; --ms-ink1: #f1ebe0; --ms-ink2: #1f1a14; --ms-ink3: #1f1a14; }
+  :root:not([data-theme="light"])[data-palette="cold"] { --mu1: #2c4a86; --mu2: #3866c0; --mu3: #78a3f3; --mu4: #bcd2ff; --mu-ink1: #eef2f8; --mu-ink2: #eef2f8; --mu-ink3: #0f131a; --mu-ink4: #0f131a; }
+}
+:root[data-theme="dark"] { --mu1: #7a5a12; --mu2: #b08419; --mu3: #e3ad2c; --mu4: #ffd56b; --mu-ink1: #f1ebe0; --mu-ink2: #1f1a14; --mu-ink3: #1f1a14; --mu-ink4: #1f1a14; --ms1: #8f3a2c; --ms2: #dc6a52; --ms3: #ff9a83; --ms-ink1: #f1ebe0; --ms-ink2: #1f1a14; --ms-ink3: #1f1a14; }
+:root[data-theme="dark"][data-palette="cold"] { --mu1: #2c4a86; --mu2: #3866c0; --mu3: #78a3f3; --mu4: #bcd2ff; --mu-ink1: #eef2f8; --mu-ink2: #eef2f8; --mu-ink3: #0f131a; --mu-ink4: #0f131a; }
 /* Colour-blind mode: low / moderate / high become blue / neutral / orange (no red against green); labels stay. */
 :root[data-cvd="on"] { --ok: #1f68c0; --ok-soft: #e6f0fb; --warn: #6f695e; --warn-soft: #f1efea; --bad: #b23a0b; --bad-soft: #fde8dc; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"])[data-cvd="on"] { --ok: #5c9cec; --ok-soft: #142338; --warn: #a39d91; --warn-soft: #24211c; --bad: #ec7442; --bad-soft: #3d2215; } }
@@ -252,6 +263,64 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mstep .arrow { font-size: 18px; color: var(--accent); flex: none; }
 .mbar { display: flex; align-items: center; gap: 8px; } .mbar i { display: block; height: 8px; border-radius: 999px; background: var(--fill); }
 @media (max-width: 640px) { .mroutes li { grid-template-columns: 1fr; } }
+/* Screen map: the screen drawn from where its controls sit, with a lens (problems, use, routes) and the picked element's numbers. */
+.mapbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; justify-content: space-between; margin-top: 12px; }
+.mapbar .seg { margin-top: 0; } .mapbar .open { display: flex; flex-wrap: wrap; gap: 8px; }
+.mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; margin-top: 12px; }
+@media (max-width: 960px) { .mapwrap { grid-template-columns: minmax(0, 1fr); } }
+.mapfig { min-width: 0; margin: 0; }
+.mapsvg { display: block; width: 100%; height: auto; margin: 0 auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; }
+.mapsvg .lm { fill: var(--sunken); stroke: var(--line); vector-effect: non-scaling-stroke; }
+.mapsvg .me { cursor: pointer; outline: none; }
+.mapsvg .me rect.hit { fill: transparent; stroke: none; }
+.mapsvg .me rect.box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.mapsvg .me text { fill: var(--fg); font-weight: 500; pointer-events: none; }
+.mapsvg .me.never rect.box { fill: none; stroke: var(--faint); stroke-dasharray: 5 4; }
+.mapsvg .me.never text { fill: var(--faint); }
+.mapsvg .me.dim { opacity: .35; }
+.mapsvg .me.u1 rect.box { fill: var(--mu1); stroke: var(--mu1); } .mapsvg .me.u1 text { fill: var(--mu-ink1); }
+.mapsvg .me.u2 rect.box { fill: var(--mu2); stroke: var(--mu2); } .mapsvg .me.u2 text { fill: var(--mu-ink2); }
+.mapsvg .me.u3 rect.box { fill: var(--mu3); stroke: var(--mu3); } .mapsvg .me.u3 text { fill: var(--mu-ink3); }
+.mapsvg .me.u4 rect.box { fill: var(--mu4); stroke: var(--mu4); } .mapsvg .me.u4 text { fill: var(--mu-ink4); }
+.mapsvg .me.s1 rect.box { fill: var(--ms1); stroke: var(--ms1); } .mapsvg .me.s1 text { fill: var(--ms-ink1); }
+.mapsvg .me.s2 rect.box { fill: var(--ms2); stroke: var(--ms2); } .mapsvg .me.s2 text { fill: var(--ms-ink2); }
+.mapsvg .me.s3 rect.box { fill: var(--ms3); stroke: var(--ms3); } .mapsvg .me.s3 text { fill: var(--ms-ink3); }
+.mapsvg .me:hover rect.box, .mapsvg .me:focus-visible rect.box { stroke: var(--accent); stroke-width: 2px; }
+.mapsvg .me.sel rect.box { stroke: var(--accent); stroke-width: 3px; }
+/* Arrows and words on the drawing never take a click or a hover from the elements under them. */
+.mapsvg .arr, .mapsvg .pills { pointer-events: none; }
+.mapsvg .arr path { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; opacity: .9; }
+.mapsvg .arr path.go { stroke: var(--accent); } .mapsvg .arr path.back { stroke: var(--warn); }
+.mapsvg .arr path.from { stroke: var(--faint); stroke-width: 1.5px; stroke-dasharray: 4 5; opacity: .8; }
+.mapsvg marker.go path { fill: var(--accent); } .mapsvg marker.back path { fill: var(--warn); }
+.mapsvg .pill rect { stroke: var(--surface); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.mapsvg .pill text { font-weight: 600; }
+.mapsvg .pill.go rect { fill: var(--accent); } .mapsvg .pill.go text { fill: var(--on-accent); }
+.mapsvg .pill.back rect { fill: var(--warn); } .mapsvg .pill.back text { fill: var(--surface); }
+.mapsvg .pill.bad rect { fill: var(--bad); } .mapsvg .pill.bad text { fill: var(--surface); }
+.mapsvg .pill.ink rect { fill: var(--fg); } .mapsvg .pill.ink text { fill: var(--surface); }
+.mapsvg text { font-family: inherit; }
+.maplegend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 10px; font-size: 12px; color: var(--fg2); }
+.maplegend .sw { display: inline-block; width: 18px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+.maplegend .sw.never { border: 1px dashed var(--faint); }
+.maplegend .ln { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+.maplegend .ln.go { border-color: var(--accent); } .maplegend .ln.back { border-color: var(--warn); } .maplegend .ln.from { border-color: var(--faint); border-top-style: dashed; }
+.mappanel { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--surface); min-width: 0; }
+.mappanel h3 { margin: 0; font-size: 15px; } .mappanel .lead { margin: 4px 0 12px; color: var(--fg2); font-size: 13px; }
+.mappanel .lead code { font-size: 11px; color: var(--faint); overflow-wrap: anywhere; }
+.mappanel ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mappanel li button { width: 100%; height: auto; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-radius: 10px; padding: 8px 10px;
+  cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+.mappanel li button:hover { background: var(--sunken); } .mappanel li button.dim { opacity: .55; }
+.mappanel li .name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mappanel li .num { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.mappanel li .say { grid-column: 1 / -1; color: var(--fg2); font-size: 13px; }
+.mappanel li code { font-size: 11px; color: var(--faint); overflow-wrap: anywhere; }
+.mappanel .chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.mappanel .chip.warn { color: var(--warn); background: var(--warn-soft); } .mappanel .chip.bad { color: var(--bad); background: var(--bad-soft); }
+.mappanel .note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); color: var(--fg2); font-size: 13px; }
+.mappanel .back { font-size: 13px; height: auto; padding: 3px 10px; margin-bottom: 10px; }
+.mapnote { margin-top: 8px; }
 .psec { margin-top: 22px; } .psec > .meta { margin-bottom: 2px; font-size: 13px; color: var(--fg); }
 .why { font-size: 12px; line-height: 16px; color: var(--fg2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
@@ -505,7 +574,7 @@ const HELP_PT = {
   accounts: ['O que é', 'Para cada conta: frustração (de 0 a 100, pontos dos sinais por visita), falhas que ela encontrou, pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Pior primeiro" soma 25 pontos por número que caiu, a frustração, o quanto ela subiu e as falhas a cada 100 visitas. A Tendência diz "Caiu" quando um desses números ficou em 60% ou menos do que era e além da oscilação normal; "Subiu" é o espelho (o de antes era 60% ou menos do atual, além da oscilação) sem nada caindo; o resto é "Estável". A variação aparece em %; passe o mouse para ver o número de antes.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
   kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
-  map: ['O que é', 'O mapa abre o próprio app numa aba nova, com o uso desenhado por cima da tela real: no Calor, cada elemento pintado pelo quanto é clicado (tracejado é o que ninguém clica); nas Rotas, setas de um clique para o próximo, mais grossas e quentes nas mais feitas. O link vale por uma hora.', 'Rotas que vão e voltam entre os mesmos dois pontos, ou que atravessam a tela de ponta a ponta, sugerem aproximar os elementos ou mudar a ordem.'],
+  map: ['O que é', 'Uma prévia da tela desenhada pelas posições dos botões, links e regiões (menu, cabeçalho, conteúdo) que o app enviou, sem nada do que a tela mostra. Problemas pinta só o que irrita, pela parte dos cliques que viram raiva, clique sem resposta ou erro logo depois; Uso pinta pelo número de cliques (tracejado: ninguém clica); Rotas desenha para onde as pessoas vão depois de cada elemento. Clique num elemento para ver os números dele. "Abrir no app" mostra o mesmo sobre a tela real, por uma hora.', 'Elemento vermelho forte é o primeiro a consertar. Botão importante claro ou tracejado está escondido ou mal nomeado. "Vai e volta" entre dois elementos, ou setas que cruzam a tela de ponta a ponta, sugerem juntar os dois ou mudar a ordem.'],
   detours: ['O que é', 'Tarefas começadas numa tela (clicou ou digitou, sem salvar) em que a pessoa sai e volta para concluir: para outra tela do sistema, ou para fora do navegador. Vale para formulário, filtro, modal, configuração — qualquer coisa. Nada do que foi digitado é coletado.', 'Saída frequente para a mesma tela é informação que falta aqui: trazer, buscar ou preencher automaticamente. Saída do navegador é informação que vem de fora: integração ou importação.'],
   ways: ['O que é', 'Por quais telas as pessoas passam, desde a última coisa que salvaram, antes de usar cada botão ou ação, comparado com o normal do app. A tela inicial e os menus estão no caminho de tudo, por isso só se destaca a tela que aparece bem mais do que o normal.', 'Uma tela que aparece no caminho muito mais do que o normal, e onde a pessoa clicou por lá, é onde ela procura aquilo primeiro: um atalho ali, ou mudar o recurso de lugar.'],
   patterns: ['O que é', 'O que as pessoas fazem sempre do mesmo jeito: o campo em que clicam primeiro ao abrir uma tela, o clique que quase sempre vem depois de outro, o botão que clicam depois de digitar em vez de usar Enter, o botão que precisou de dois cliques e o clique que quase acertou um botão. Só clique de pessoa conta; nada do que é digitado sai do navegador.', 'Cada padrão é um atrito pequeno e repetido: foco automático, Enter que funciona, área de clique maior. Somados, viram minutos por dia de quem usa muito.'],
@@ -545,7 +614,7 @@ const HELP_EN = {
   accounts: ['What it is', 'Per account: frustration (0 to 100, signal points per visit), the failures it ran into, people and sessions a day and the use of watched features, against the period before. "Worst first" adds 25 points per number that dropped, the frustration, how much it rose and the failures per 100 visits. The Trend says "Dropped" when one of those numbers is at 60% or less of before and beyond the usual ups and downs; "Rose" is the mirror (before was 60% or less of now, beyond the ups and downs) with nothing dropping; the rest is "Steady". The change shows as a %; hover it to see the number before.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
   kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
-  map: ['What it is', 'The map opens the app itself in a new tab, with use drawn over the real screen: Heat paints each element by how much it is clicked (dashed is what nobody clicks); Routes draws arrows from one click to the next, thicker and hotter the more taken. The link lasts an hour.', 'Routes going back and forth between the same two points, or crossing the screen end to end, suggest bringing the elements closer or changing their order.'],
+  map: ['What it is', 'A preview of the screen drawn from where the buttons, links and regions (menu, header, content) the app sent sit, with nothing of what the screen shows. Problems paints only what irritates, by the share of clicks that became rage, no response or an error right after; Use paints by number of clicks (dashed: nobody clicks); Routes draws where people go after each element. Click an element to see its numbers. "Open in the app" shows the same over the real screen, for an hour.', 'A strong red element is the first to fix. An important button in a light shade or dashed is hidden or badly named. "Back and forth" between two elements, or arrows crossing the screen end to end, suggest bringing them together or changing their order.'],
   detours: ['What it is', 'Tasks started on a screen (clicked or typed, not saved) that people leave and come back to finish: for another screen of the system, or outside the browser. Forms, filters, dialogs, settings — anything. Nothing typed is collected.', 'A frequent trip to the same screen is information missing here: bring it, search it or fill it in. Leaving the browser is information from outside: integration or import.'],
   ways: ['What it is', 'Which screens people go through, since the last thing they saved, before using each button or action, against the app\'s usual. Home and menus are on the way to everything, so only a screen that shows up far more than usual stands out.', 'A screen that is on the way far more than usual, where people clicked around, is where they look for that thing first: a shortcut there, or moving the feature.'],
   patterns: ['What it is', 'What people always do the same way: the field they click first on opening a screen, the click that nearly always follows another, the button they click after typing instead of pressing Enter, the button that needed two clicks and the click that nearly hit a button. Only a person\'s clicks count; nothing typed leaves the browser.', 'Each pattern is a small, repeated friction: auto focus, Enter that works, a bigger click area. Added up, they are minutes a day for heavy users.'],
@@ -696,7 +765,27 @@ const L = PT ? {
     firstClick: 'Primeiro clique', share: 'Quanto', ofVisits: (n) => `de ${num(n)} visitas`, follows: 'Clique que quase sempre vem depois de outro', after: 'Depois de',
     then: 'Clicam em', field: 'campo', ofClicks: (n) => `de ${num(n)} cliques`, noEnter: 'Digitam e clicam num botão em vez de Enter', typedIn: 'Digitaram em',
     thenClicked: 'E clicaram em', retry: 'Precisou de um segundo clique', near: 'Cliques que quase acertaram', times: 'Vezes', none: 'Nenhum padrão forte neste período.' },
-  mapTab: { title: 'Mapa de uso', hint: 'Escolha a tela e abra o app com o mapa por cima: Calor mostra o quanto cada elemento é clicado; Rotas, as setas de um clique para o próximo.',
+  mapTab: { title: 'Mapa da tela', hint: 'A tela desenhada pelas posições dos botões e links: onde está o problema, o que é usado e para onde as pessoas vão depois.',
+    lenses: { routes: 'Rotas', problems: 'Problemas', usage: 'Uso' }, lensLabel: 'O que mostrar', views: { desktop: 'Desktop', mobile: 'Celular' }, viewLabel: 'Tamanho da tela',
+    lensHint: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Só acende o que irrita.', usage: 'Quanto cada elemento é clicado.' }, onlyOf: (x) => `Só as rotas de ${x}.`,
+    irritates: (p) => `${p}% irrita`, clicks: (n) => n === 1 ? '1 clique' : `${num(n)} cliques`, times: (n) => n === 1 ? '1 vez' : `${num(n)} vezes`, backForth: 'vai e volta',
+    arrivals: (n, all) => `${num(n)} das ${num(all)} chegadas`, afterX: (x) => `Depois: ${x}`, beforeX: (x) => `Antes: ${x}`, allRoutes: '← Todas as rotas',
+    legend: { best: 'próximo passo mais comum', thick: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais', from: 'de onde chegam',
+      problems: 'Dos cliques no elemento, quantos irritam:', sev: ['até 10%', '10–30%', '30% ou mais'], calm: 'sem cor = nenhum problema', usage: 'Cliques no período:', never: 'nunca clicado' },
+    look: 'O que olhar nesta tela', lookLead: 'Os passos que mais dizem algo, primeiro o mais forte.', irritTitle: 'O que irrita nesta tela',
+    irritLead: 'Parte dos cliques que viraram raiva, clique sem resposta ou erro logo depois.', useTitle: 'O que é mais usado', useLead: 'Cliques no período.',
+    mostly: (why) => `na maioria, ${why}`, errorsAfter: 'erros logo depois do clique', deadMostly: 'cliques sem resposta',
+    readStrong: (p, a, b) => `${p}% de quem clica em ${a} vai direto para ${b}: é o caminho esperado e pode encurtar.`,
+    readLoop: (a, b) => `${a} e ${b} ficam em vai e volta: sinal de que as pessoas não acham o que fazer em seguida.`,
+    readSpread: 'Nenhum passo domina: depois de cada elemento as pessoas se espalham.',
+    oneNext: (a, b) => `Quase todo mundo vai de ${a} para ${b}: vale abrir ${b} já com o foco, ou juntar os dois passos.`,
+    spread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
+    noNext: (a) => `Ninguém clica em outro elemento desta tela logo depois de ${a}: costuma ser o fim da tarefa ou a saída da tela.`,
+    fixFirst: (a, p, fix) => `${a} irrita ${p}% das vezes que é clicado. ${fix}`, neverN: (n) => `${n} elemento(s) desenhado(s) nunca clicado(s) no período (tracejados): escondidos, mal nomeados ou sobrando.`,
+    noProblems: 'Nada irrita nos elementos desta tela no período.', noSteps: 'Nenhum passo comum (15% ou mais do que vem depois) entre os elementos desenhados.',
+    drawn: (when, w) => `Desenho de ${when}, numa janela de ${w} px.`, offMap: (n) => `${n} elemento(s) clicado(s) no período sem posição no desenho (campos de texto, ou telas vistas antes da atualização): estão na lista abaixo.`,
+    noLayout: 'Ainda não há desenho desta tela. A prévia aparece quando o app atualizar o pacote termometro para a versão que envia as posições dos elementos (a seguinte à 0.2.5) e alguém abrir esta tela. Até lá, use a lista abaixo ou abra no app.',
+    openApp: 'Abrir no app:',
     openHeat: 'Abrir com o calor', openRoutes: 'Abrir com as rotas', recordPage: 'Tela de um registro: o app abre no início; navegue até um registro e o mapa acompanha.',
     routes: 'Rotas de clique nesta tela', routesHint: 'De um clique para o próximo, na mesma visita: as mais feitas primeiro.', noRoutes: 'Nenhuma sequência de cliques nesta tela no período.' },
   rageWhy: { waiting: 'esperando resposta', error: 'deu erro', nothing: 'nada aconteceu', not_clickable: 'parece clicável, mas não é',
@@ -915,7 +1004,27 @@ const L = PT ? {
     firstClick: 'First click', share: 'How often', ofVisits: (n) => `of ${num(n)} visits`, follows: 'A click that nearly always follows another', after: 'After',
     then: 'They click', field: 'field', ofClicks: (n) => `of ${num(n)} clicks`, noEnter: 'They type and click a button instead of Enter', typedIn: 'Typed in',
     thenClicked: 'Then clicked', retry: 'Needed a second click', near: 'Clicks that nearly hit', times: 'Times', none: 'No strong pattern in this period.' },
-  mapTab: { title: 'Usage map', hint: 'Pick the screen and open the app with the map over it: Heat shows how much each element is clicked; Routes, the arrows from one click to the next.',
+  mapTab: { title: 'Screen map', hint: 'The screen drawn from where its buttons and links sit: where the trouble is, what is used and where people go next.',
+    lenses: { routes: 'Routes', problems: 'Problems', usage: 'Use' }, lensLabel: 'What to show', views: { desktop: 'Desktop', mobile: 'Phone' }, viewLabel: 'Screen size',
+    lensHint: { routes: 'The most common way on after each element.', problems: 'Lights up only what irritates.', usage: 'How much each element is clicked.' }, onlyOf: (x) => `Only the routes of ${x}.`,
+    irritates: (p) => `${p}% irritate`, clicks: (n) => n === 1 ? '1 click' : `${num(n)} clicks`, times: (n) => n === 1 ? 'once' : `${num(n)} times`, backForth: 'back and forth',
+    arrivals: (n, all) => `${num(n)} of ${num(all)} arrivals`, afterX: (x) => `Then: ${x}`, beforeX: (x) => `Before: ${x}`, allRoutes: '← All routes',
+    legend: { best: 'most common next step', thick: 'thicker arrow = bigger share', min: 'only steps of 15% or more', from: 'where they come from',
+      problems: 'Of the element\'s clicks, how many irritate:', sev: ['up to 10%', '10–30%', '30% or more'], calm: 'no colour = no trouble', usage: 'Clicks in the period:', never: 'never clicked' },
+    look: 'What to look at on this screen', lookLead: 'The steps that say the most, strongest first.', irritTitle: 'What irritates on this screen',
+    irritLead: 'Share of clicks that became rage, no response or an error right after.', useTitle: 'What is used most', useLead: 'Clicks in the period.',
+    mostly: (why) => `mostly ${why}`, errorsAfter: 'errors right after the click', deadMostly: 'clicks with no response',
+    readStrong: (p, a, b) => `${p}% of those who click ${a} go straight to ${b}: it is the expected way and can be shorter.`,
+    readLoop: (a, b) => `${a} and ${b} go back and forth: a sign people do not find what to do next.`,
+    readSpread: 'No step dominates: after each element people spread out.',
+    oneNext: (a, b) => `Nearly everyone goes from ${a} to ${b}: open ${b} already focused, or merge the two steps.`,
+    spread: (a) => `After ${a} people spread out: no next step dominates. If there is an expected way, the screen does not make it clear.`,
+    noNext: (a) => `Nobody clicks another element of this screen right after ${a}: usually the end of the task or leaving the screen.`,
+    fixFirst: (a, p, fix) => `${a} irritates ${p}% of the times it is clicked. ${fix}`, neverN: (n) => `${n} drawn element(s) never clicked in the period (dashed): hidden, badly named or not needed.`,
+    noProblems: 'Nothing on this screen\'s elements irritates in the period.', noSteps: 'No common step (15% or more of what follows) between the drawn elements.',
+    drawn: (when, w) => `Drawn ${when}, in a ${w} px window.`, offMap: (n) => `${n} element(s) clicked in the period with no place in the drawing (text fields, or screens seen before the update): they are in the list below.`,
+    noLayout: 'There is no drawing of this screen yet. The preview appears once the app updates the termometro package to the version that sends where elements sit (the one after 0.2.5) and someone opens this screen. Until then, use the list below or open it in the app.',
+    openApp: 'Open in the app:',
     openHeat: 'Open with the heat', openRoutes: 'Open with the routes', recordPage: 'A record\'s screen: the app opens at its start; go to a record and the map follows.',
     routes: 'Click routes on this screen', routesHint: 'From one click to the next, in the same visit: the most taken first.', noRoutes: 'No click sequence on this screen in the period.' },
   rageWhy: { waiting: 'waiting for an answer', error: 'it failed', nothing: 'nothing happened', not_clickable: 'looks clickable, is not',
@@ -1242,10 +1351,12 @@ function shell() {
     if (e.target.matches('.dict-name')) saveName(e.target)
     if (e.target.id === 'rule-kind') { state.featureEdit.kind = e.target.value; state.featureEdit.name = $('#feat-name').value; render() }
     if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
-    if (e.target.id === 'flow-screen' || e.target.id === 'map-screen') { state.route = e.target.value; render() }
+    if (e.target.id === 'flow-screen' || e.target.id === 'map-screen') { state.route = e.target.value; state.mapSel = ''; render() }
     if (e.target.id === 'funnel-add' && e.target.value) { state.funnel = JSON.stringify([...funnelSteps(), e.target.value]); render() }
   })
   $('#content').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr.row')) { e.preventDefault(); e.target.click() } })
+  // An element of the screen map (SVG has no click()): Enter or Space picks it.
+  $('#content').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.mapsvg [data-map-el]')) { e.preventDefault(); onMapClick(e.target) } })
 
 }
 
@@ -2686,26 +2797,238 @@ async function accountDetail(e, id) {
 
 // Map ---------------------------------------------------------------------------------------------------------
 const MP = () => L.mapTab
+const STEP_SHARE = 0.15 // a step shown on the map: at least this share of what follows an element...
+const STEP_MIN = 5      // ...and seen at least this many times (2 of 3 is chance, not a route)
 async function map() {
   const { screens } = await read('/api/usage')
   if (!screens.length) return empty(L.noVisits)
   if (!screens.some((x) => x.route === state.route)) state.route = screens[0].route
-  const d = await read('/api/usage', { route: state.route })
+  // A phone opens the phone's drawing when there is one; the toggle remembers the choice for the visit.
+  const d = await read('/api/usage', { route: state.route, viewport: state.mapView || (innerWidth < 640 ? 'mobile' : 'desktop') })
+  state.mapData = d
+  if (state.mapSel && !d.layout?.boxes[state.mapSel] && !d.elements.some((e) => e.target === state.mapSel)) state.mapSel = ''
   const project = state.me.projects.find((p) => p.name === $('#project').value)
   const max = Math.max(1, ...d.paths.map((p) => p.n))
   const nameOf = (t, label) => `${screenText(d.route) || d.route} › ${label || L.unnamed}`
-  return `<section class="card"><div class="head"><div><div class="label">${MP().title}${help('map')}</div><div class="meta">${MP().hint}</div></div>
+  const lens = state.mapLens || 'routes'
+  const open = project?.url
+    ? `<div class="open"><span class="meta">${MP().openApp}</span><button data-open-map="heat">${MP().openHeat}</button><button data-open-map="routes">${MP().openRoutes}</button></div>`
+    : `<span class="meta">${L.mapNoUrl}</span>`
+  return `<section class="card" id="map-card"><div class="head"><div><div class="label">${MP().title}${help('map')}</div><div class="meta">${MP().hint}</div></div>
       <select id="map-screen" aria-label="${L.screen}">${screens.map((x) => `<option value="${esc(x.route)}" ${x.route === state.route ? 'selected' : ''}>${esc(screenText(x.route) ? `${screenText(x.route)} (${x.route})` : x.route)} · ${num(x.visits)}</option>`).join('')}</select></div>
-    <div class="actions-row" style="margin-top:12px">${project?.url
-      ? `<button class="primary" data-open-map="heat">${MP().openHeat}</button><button data-open-map="routes">${MP().openRoutes}</button>
-         ${state.route.includes(':') ? `<span class="meta">${MP().recordPage}</span>` : ''}`
-      : `<span class="meta">${L.mapNoUrl}</span>`}</div></section>
+    <div class="mapbar">${d.layout ? `<div class="seg" role="group" aria-label="${MP().lensLabel}">${Object.entries(MP().lenses).map(([k, t]) =>
+        `<button data-map-lens="${k}" aria-pressed="${lens === k}">${t}</button>`).join('')}</div>` : ''}
+      ${d.layouts.length > 1 ? `<div class="seg" role="group" aria-label="${MP().viewLabel}">${d.layouts.map((k) =>
+        `<button data-map-view="${k}" aria-pressed="${d.layout.viewport === k}">${MP().views[k]}</button>`).join('')}</div>` : ''}
+      ${open}</div>
+    ${state.route.includes(':') && project?.url ? `<p class="meta mapnote">${MP().recordPage}</p>` : ''}
+    <div id="map-body">${d.layout ? mapBody() : `<p class="meta mapnote">${MP().noLayout}</p>`}</div></section>
     <section class="card"><div class="label">${MP().routes}</div><div class="meta">${MP().routesHint}</div>
       ${d.paths.length ? `<ol class="mroutes">${d.paths.slice(0, 15).map((p) => `<li>
         <div class="mstep"><span>${named(nameOf(p.from, p.from_label), p.from)}</span><span class="arrow" aria-hidden="true">→</span><span>${named(nameOf(p.to, p.to_label), p.to)}</span></div>
         <div class="mbar"><i style="width:${p.n / max * 100}%"></i><b>${num(p.n)}</b></div></li>`).join('')}</ol>` : `<p class="meta">${MP().noRoutes}</p>`}
     </section>`
 }
+
+// What the map knows of each element: its numbers, how much of its clicks irritate and why, its steps out and in as shares.
+function mapModel() {
+  const d = state.mapData, lay = d.layout, route = d.route
+  const byT = Object.fromEntries(d.elements.map((e) => [e.target, e]))
+  const nameOf = (t) => controlLabel(route, t) || lay?.labels?.[t] || byT[t]?.label || ''
+  const out = {}, inn = {}
+  for (const p of d.paths) { (out[p.from] ??= []).push(p); (inn[p.to] ??= []).push(p) }
+  const total = (list) => (list ?? []).reduce((a, p) => a + p.n, 0)
+  const info = (t) => {
+    const e = byT[t] ?? { target: t, clicks: 0, users: 0, rage: 0, dead: 0, errors: 0 }
+    const bad = e.rage + e.dead + e.errors
+    const rate = bad ? bad / Math.max(e.clicks, bad) : 0
+    const reason = Object.entries(e.reasons ?? {}).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+    return { ...e, name: nameOf(t), bad, rate, reason, sev: !bad ? 0 : rate < 0.1 ? 1 : rate < 0.3 ? 2 : 3, arrivals: total(inn[t]),
+      out: (out[t] ?? []).map((p) => ({ ...p, share: p.n / total(out[t]) })).sort((a, b) => b.n - a.n),
+      in: (inn[t] ?? []).map((p) => ({ ...p, share: p.n / total(inn[t]) })).sort((a, b) => b.n - a.n) }
+  }
+  const all = [...new Set([...Object.keys(lay?.boxes ?? {}), ...d.elements.map((e) => e.target)])].map(info)
+  const byTarget = Object.fromEntries(all.map((x) => [x.target, x]))
+  const share = (a, b) => byTarget[a]?.out.find((p) => p.to === b)?.share ?? 0
+  return { lay, route, all, byT: byTarget, nameOf, share, loop: (a, b) => share(a, b) >= STEP_SHARE && share(b, a) >= STEP_SHARE }
+}
+
+// The steps drawn. Nothing picked: each drawn element's most common next step, when it is 15% or more of what follows it.
+// One element picked: everything that leaves it.
+function mapSteps(m, sel) {
+  const boxes = m.lay.boxes
+  if (sel) return (m.byT[sel]?.out ?? []).filter((p) => boxes[p.to] && boxes[p.from])
+  return m.all.map((x) => x.out[0]).filter((p) => p && p.n >= STEP_MIN && p.share >= STEP_SHARE && boxes[p.from] && boxes[p.to]).sort((a, b) => b.share - a.share)
+}
+
+const mapPct = (r) => Math.round(r * 100)
+// Why an element irritates, in words: the reason the collector saw most, else what kind of trouble it was.
+function mapWhy(x) {
+  if (x.reason && L.rageWhy[x.reason]) return MP().mostly(L.rageWhy[x.reason])
+  return x.errors >= x.dead && x.errors >= x.rage ? MP().errorsAfter : x.dead >= x.rage ? MP().deadMostly : ''
+}
+
+function mapBody() {
+  const m = mapModel(), lay = m.lay, lens = state.mapLens || 'routes', sel = m.byT[state.mapSel] ? state.mapSel : ''
+  const unnamed = (t) => m.nameOf(t) || unnamedText(t)
+  const els = m.all.filter((x) => lay.boxes[x.target])
+  const off = m.all.filter((x) => !lay.boxes[x.target] && x.clicks).length
+  const maxClicks = Math.max(1, ...els.map((x) => x.clicks))
+  const steps = lens === 'routes' ? mapSteps(m, sel) : []
+  const ranges = [1, 2, 3, 4].map((i) => [Math.floor(maxClicks * (i - 1) / 4) + 1, Math.ceil(maxClicks * i / 4)])
+  const G = MP().legend
+  const legend = lens === 'routes'
+    ? `<span><i class="ln go"></i>${G.best}</span><span><i class="ln back"></i>${MP().backForth}</span><span>${G.thick}</span><span>${G.min}</span>${sel ? `<span><i class="ln from"></i>${G.from}</span>` : ''}`
+    : lens === 'problems'
+      ? `<span>${G.problems}</span>${G.sev.map((t, i) => `<span><i class="sw" style="background:var(--ms${i + 1})"></i>${t}</span>`).join('')}<span>${G.calm}</span>`
+      : `<span>${G.usage}</span>${ranges.map(([a, b], i) => `<span><i class="sw" style="background:var(--mu${i + 1})"></i>${num(Math.min(a, b))}–${num(b)}</span>`).join('')}<span><i class="sw never"></i>${G.never}</span>`
+  const when = new Date(lay.at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: 'short' })
+  const hint = sel && lens === 'routes' ? MP().onlyOf(unnamed(sel)) : MP().lensHint[lens]
+  return `<p class="meta" id="map-hint" style="margin:8px 0 0">${esc(hint)}</p>
+    <div class="mapwrap"><figure class="mapfig"><div id="map-svg">${mapSvg(m, els, steps, lens, sel, maxClicks, unnamed)}</div>
+      <figcaption class="maplegend">${legend}</figcaption>
+      <p class="meta mapnote">${MP().drawn(when, num(lay.vw))}${off ? ' ' + MP().offMap(off) : ''}</p></figure>
+    <aside class="mappanel" aria-live="polite">${sel ? mapPanel(m, m.byT[sel], unnamed) : mapTop(m, els, steps, lens, unnamed)}</aside></div>`
+}
+
+// The drawing. Text, pills and arrowheads keep their size on screen: k is page pixels per screen pixel at the drawn width.
+function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
+  const lay = m.lay, k = state.mapK?.[lay.viewport + lay.vw] ?? Math.max(1, lay.dw / Math.max(280, ($('#content')?.clientWidth ?? 1000) - 380))
+  const bottom = Math.max(lay.vh, ...Object.values(lay.boxes).map((b) => b[1] + b[3] + 16))
+  const W = lay.dw, H = Math.min(lay.dh, bottom)
+  const fs = 12 * k, pad = 6 * k
+  const fit = (text, w) => { const n = Math.floor((w - 2 * pad) / (fs * 0.58)); return n < 3 ? '' : text.length > n ? text.slice(0, n - 1) + '…' : text }
+  const lm = (lay.landmarks ?? []).map((l) => { const [x, y, w, h] = l.box
+    return `<rect class="lm" x="${x}" y="${y}" width="${w}" height="${h}" rx="${6 * k}"/>` }).join('')
+  const touched = new Set(sel ? [sel, ...steps.map((p) => p.to), ...m.byT[sel].in.filter((p) => p.share >= STEP_SHARE).map((p) => p.from)] : [])
+  const step = (x) => !x.clicks ? 0 : Math.min(4, Math.ceil(x.clicks / maxClicks * 4))
+  const pills = [], taken = Object.values(lay.boxes).map((b) => [...b])
+  const tipOf = (x) => [unnamed(x.target) + (m.nameOf(x.target) ? '' : ` (${x.target})`), MP().clicks(x.clicks),
+    x.bad ? `${MP().irritates(mapPct(x.rate))}${mapWhy(x) ? ` (${mapWhy(x)})` : ''}` : '',
+    x.out[0] ? MP().afterX(`${unnamed(x.out[0].to)} ${mapPct(x.out[0].share)}%`) : ''].filter(Boolean).join(' · ')
+  const boxes = els.map((x) => {
+    const [bx, by, bw, bh] = lay.boxes[x.target]
+    const cls = lens === 'problems' ? (x.sev ? 's' + x.sev : '') : lens === 'usage' ? (step(x) ? 'u' + step(x) : 'never') : ''
+    const dim = lens === 'routes' && sel && !touched.has(x.target)
+    const label = bh >= 15 * k ? fit(unnamed(x.target), bw) : ''
+    // The number in words above the element: how much it irritates, or how much it is clicked.
+    if (lens === 'problems' && x.sev) pills.push(mapPill(lay.boxes[x.target], MP().irritates(mapPct(x.rate)), k, [W, H], 'bad', taken))
+    if (lens === 'usage' && x.clicks) pills.push(mapPill(lay.boxes[x.target], MP().clicks(x.clicks), k, [W, H], 'ink', taken))
+    const hit = Math.max(0, 8 * k - Math.min(bw, bh) / 2)
+    return `<g class="me ${cls}${sel === x.target ? ' sel' : ''}${dim ? ' dim' : ''}" data-map-el="${esc(x.target)}" tabindex="0" role="button" data-tip="${esc(tipOf(x))}" aria-label="${esc(tipOf(x))}">
+      <rect class="hit" x="${bx - hit}" y="${by - hit}" width="${bw + 2 * hit}" height="${bh + 2 * hit}"/>
+      <rect class="box" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${Math.min(6 * k, bh / 2)}"/>
+      ${label ? `<text x="${bx + pad}" y="${by + bh / 2 + 4 * k}" font-size="${fs}">${esc(label)}</text>` : ''}</g>`
+  }).join('')
+  // A curved arrow from the edge of one element to the edge of the other.
+  const curve = (a, b, bend) => {
+    const ca = [a[0] + a[2] / 2, a[1] + a[3] / 2], cb = [b[0] + b[2] / 2, b[1] + b[3] / 2]
+    const dx = cb[0] - ca[0], dy = cb[1] - ca[1], len = Math.hypot(dx, dy) || 1
+    const bd = Math.min(bend * k, len * 0.28), cx = (ca[0] + cb[0]) / 2 - dy / len * bd, cy = (ca[1] + cb[1]) / 2 + dx / len * bd
+    const edge = (r, c, tx, ty) => { const ux = tx - c[0], uy = ty - c[1], l = Math.hypot(ux, uy) || 1
+      const t = Math.min(r[2] / 2 / (Math.abs(ux / l) || 1e-9), r[3] / 2 / (Math.abs(uy / l) || 1e-9)) + 4 * k
+      return [c[0] + ux / l * Math.min(t, l * 0.9), c[1] + uy / l * Math.min(t, l * 0.9)] }
+    const [sx, sy] = edge(a, ca, cx, cy), [ex, ey] = edge(b, cb, cx, cy)
+    return { d: `M${sx},${sy} Q${cx},${cy} ${ex},${ey}`, mx: 0.25 * sx + 0.5 * cx + 0.25 * ex, my: 0.25 * sy + 0.5 * cy + 0.25 * ey }
+  }
+  const incoming = lens === 'routes' && sel ? m.byT[sel].in.filter((p) => p.share >= STEP_SHARE && lay.boxes[p.from] && p.from !== sel).map((p) =>
+    `<path class="from" d="${curve(lay.boxes[p.from], lay.boxes[sel], 50).d}"/>`).join('') : ''
+  const arrows = steps.map((p) => {
+    const loop = m.loop(p.from, p.to), c = curve(lay.boxes[p.from], lay.boxes[p.to], 90)
+    pills.push(mapPill([c.mx, c.my, 0, 0], `${mapPct(p.share)}%`, k, [W, H], loop ? 'back' : 'go', null))
+    return `<path class="${loop ? 'back' : 'go'}" d="${c.d}" stroke-width="${2 + p.share * 7}" marker-end="url(#mk-${loop ? 'back' : 'go'})"/>`
+  }).join('')
+  const mk = (id, cls) => `<marker id="${id}" class="${cls}" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="${12 * k}" markerHeight="${12 * k}" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>`
+  return `<svg class="mapsvg" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
+    <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}</defs>${lm}${boxes}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
+    <g class="pills" aria-hidden="true">${pills.join('')}</g></svg>`
+}
+
+// Words on the drawing: a percentage centred on an arrow (no `taken`), or a number next to an element — above it, else
+// right, left or below, wherever it covers no other element or word (`taken` collects what is already there).
+function mapPill(box, text, k, [W, H], kind, taken) {
+  const fs = 12 * k, w = text.length * fs * 0.6 + 14 * k, h = 20 * k, g = 3 * k
+  const [bx, by, bw, bh] = box
+  let left = bx + bw / 2 - w / 2, top = by + bh / 2 - h / 2
+  if (taken) {
+    const hits = (l, t) => t < 0 || l < 0 || l + w > W || t + h > H || taken.some((r) => r !== box && l < r[0] + r[2] && l + w > r[0] && t < r[1] + r[3] && t + h > r[1] &&
+      !(r[0] === bx && r[1] === by && r[2] === bw && r[3] === bh))
+    const spots = [[bx, by - h - g], [bx + bw + g, by + bh / 2 - h / 2], [bx - w - g, by + bh / 2 - h / 2], [bx, by + bh + g],
+      ...(bw >= 2 * w ? [[bx + bw - w - g, by + bh / 2 - h / 2]] : [])] // a wide row with no room around: inside, at its right end
+    ;[left, top] = spots.find(([l, t]) => !hits(l, t)) ?? spots[0]
+    taken.push([left, top, w, h])
+  }
+  left = Math.max(0, Math.min(left, W - w)); top = Math.max(0, Math.min(top, H - h))
+  return `<g class="pill ${kind}"><rect x="${left}" y="${top}" width="${w}" height="${h}" rx="${h / 2}"/><text x="${left + 7 * k}" y="${top + 14 * k}" font-size="${fs}">${esc(text)}</text></g>`
+}
+
+const mapItem = (t, name, value, say = '', dim = false) => `<li><button data-map-el="${esc(t)}"${dim ? ' class="dim"' : ''}><span class="name">${esc(name)}</span><span class="num">${esc(value)}</span>${say ? `<span class="say">${say}</span>` : ''}</button></li>`
+const mapChip = (kind, text) => `<span class="chip ${kind}">${esc(text)}</span>`
+
+// Nothing picked: what to look at under the lens, strongest first, and a reading of it.
+function mapTop(m, els, steps, lens, unnamed) {
+  let title, lead, items, note = ''
+  if (lens === 'routes') {
+    title = MP().look; lead = MP().lookLead
+    items = steps.map((p) => mapItem(p.from, `${unnamed(p.from)} → ${unnamed(p.to)}`, `${mapPct(p.share)}%`,
+      esc(MP().times(p.n)) + (m.loop(p.from, p.to) ? ' · ' + mapChip('warn', MP().backForth) : '')))
+    const strong = steps.find((p) => p.share >= 0.6), loop = steps.find((p) => m.loop(p.from, p.to))
+    note = !steps.length ? MP().noSteps : [strong && MP().readStrong(mapPct(strong.share), unnamed(strong.from), unnamed(strong.to)),
+      loop && MP().readLoop(unnamed(loop.from), unnamed(loop.to)), !strong && !loop && MP().readSpread].filter(Boolean).join(' ')
+  } else if (lens === 'problems') {
+    title = MP().irritTitle; lead = MP().irritLead
+    const bad = m.all.filter((x) => x.bad).sort((a, b) => b.rate - a.rate || b.bad - a.bad)
+    items = bad.slice(0, 8).map((x) => mapItem(x.target, unnamed(x.target), `${mapPct(x.rate)}%`, esc(mapWhy(x))))
+    const first = bad[0]
+    note = !first ? MP().noProblems : MP().fixFirst(unnamed(first.target), mapPct(first.rate), L.rageFix[first.reason] ?? '')
+  } else {
+    title = MP().useTitle; lead = MP().useLead
+    items = m.all.filter((x) => x.clicks).sort((a, b) => b.clicks - a.clicks).slice(0, 8).map((x) => mapItem(x.target, unnamed(x.target), num(x.clicks), `<code>${esc(x.target)}</code>`))
+    const never = els.filter((x) => !x.clicks).length
+    note = never ? MP().neverN(never) : ''
+  }
+  return `<h3>${esc(title)}</h3><p class="lead">${esc(lead)}</p>${items.length ? `<ol>${items.join('')}</ol>` : ''}${note ? `<div class="note">${esc(note)}</div>` : ''}`
+}
+
+// One element picked: its numbers, why it irritates, where people go after it and where they come from, and a reading.
+function mapPanel(m, x, unnamed) {
+  const name = unnamed(x.target)
+  const after = x.out.map((p) => mapItem(p.to, MP().afterX(unnamed(p.to)), `${mapPct(p.share)}%`,
+    esc(MP().times(p.n)) + (m.loop(p.from, p.to) ? ' · ' + mapChip('warn', MP().backForth) : ''), p.share < STEP_SHARE))
+  const before = x.in.slice(0, 3).map((p) => mapItem(p.from, MP().beforeX(unnamed(p.from)), `${mapPct(p.share)}%`, esc(MP().arrivals(p.n, x.arrivals))))
+  const top = x.out[0]
+  const note = !top ? MP().noNext(name) : top.share >= 0.6 ? MP().oneNext(name, unnamed(top.to)) : MP().spread(name)
+  return `<button class="back" data-map-el="">${MP().allRoutes}</button>
+    <h3>${esc(name)}</h3><p class="lead">${esc(MP().clicks(x.clicks))}${x.bad ? ' · ' + mapChip('bad', MP().irritates(mapPct(x.rate))) : ''}
+      ${x.bad && mapWhy(x) ? `<br>${esc(mapWhy(x))}` : ''}<br><code class="tech">${esc(x.target)}</code></p>
+    ${after.length || before.length ? `<ol>${after.join('')}${before.join('')}</ol>` : ''}<div class="note">${esc(note)}</div>`
+}
+
+// The lens, the element picked and the window size redraw the card only; the screen size reads the other drawing.
+function onMapClick(el) {
+  if (el.dataset.mapView !== undefined) { state.mapView = el.dataset.mapView; state.mapSel = ''; return render() }
+  // Like the reference: another lens drops the pick; picking an element shows its routes.
+  if (el.dataset.mapLens !== undefined) { state.mapLens = el.dataset.mapLens; if (state.mapLens !== 'routes') state.mapSel = '' }
+  if (el.dataset.mapEl !== undefined) { state.mapSel = state.mapSel === el.dataset.mapEl ? '' : el.dataset.mapEl; if (state.mapSel) state.mapLens = 'routes' }
+  redrawMap(el.dataset.mapEl ?? null)
+}
+function redrawMap(focus = null) {
+  const body = $('#map-body'); if (!body || !state.mapData?.layout) return
+  document.querySelectorAll('[data-map-lens]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mapLens === (state.mapLens || 'routes'))))
+  tip.hidden = true
+  body.innerHTML = mapBody()
+  fitMap()
+  if (focus) body.querySelector(`.mapsvg [data-map-el="${CSS.escape(focus)}"]`)?.focus({ preventScroll: true })
+}
+// Measures the drawing once on the page: text and arrowheads keep their screen size at any width.
+function fitMap() {
+  const svg = $('#map-svg svg'), lay = state.mapData?.layout; if (!svg || !lay) return
+  const k = Math.max(1, lay.dw / svg.getBoundingClientRect().width)
+  ;(state.mapK ??= {})[lay.viewport + lay.vw] = k
+  if (Math.abs(k - Number(svg.dataset.k)) / k > 0.04) { $('#map-body').innerHTML = mapBody() }
+}
+let mapResize = 0
+addEventListener('resize', () => { clearTimeout(mapResize); mapResize = setTimeout(() => { if (state.tab === 'map' && $('#map-svg')) { state.mapK = {}; redrawMap() } }, 150) })
 
 // Dictionary ---------------------------------------------------------------------------------------------------
 const D = () => L.dict
@@ -2786,6 +3109,7 @@ async function draw(seq) {
     describeTips()
     $('#open-map')?.addEventListener('click', () => openMap(state.route))
     document.querySelectorAll('[data-open-map]').forEach((b) => b.addEventListener('click', () => openMap(state.route, b.dataset.openMap)))
+    if (state.tab === 'map') fitMap()
     addCsvButtons()
     paginate()
     writeHash()
@@ -2797,6 +3121,8 @@ async function draw(seq) {
 }
 
 function onContentClick(e) {
+  const mapEl = e.target.closest?.('[data-map-el],[data-map-lens],[data-map-view]')
+  if (mapEl) return onMapClick(mapEl)
   const none = e.target.closest('[data-empty]')
   if (none) return onEmptyClick(none)
   const copy = e.target.closest('[data-copy]')
