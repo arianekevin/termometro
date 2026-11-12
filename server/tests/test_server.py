@@ -190,6 +190,34 @@ class Server(unittest.TestCase):
         self.assertEqual((back["a"], back["b"]), ("10.0", "2.0"))
         self.assertEqual(self.read("/api/compare?project=blog&days=1")["routes"], [])
 
+    def test_compare_is_per_visit_and_session_and_finds_the_version_before_out_of_the_period(self):
+        page = lambda r: {"type": "page", "route": r}
+        self.send([page("/cart")] * 4 + [{"type": "js_error", "route": "/cart", "detail": "TypeError: x"}], version="1.0", session="a1")
+        self.age(10)
+        for n in range(4):
+            self.send([page("/cart")] * 5, version="1.1", session=f"b{n}")
+        c = self.read("/api/compare?project=shop&days=7")
+        self.assertEqual((c["versions"], c["previous"]), (["1.1"], {"version": "1.0", "days": 18}))  # 11 days ago + the 7 of the period
+        wide = self.read("/api/compare?project=shop&days=18")
+        self.assertEqual((wide["a"], wide["b"]), ("1.0", "1.1"))
+        a, b = wide["overall"]["a"], wide["overall"]["b"]
+        self.assertEqual((a["sessions"], a["failures"], a["failures_per_100"]), (1, 1, 100.0))
+        self.assertEqual((b["visits"], b["sessions"], b["failures_per_100"]), (20, 4, 0))
+        self.assertLess(a["first_at"], b["first_at"])
+        self.assertIsNone(self.read("/api/compare?project=blog&days=7")["previous"])
+
+    def test_insights_are_ordered_by_severity_times_reach(self):
+        page = {"type": "page", "route": "/cart"}
+        for n in range(30):  # a 4xx that reaches 30 people, against a 4xx that reaches one
+            self.send([page, {"type": "http_4xx", "route": "/cart", "detail": "GET /api/wide 404"}], session=f"w{n}", user=f"u{n}")
+        self.send([page] + [{"type": "http_4xx", "route": "/cart", "detail": "GET /api/narrow 404"}] * 40, session="n1", user="u0")
+        o = self.read("/api/overview?project=shop&days=7")
+        new = [i for i in o["insights"] if i["kind"] == "failure_new"]
+        self.assertEqual([i["detail"] for i in new], ["GET /api/wide 404", "GET /api/narrow 404"])  # more times, fewer people: after
+        self.assertEqual((new[0]["reach_sessions"], new[0]["reach_people"]), (30, 30))
+        self.assertGreater(new[0]["impact"], new[1]["impact"])
+        self.assertEqual([i["impact"] for i in o["insights"]], sorted((i["impact"] for i in o["insights"]), reverse=True))
+
     def age(self, days):
         """Moves everything sent so far `days` into the past."""
         with t.connect() as con:

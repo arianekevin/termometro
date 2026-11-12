@@ -70,6 +70,7 @@ import urllib.parse
 import urllib.request
 import hmac
 import json
+import math
 import os
 import re
 import secrets
@@ -709,12 +710,20 @@ def compare(con, f: Filter) -> dict:
     older = versions[:versions.index(b)] if b else []
     a = f.q.get("a") if f.q.get("a") in versions and f.q.get("a") != b else (older[-1] if older else "")
     if not a or not b:
-        return {"versions": versions, "a": a, "b": b, "overall": {}, "routes": [], "actions": [], "new_failures": []}
+        return {"versions": versions, "a": a, "b": b, "overall": {}, "routes": [], "actions": [], "new_failures": [],
+                "previous": previous_version(con, base, b) if b else None}
     fa, fb = Filter({**base, "version": a}), Filter({**base, "version": b})
+    wide = Filter({**base, "days": str(CONFIG.retention_days)})
 
     def overall(fv):
+        """Per visit and per session, so versions used for different lengths of time compare; the volume only as context."""
         rows = frustration_by(con, fv, "version")
-        return {k: rows[0][k] for k in ("visits", "score", "signals")} if rows else {"visits": 0, "score": 0, "signals": {}}
+        out = {k: rows[0][k] for k in ("visits", "sessions", "score", "signals")} if rows else {"visits": 0, "sessions": 0, "score": 0, "signals": {}}
+        out["failures"] = con.execute(f"SELECT COUNT(*) FROM events WHERE {fv.sql} AND type IN {FAILURES}", fv.args).fetchone()[0]
+        out["failures_per_100"] = round(out["failures"] / out["sessions"] * 100, 1) if out["sessions"] else 0
+        out["first_at"] = con.execute(f"SELECT MIN(at) FROM events WHERE {wide.sql} AND version = ?",
+                                      wide.args + [fv.q["version"]]).fetchone()[0]
+        return out
 
     def side(g):
         return {"visits": g["visits"], "score": g["score"], "signals": g["signals"]} if g else None
@@ -736,6 +745,19 @@ def compare(con, f: Filter) -> dict:
         GROUP BY type, detail ORDER BY n DESC""", fb.args) if (k, d) not in seen]
     return {"versions": versions, "a": a, "b": b, "overall": {"a": overall(fa), "b": overall(fb)},
             "routes": routes, "actions": acts, "new_failures": new[:20]}
+
+
+def previous_version(con, base: dict, b: str) -> dict | None:
+    """When the period holds a single version: the one before it in the retained history (since the mark), and how many
+    days the period must cover to hold it as well, with as many days of it as the period has now."""
+    wide = Filter({**base, "days": str(CONFIG.retention_days)})
+    versions = versions_in_order(con, wide)
+    if b not in versions or versions.index(b) == 0:
+        return None
+    a = versions[versions.index(b) - 1]
+    last = con.execute(f"SELECT MAX(at) FROM events WHERE {wide.sql} AND version = ?", wide.args + [a]).fetchone()[0]
+    days = math.ceil((time.time() * 1000 - last) / 86_400_000) + Filter(base).days
+    return {"version": a, "days": min(days, CONFIG.retention_days)}
 
 
 INSIGHT_MIN_VISITS = 10  # a screen needs this many visits before its score says anything
@@ -784,6 +806,36 @@ def deploys(con, f: Filter) -> list[dict]:
     return [{"version": v, "at": at, "day": d} for v, at, d in con.execute(f"""
         SELECT version, MIN(at), date(MIN(at) / 1000, 'unixepoch') FROM events WHERE {f.sql} AND version != '?'
         GROUP BY version ORDER BY MIN(id)""", f.args)]
+
+
+ELEMENT_INSIGHTS = ("element_irritating", "retry_needed", "near_miss", "focus_candidate", "click_follows", "search_no_enter")
+
+
+def reach_of(con, f: Filter, i: dict) -> tuple[int, int]:
+    """Who an insight touches in the period: (sessions, people), counted on its most specific thing: the failure, the
+    button on its screen, the action, the account, or else the screen."""
+    kind = i["kind"]
+    if kind.startswith("failure_"):
+        where, args = "type = ? AND detail = ?", [i["type"], i["detail"]]
+    elif kind in ("action_laborious", "pair_linked") or (kind in ("reach_far", "looked_elsewhere") and i.get("kind_of") == "action"):
+        where, args = "type = 'action' AND detail = ?", [i.get("action") or i.get("a") or i.get("key")]
+    elif kind in ELEMENT_INSIGHTS or kind in ("reach_far", "looked_elsewhere"):
+        where, args = "route = ? AND target = ?", [i.get("route", ""), i.get("target") or i.get("key", "")]
+    elif i.get("account"):
+        where, args = "account = ?", [i["account"]]
+    elif i.get("route"):
+        where, args = "route = ? AND type = 'page'", [i["route"]]
+    else:
+        return 0, 0
+    sessions, people = con.execute(f"""SELECT COUNT(DISTINCT session), COUNT(DISTINCT NULLIF(user_id, '')) FROM events
+        WHERE {f.sql} AND {where}""", f.args + args).fetchone()
+    return sessions, people
+
+
+def impact_of(i: dict) -> float:
+    """Severity times reach: the insight's weight (how serious and how far from normal) grown by the log of the sessions and
+    people it touches, so a bug in 500 sessions passes the same bug in 5, and a serious thing still passes a wide idea."""
+    return round(i["weight"] * math.log10(10 + i["reach_sessions"] + 2 * i["reach_people"]), 1)
 
 
 def overview(con, f: Filter) -> dict:
@@ -895,7 +947,10 @@ def overview(con, f: Filter) -> dict:
                 else:
                     add("account_feature_drop", "warn", 140 + min(d["before"] - d["now"], 99), link, account=r["account"],
                         feature=d["name"], before=d["before"], now=d["now"])
-    insights.sort(key=lambda i: -i["weight"])
+    for i in insights:
+        i["reach_sessions"], i["reach_people"] = reach_of(con, f, i)
+        i["impact"] = impact_of(i)
+    insights.sort(key=lambda i: (-i["impact"], -i["weight"]))
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
             "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f), "kinds": kinds(con, f),
             "insights": insights[:20]}
