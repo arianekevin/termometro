@@ -15,6 +15,10 @@
  * within 1 s), js_error, http_4xx / http_5xx (401 is left out: an expired session is not frustration), abandon
  * (started filling a form or dialog and left the screen without saving), bounce (went back within 4 s) and slow
  * (a request that answered after 3 s while the page was in front of the user).
+ * Patterns, outside the frustration level: retry (the same control clicked again 0.4–5 s after a click that changed
+ * nothing: the first one did not take), near_miss (a click on nothing clickable within 10 px of a control: target
+ * the control it nearly hit), typed (once per field per visit: someone typed there — never what) and enter (Enter
+ * pressed in a field).
  * Usage: page (a visit), click (every click), inventory (what can be clicked on a screen, once per screen per
  * session) and action (a write the backend accepted, with the clicks and time it took since the previous one).
  *
@@ -85,7 +89,7 @@ export interface Termometro {
 }
 
 type EventType = 'page' | 'rage' | 'dead' | 'js_error' | 'http_4xx' | 'http_5xx' | 'abandon' | 'bounce' | 'slow' |
-  'click' | 'action' | 'inventory' | 'track'
+  'click' | 'action' | 'inventory' | 'track' | 'retry' | 'near_miss' | 'typed' | 'enter'
 interface TrackedEvent {
   type: EventType
   route: string
@@ -215,6 +219,18 @@ export function labelOf(el: Element | null): string {
   const labelled = by ? by.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' ') : ''
   const value = control instanceof HTMLInputElement ? control.value : ''
   return clean(control.getAttribute('aria-label') || labelled || control.getAttribute('title') || value || control.textContent)
+}
+
+const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="hidden"]),textarea,select'
+
+/** A field's name as the app writes it — its <label>, aria-label or placeholder —, never what is typed in it. */
+export function fieldLabelOf(el: Element | null): string {
+  const field = el?.closest(FIELD)
+  if (!field || field.closest('[data-termometro-private]')) return ''
+  const id = field.getAttribute('id')
+  const label = (id && document.querySelector(`label[for="${cssEscape(id)}"]`)) || field.closest('label')
+  const text = label ? Array.from(label.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ') || label.textContent : ''
+  return clean(field.getAttribute('data-termometro-label') || field.getAttribute('aria-label') || text || field.getAttribute('placeholder'))
 }
 
 /** The screen's name for people, or '' on a record's page (`:id` in the route) and wherever it is not known. */
@@ -456,6 +472,7 @@ export function start(options: Options): Termometro {
     currentRoute = route ?? options.route?.() ?? routeFromPath(location.pathname)
     arrivedAt = Date.now()
     slowSeen.clear()
+    typedHere.clear()
     pageEvent()
     scheduleInventory()
   }
@@ -473,6 +490,24 @@ export function start(options: Options): Termometro {
     }, 300)
   }
 
+  // The last click on a control and how things stood then: a second click on it that the first did not answer is a retry.
+  let lastControl = { selector: '', t: 0, mutations: 0, network: 0, href: '' }
+  const typedHere = new Set<string>()
+  const RETRY_MIN_MS = 400, RETRY_MAX_MS = 5000, NEAR_PX = 10
+
+  // A click on nothing clickable, right next to a control: the control it nearly hit.
+  function nearMiss(e: MouseEvent): Element | null {
+    if (typeof document.elementsFromPoint !== 'function') return null
+    const around: Array<[number, number]> = [[NEAR_PX, 0], [-NEAR_PX, 0], [0, NEAR_PX], [0, -NEAR_PX], [6, 6], [-6, 6], [6, -6], [-6, -6]]
+    for (const [dx, dy] of around) {
+      for (const el of document.elementsFromPoint(e.clientX + dx, e.clientY + dy)) {
+        const hit = el.closest(CLICKABLE)
+        if (hit && !hit.closest(OVERLAY)) return hit
+      }
+    }
+    return null
+  }
+
   // Clicks: usage, rage, dead, and the effort of the next action.
   listen(document, 'click', (e) => {
     // Only what a person did: a click the app fires by code (el.click(), dispatchEvent) is not usage, not
@@ -483,7 +518,18 @@ export function start(options: Options): Termometro {
     const now = Date.now()
     const clickable = target?.closest(CLICKABLE) ?? null
     const selector = selectorOf(clickable ?? target)
-    const label = labelOf(clickable) || undefined
+    const label = labelOf(clickable) || fieldLabelOf(target) || undefined
+    if (clickable) {
+      const gap = now - lastControl.t
+      const quiet = mutationCount === lastControl.mutations && networkCount === lastControl.network && location.href === lastControl.href
+      if (selector === lastControl.selector && gap >= RETRY_MIN_MS && gap <= RETRY_MAX_MS && quiet) {
+        record({ type: 'retry', route: currentRoute, target: selector, label })
+      }
+      lastControl = { selector, t: now, mutations: mutationCount, network: networkCount, href: location.href }
+    } else if (target && !target.closest(FIELD)) {
+      const near = nearMiss(e)
+      if (near) record({ type: 'near_miss', route: currentRoute, target: selectorOf(near), label: labelOf(near) || undefined })
+    }
     record({ type: 'click', route: currentRoute, target: selector, label })
     lastClick = { target: selector, t: now }
     if (label) lastLabel = label
@@ -522,6 +568,21 @@ export function start(options: Options): Termometro {
 
   // A form started: the place only, never the value. Outside a form or dialog it is a filter or a search and
   // does not count; ticking a table row (checkbox, radio) does not either.
+  // Someone typed in a field (once per field per visit) — never what; and Enter in a field.
+  listen(document, 'input', (e) => {
+    const field = e.target instanceof Element ? e.target.closest(FIELD) : null
+    if (!field || field.closest(OVERLAY) || field.matches('select')) return
+    const selector = selectorOf(field)
+    if (typedHere.has(selector)) return
+    typedHere.add(selector)
+    record({ type: 'typed', route: currentRoute, target: selector, label: fieldLabelOf(field) || undefined })
+  })
+  listen(document, 'keydown', (e) => {
+    if (e.key !== 'Enter' || !e.isTrusted && !options.countScriptedClicks) return
+    const field = e.target instanceof Element ? e.target.closest('input') : null
+    if (!field || field.closest(OVERLAY) || !field.matches(FIELD)) return
+    record({ type: 'enter', route: currentRoute, target: selectorOf(field), label: fieldLabelOf(field) || undefined })
+  })
   listen(document, 'input', (e) => {
     const field = e.target instanceof Element ? e.target : null
     if (!field || field.closest(OVERLAY) || field.matches('input[type="checkbox"],input[type="radio"],input[type="search"]')) return

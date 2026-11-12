@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { labelOf, routeFromPath, scrub, screenOf, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
+import { fieldLabelOf, labelOf, routeFromPath, scrub, screenOf, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
 
 interface SentEvent { type: string; route: string; label?: string; labels?: string[]; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string }
 interface SentBatch { key: string; version: string; session: string; account: string; user: string; role: string; device?: string; sent?: number; events: SentEvent[] }
@@ -557,6 +557,39 @@ describe('termometro', () => {
     click(p)
     await vi.advanceTimersByTimeAsync(1500)
     expect((await events()).filter((e) => e.type === 'rage')).toEqual([])
+  })
+
+  it('sees when a control needed a second click, and a click that nearly hit a control', async () => {
+    start().page('/x')
+    document.body.innerHTML = '<div id="card"><button id="save">Salvar</button></div><button id="ok">Abrir</button>'
+    const save = document.querySelector('#save')!, ok = document.querySelector('#ok')!
+    await vi.advanceTimersByTimeAsync(100) // the screen is drawn before anyone clicks
+    click(save, 10, 10); await vi.advanceTimersByTimeAsync(800); click(save, 10, 10) // nothing happened: retry
+    await vi.advanceTimersByTimeAsync(6000)
+    ok.addEventListener('click', () => document.body.append(document.createElement('i')))
+    click(ok, 50, 50); await vi.advanceTimersByTimeAsync(800); click(ok, 50, 50) // the first one worked: no retry
+    await vi.advanceTimersByTimeAsync(6000)
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: (x: number) => (x > 100 ? [save] : []) })
+    click(document.querySelector('#card')!, 95, 10) // just left of the button
+    const all = await events()
+    expect(all.filter((e) => e.type === 'retry' || e.type === 'near_miss').map((e) => [e.type, e.target, e.label]))
+      .toEqual([['retry', 'button#save', 'Salvar'], ['near_miss', 'button#save', 'Salvar']])
+  })
+
+  it('marks typing (once per field per visit) and Enter in a field, by the field name, never the text', async () => {
+    const t = start()
+    t.page('/search')
+    document.body.innerHTML = '<label for="q">Buscar cliente</label><input id="q" placeholder="nome ou e-mail"><textarea id="n"></textarea>'
+    const q = document.querySelector<HTMLInputElement>('#q')!
+    for (const v of ['M', 'Ma', 'Maria']) { q.value = v; q.dispatchEvent(new Event('input', { bubbles: true })) }
+    q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    document.querySelector('#n')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) // a new line, not a submit
+    t.page('/search')
+    q.dispatchEvent(new Event('input', { bubbles: true }))
+    const all = await events()
+    expect(all.filter((e) => e.type === 'typed' || e.type === 'enter').map((e) => [e.type, e.target, e.label]))
+      .toEqual([['typed', 'input#q', 'Buscar cliente'], ['enter', 'input#q', 'Buscar cliente'], ['typed', 'input#q', 'Buscar cliente']])
+    expect(JSON.stringify(sent)).not.toContain('Maria')
   })
 
   it('tracks a business event by name only', async () => {

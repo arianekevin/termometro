@@ -28,6 +28,8 @@ and the API:
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
+  GET  /api/patterns   click patterns: the field clicked first on arrival, the click that follows another, typing
+                       then a button instead of Enter, controls that needed a second click, near misses
   GET  /api/product    per product area: share of visits, adoption, score, failures; little-used buttons; what is new
   GET  /api/features   each watched feature: uses against before, people, accounts, adoption, frustration, per day
   GET  /api/engagement per account: people and sessions a day, uses of each feature, now against before, drops first
@@ -86,7 +88,7 @@ VERSION = "0.2.3"
 # measure usage and effort and weigh nothing; "inventory" lists what can be clicked on a screen.
 WEIGHTS = {"rage": 3, "dead": 2, "js_error": 5, "http_5xx": 5, "http_4xx": 2, "abandon": 2, "bounce": 1, "slow": 1}
 FAILURES = "('js_error', 'http_5xx', 'http_4xx', 'slow')"
-TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory", "track"}
+TYPES = set(WEIGHTS) | {"page", "click", "action", "inventory", "track", "retry", "near_miss", "typed", "enter"}
 FACTOR, CAP = 20, 100
 
 MAX_BODY = 256 * 1024
@@ -783,6 +785,17 @@ def overview(con, f: Filter) -> dict:
     for p in [p for p in j["pairs"] if p["linked"]][:2]:
         add("pair_linked", "idea", 60 + p["share"] * 10, {"tab": "journeys", "params": {}}, a=p["a"], b=p["b"],
             share=p["share"], n=p["n"], clicks=p["clicks_median"], screens=p["screens_median"])
+    pat = patterns(con, f)
+    for x in pat["focus"][:3]:
+        add("focus_candidate", "idea", 75 + x["share"] * 10, {"tab": "journeys", "params": {}}, **x)
+    for x in [x for x in pat["follows"] if x["to_field"]][:2] + [x for x in pat["follows"] if not x["to_field"]][:1]:
+        add("click_follows", "idea", 65 + x["share"] * 10, {"tab": "journeys", "params": {}}, **x)
+    for x in pat["no_enter"][:2]:
+        add("search_no_enter", "idea", 78 + x["share"] * 10, {"tab": "journeys", "params": {}}, **x)
+    for x in [x for x in pat["retry"] if x["n"] >= 5][:2]:
+        add("retry_needed", "warn", 85 + min(x["n"], 99) / 10, {"tab": "usage", "params": {"route": x["route"]}}, **x)
+    for x in [x for x in pat["near_miss"] if x["n"] >= 5][:2]:
+        add("near_miss", "warn", 82 + min(x["n"], 99) / 10, {"tab": "usage", "params": {"route": x["route"]}}, **x)
     if not f.q.get("account"):  # one account picked: its own drops are on the Accounts tab
         for r in engagement(con, f)["accounts"][:20]:
             for d in r["drops"]:
@@ -796,7 +809,7 @@ def overview(con, f: Filter) -> dict:
     insights.sort(key=lambda i: -i["weight"])
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
             "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f), "kinds": kinds(con, f),
-            "insights": insights[:15]}
+            "insights": insights[:20]}
 
 
 def covered_days(con, f: Filter) -> float:
@@ -982,6 +995,95 @@ def product(con, f: Filter) -> dict:
     low.sort(key=lambda x: -x["sessions"])
     new.sort(key=lambda x: -x["first_seen"])
     return {"days": f.days, "active_users": active, "areas": out_areas, "low_use": low[:200], "new": new[:100]}
+
+
+FIELD_TAGS = ("input", "textarea", "select")
+PATTERN_MIN = 20        # visits to a screen, or clicks on a control, before a pattern says anything
+PATTERN_SHARE = 0.6     # how often something must happen to be a pattern
+FOLLOW_MS = 10_000      # a click this soon after another follows it
+TYPED_MS = 30_000       # a click this soon after typing in a field is what came after the typing
+
+
+def is_field(selector: str) -> bool:
+    last = selector.split(" > ")[-1]
+    return re.split(r"[#.\[]", last, maxsplit=1)[0] in FIELD_TAGS
+
+
+def patterns(con, f: Filter) -> dict:
+    """Click patterns, from the order of each session's events: the field people click first on arriving at a screen
+    (it could already be focused), the click that almost always follows another (open something, then click into
+    it), a field where people type and then click a button instead of pressing Enter, controls that needed a second
+    click, and clicks that nearly hit a control."""
+    visits: dict = {}
+    first: dict = {}
+    clicks: dict = {}
+    follows: dict = {}
+    typed: dict = {}
+    session = route_now = None
+    first_done, last_click, pending = True, None, None
+    for sid, kind, route, target, at in con.execute(f"""SELECT session, type, route, target, at FROM events WHERE {f.sql}
+            AND type IN ('page', 'click', 'typed', 'enter') ORDER BY session, at, id""", f.args):
+        if sid != session:
+            session, route_now, first_done, last_click, pending = sid, None, True, None, None
+        if kind == "page":
+            visits[route] = visits.get(route, 0) + 1
+            route_now, first_done, last_click, pending = route, False, None, None
+            continue
+        key = (route, target)
+        if kind == "typed":
+            t = typed.setdefault(key, {"n": 0, "enter": 0, "next": {}})
+            t["n"] += 1
+            pending = (key, at)
+            continue
+        if kind == "enter":
+            typed.setdefault(key, {"n": 0, "enter": 0, "next": {}})["enter"] += 1
+            pending = None
+            continue
+        if not target:
+            continue
+        if not first_done and route == route_now:
+            first.setdefault(route, {})
+            first[route][target] = first[route].get(target, 0) + 1
+        first_done = True
+        clicks[key] = clicks.get(key, 0) + 1
+        if last_click and last_click[0] != key and at - last_click[1] <= FOLLOW_MS:
+            nxt = follows.setdefault(last_click[0], {})
+            nxt[key] = nxt.get(key, 0) + 1
+        if pending and pending[0] != key and at - pending[1] <= TYPED_MS:
+            nxt = typed[pending[0]]["next"]
+            nxt[key] = nxt.get(key, 0) + 1
+            pending = None
+        last_click = (key, at)
+
+    def top(counter):
+        return max(counter.items(), key=lambda kv: kv[1]) if counter else (None, 0)
+    focus = []
+    for route, n in visits.items():
+        target, c = top(first.get(route, {}))
+        if n >= PATTERN_MIN and target and is_field(target) and c / n >= PATTERN_SHARE:
+            focus.append({"route": route, "target": target, "visits": n, "share": round(c / n, 2)})
+    after = []
+    for a, nxt in follows.items():
+        b, c = top(nxt)
+        n = clicks.get(a, 0)
+        if n >= PATTERN_MIN and c / n >= PATTERN_SHARE:
+            after.append({"route": a[0], "target": a[1], "next_route": b[0], "next_target": b[1], "times": n,
+                          "share": round(c / n, 2), "to_field": is_field(b[1])})
+    no_enter = []
+    for (route, field), t in typed.items():
+        b, c = top(t["next"])
+        if t["n"] >= PATTERN_MIN / 2 and b and c / t["n"] >= PATTERN_SHARE and t["enter"] / t["n"] < 0.2:
+            no_enter.append({"route": route, "target": field, "typed": t["n"], "enter_share": round(t["enter"] / t["n"], 2),
+                             "next_route": b[0], "next_target": b[1], "share": round(c / t["n"], 2)})
+
+    def counted(kind):
+        return [{"route": r, "target": t, "n": n} for r, t, n in con.execute(f"""SELECT route, target, COUNT(*) n FROM events
+            WHERE {f.sql} AND type = ? GROUP BY route, target ORDER BY n DESC LIMIT 20""", f.args + [kind])]
+    focus.sort(key=lambda x: -x["visits"] * x["share"])
+    after.sort(key=lambda x: -x["times"] * x["share"])
+    no_enter.sort(key=lambda x: -x["typed"])
+    return {"focus": focus[:20], "follows": after[:30], "no_enter": no_enter[:20], "retry": counted("retry"),
+            "near_miss": counted("near_miss")}
 
 
 SEARCH_LIMIT = 8
@@ -1395,7 +1497,7 @@ def names(con, project: str) -> dict:
     shared = {n for n in set(screens.values()) if list(screens.values()).count(n) >= SHARED_NAME}
     screens = {r: n for r, n in screens.items() if n not in shared}
     controls = most_common(con.execute("""SELECT route || char(9) || target, label, COUNT(*) FROM events WHERE project = ?
-        AND type IN ('click', 'rage', 'dead') AND label != '' GROUP BY route, target, label""", (project,)))
+        AND type IN ('click', 'rage', 'dead', 'retry', 'near_miss', 'typed', 'enter') AND label != '' GROUP BY route, target, label""", (project,)))
     for route, target, label in con.execute("SELECT route, target, label FROM elements WHERE project = ? AND label != ''", (project,)):
         controls.setdefault(route + "\t" + target, label)
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
@@ -1581,7 +1683,7 @@ def engagement_read(con, f: Filter) -> dict:
     return out
 
 
-READS = {"/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
+READS = {"/api/patterns": patterns, "/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
          "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
          "/api/report": report}

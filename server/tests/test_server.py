@@ -354,6 +354,28 @@ class Server(unittest.TestCase):
         [irr] = [i for i in o["insights"] if i["kind"] == "element_irritating"]
         self.assertEqual(irr["reason"], "waiting")
 
+    def test_click_patterns_focus_follow_enter_retry_and_near_miss(self):
+        page = lambda r: {"type": "page", "route": r}
+        clk = lambda r, t: {"type": "click", "route": r, "target": t}
+        for i in range(20):
+            evs = [page("/users"), clk("/users", "form#f > input#name"),           # always clicks the name field first
+                   clk("/users", "button#new"), clk("/users", "div#dlg > input#email"),  # opens the dialog, clicks its field
+                   {"type": "typed", "route": "/users", "target": "input#q"}, clk("/users", "button#search")]  # never Enter
+            if i < 6:
+                evs += [clk("/users", "button#save"), {"type": "retry", "route": "/users", "target": "button#save"},
+                        {"type": "near_miss", "route": "/users", "target": "button#tiny"}]
+            self.send(evs, session=f"s{i}")
+        p = self.read("/api/patterns?project=shop&days=1")
+        self.assertEqual([(x["route"], x["target"], x["share"]) for x in p["focus"]], [("/users", "form#f > input#name", 1.0)])
+        follow = {(x["target"], x["next_target"]): x for x in p["follows"]}
+        self.assertTrue(follow[("button#new", "div#dlg > input#email")]["to_field"])
+        [ne] = p["no_enter"]
+        self.assertEqual((ne["target"], ne["next_target"], ne["share"], ne["enter_share"]), ("input#q", "button#search", 1.0, 0.0))
+        self.assertEqual((p["retry"][0]["target"], p["retry"][0]["n"]), ("button#save", 6))
+        self.assertEqual((p["near_miss"][0]["target"], p["near_miss"][0]["n"]), ("button#tiny", 6))
+        kinds = {i["kind"] for i in self.read("/api/overview?project=shop&days=1")["insights"]}
+        self.assertTrue({"focus_candidate", "click_follows", "search_no_enter", "retry_needed", "near_miss"} <= kinds, kinds)
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

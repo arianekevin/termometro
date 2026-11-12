@@ -39,6 +39,7 @@ bank data or anything under LGPD/GDPR. Termometro keeps only the shape of the in
 | the signal (rage click, dead click, error…) | what users typed or what a record shows |
 | the route as a pattern (`/orders/:id`) | the real ids in the URL |
 | a short selector (`button#save`) | names, e-mails |
+| that someone typed in a field and whether they pressed Enter, with the field's name (its label or placeholder) | what was typed |
 | the app's own words on a control ("New user") and the screen's name ("Users"), up to 40 characters | text inside tables, lists of records and fields, a record page's title, anything under `data-termometro-private` |
 | the ids you choose to give (account, user, role) | recordings, screenshots |
 | optionally, the user's name (`identity.name`), kept apart and never in what an AI reads; `"people_names": false` on the project drops it | |

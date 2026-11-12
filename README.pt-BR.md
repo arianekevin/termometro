@@ -39,6 +39,7 @@ dado bancário ou qualquer coisa sob a LGPD. O Termometro guarda só a forma da 
 | o sinal (rage click, clique sem resposta, erro…) | o que o usuário digitou ou o que um registro mostra |
 | a rota como padrão (`/pedidos/:id`) | os ids reais da URL |
 | um seletor curto (`button#salvar`) | nomes, e-mails |
+| que alguém digitou num campo e se apertou Enter, com o nome do campo (rótulo ou placeholder) | o que foi digitado |
 | as palavras do próprio app num controle ("Novo usuário") e o nome da tela ("Usuários"), até 40 caracteres | texto de tabelas, listas de registros e campos, título da página de um registro, tudo dentro de `data-termometro-private` |
 | os ids que você escolher mandar (conta, usuário, papel) | gravações, prints |
 | se quiser, o nome do usuário (`identity.name`), guardado à parte e nunca no que uma IA lê; `"people_names": false` no projeto descarta | |
