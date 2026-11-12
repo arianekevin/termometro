@@ -33,7 +33,8 @@ and the API:
                        then a button instead of Enter, controls that needed a second click, near misses
   GET  /api/product    per product area: share of visits, adoption, score, failures; little-used buttons; what is new
   GET  /api/features   each watched feature: uses against before, people, accounts, adoption, frustration, per day
-  GET  /api/engagement per account: people and sessions a day, uses of each feature, now against before, drops first
+  GET  /api/engagement per account: people and sessions a day, uses of each feature, now against before, and the
+                       trend (down, flat, up: the drop rule and its mirror), falling first
                        (with ?account=, also that account's day by day)
   POST /api/features   {id?, name, rules: [{kind: screen|control|action|track, key}]} or {id, delete: true}
                        ?feature=<id> on any read above narrows it to what belongs to that feature
@@ -590,8 +591,21 @@ def summary(con, f: Filter) -> dict:
     effort = effort_by_route(con, f)
     for r in routes:
         r["effort"] = effort.get(r["key"])
+    # The same length of time just before, when it has data on at least half as many days: what "now" is compared with.
+    prev = Filter(f.q, before=True)
+    overall_before = None
+    if covered_days(con, prev) >= max(1, covered_days(con, f) / 2):
+        b_visits, b_points = con.execute(f"""
+            SELECT COALESCE(SUM(type = 'page'), 0), COALESCE(SUM({WEIGHT_CASE}), 0) FROM events WHERE {prev.sql}""", prev.args).fetchone()
+        b_sessions = con.execute(f"SELECT COUNT(DISTINCT session) FROM events WHERE {prev.sql}", prev.args).fetchone()[0]
+        overall_before = {"visits": b_visits, "sessions": b_sessions, "score": score(b_points, b_visits)}
+        before = {g["key"]: g for g in frustration_by(con, prev, "route")}
+    for r in routes:
+        b = before.get(r["key"]) if overall_before else None
+        r["before"] = {"score": b["score"], "visits": b["visits"], "categories": b["categories"]} if b and b["visits"] else None
     return {"days": f.days, "weights": WEIGHTS, "factor": FACTOR, "categories": {c: list(t) for c, t in CATEGORIES.items()},
             "overall": {"visits": visits, "sessions": sessions, "points": points, "score": score(points, visits)},
+            "before": overall_before,
             "routes": routes,
             "versions": sorted(frustration_by(con, f, "version") if not f.q.get("version") else [], key=lambda g: g["key"])}
 
@@ -972,8 +986,25 @@ def dropped(before: float, now: float) -> bool:
     """...and only when the fall is bigger than the usual ups and downs of counts that size (three Poisson deviations: many accounts times many features would otherwise cry wolf):
     22 → 11 uses in a small account is chance; 210 → 60 people-days is not."""
     return now <= before * DROP and before - now >= 3 * (before + now) ** 0.5
+
+
+def rose(before: float, now: float) -> bool:
+    """The mirror of a drop: before at or below 60% of now, and beyond the usual ups and downs."""
+    return before <= now * DROP and now - before >= 3 * (before + now) ** 0.5
+
+
 DROP_MIN_USERS = 2   # an account needs this many people a day before, for a drop of people to mean something
 DROP_MIN_USES = 10   # and a feature this many uses in the period before
+
+
+TREND_ORDER = {"down": 0, "flat": 1, None: 1, "up": 2}
+
+
+def move(before: float, now: float, enough: bool) -> str:
+    """down when it dropped (and was big enough before for a drop to mean something), up when it rose, else flat."""
+    if enough and dropped(before, now):
+        return "down"
+    return "up" if rose(before, now) else "flat"
 
 
 def engagement(con, f: Filter) -> dict:
@@ -1010,16 +1041,24 @@ def engagement(con, f: Filter) -> dict:
         drops = []
         if comparable and b.get("users_day", 0) >= DROP_MIN_USERS and dropped(b["users_day"] * days_now, a.get("users_day", 0) * days_now):
             drops.append({"what": "users_day", "before": b["users_day"], "now": a.get("users_day", 0)})
+        # Where each number went: down, up or flat, by the same rule as a drop (and its mirror); totals over the window now.
+        moves = {}
+        for k, least in (("users_day", DROP_MIN_USERS), ("sessions_day", DROP_MIN_USERS)):
+            moves[k] = move(b.get(k, 0) * days_now, a.get(k, 0) * days_now, b.get(k, 0) >= least) if comparable else None
         feats_row = []
         for ft in feats:
             n, m = (a.get("features") or {}).get(ft["id"], 0), (b.get("features") or {}).get(ft["id"], 0)
-            feats_row.append({"id": ft["id"], "now": n, "before": m if comparable else None})
+            feats_row.append({"id": ft["id"], "now": n, "before": m if comparable else None,
+                              "move": move(m * days_now / days_before, n, m >= DROP_MIN_USES) if comparable else None})
             if comparable and m >= DROP_MIN_USES and dropped(m * days_now / days_before, n):
                 drops.append({"what": "feature", "feature": ft["id"], "name": ft["name"], "before": m, "now": n})
+        all_moves = list(moves.values()) + [x["move"] for x in feats_row]
+        trend = None if not comparable else "down" if "down" in all_moves else "up" if "up" in all_moves else "flat"
         rows.append({"account": account, "now": {k: a.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")},
                      "before": {k: b.get(k, 0) for k in ("users_day", "sessions_day", "users", "visits")} if comparable else None,
-                     "features": feats_row, "drops": drops})
-    rows.sort(key=lambda r: (-len(r["drops"]), -r["now"]["visits"]))
+                     "features": feats_row, "drops": drops, "moves": moves, "trend": trend})
+    # The ones falling first (the biggest drops ahead), then the steady, then the rising.
+    rows.sort(key=lambda r: (TREND_ORDER[r["trend"]], -len(r["drops"]), -r["now"]["visits"]))
     return {"days": f.days, "covered": round(days_now, 1), "comparable": comparable,
             "features": [{"id": x["id"], "name": x["name"]} for x in feats], "accounts": rows}
 

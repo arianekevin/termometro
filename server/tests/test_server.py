@@ -339,11 +339,50 @@ class Server(unittest.TestCase):
         self.assertEqual(e["accounts"][0]["account"], "a1")  # drops first
         self.assertEqual([d["what"] for d in a1["drops"]], ["feature"])
         self.assertEqual((a1["drops"][0]["before"], a1["drops"][0]["now"]), (12, 1))
-        self.assertEqual(a1["features"], [{"id": fid, "now": 1, "before": 12}])
+        self.assertEqual(a1["features"], [{"id": fid, "now": 1, "before": 12, "move": "down"}])
+        self.assertEqual(a1["trend"], "down")
         daily = self.read("/api/engagement?project=shop&days=40&account=a1")["daily"]
         self.assertEqual(sum(d["features"].get(fid, 0) for d in daily), 13)
         kinds = [i["kind"] for i in self.read("/api/overview?project=shop&days=20")["insights"]]
         self.assertIn("account_feature_drop", kinds)
+
+    def test_engagement_says_the_trend_of_each_account_and_puts_the_falling_first(self):
+        def visit(account, users, prefix):
+            for i in range(users):
+                self.send([{"type": "page", "route": "/home"}], user=f"{account}-{prefix}{i}", account=account, session=f"{account}-{prefix}{i}")
+        self.send([{"type": "page", "route": "/home"}], session="first")  # the project was already sending before
+        self.age(1)
+        visit("up", 1, "b"); visit("down", 12, "b"); visit("flat", 3, "b")
+        self.age(1.5)  # inside the 24 hours before
+        visit("up", 12, "n"); visit("down", 1, "n"); visit("flat", 3, "n")
+        e = self.read("/api/engagement?project=shop&days=1")
+        self.assertTrue(e["comparable"])
+        self.assertEqual([(r["account"], r["trend"]) for r in e["accounts"]], [("down", "down"), ("flat", "flat"), ("up", "up")])
+        down = e["accounts"][0]
+        self.assertEqual(down["moves"], {"users_day": "down", "sessions_day": "down"})
+        self.assertEqual([d["what"] for d in down["drops"]], ["users_day"])  # the alerts keep their own rule
+
+    def test_trend_rule_is_the_drop_and_its_mirror_beyond_chance(self):
+        self.assertEqual(t.move(210, 60, True), "down")
+        self.assertEqual(t.move(22, 11, True), "flat")  # a small count halving is chance
+        self.assertEqual(t.move(210, 60, False), "flat")  # too small before for a drop to mean something
+        self.assertEqual(t.move(60, 210, True), "up")
+        self.assertEqual(t.move(11, 22, True), "flat")
+        self.assertEqual(t.move(0, 14, False), "up")  # came from nothing
+
+    def test_summary_compares_each_screen_and_the_whole_with_the_period_before(self):
+        page = {"type": "page", "route": "/cart"}
+        self.send([{"type": "page", "route": "/home"}], session="first")
+        self.age(1)
+        self.send([page] * 10 + [{"type": "rage", "route": "/cart", "target": "button#pay"}], session="before")
+        self.age(1.5)
+        self.send([page, page, {"type": "rage", "route": "/cart", "target": "button#pay"},
+                   {"type": "http_5xx", "route": "/cart", "target": "button#pay", "detail": "POST /api/pay 500"}], session="now")
+        s = self.read("/api/summary?project=shop&days=1")
+        self.assertEqual(s["before"], {"visits": 10, "sessions": 1, "score": 6})
+        [cart] = s["routes"]
+        self.assertEqual((cart["score"], cart["before"]["score"], cart["before"]["visits"]), (80, 6, 10))
+        self.assertIsNone(self.read("/api/summary?project=shop&days=7")["before"])  # no week before with data
 
     def test_product_health_groups_screens_into_areas_and_finds_little_used_and_new_buttons(self):
         inv = {"type": "inventory", "route": "/config/users", "targets": ["button#new", "button#export"]}
