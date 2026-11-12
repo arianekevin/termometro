@@ -104,8 +104,7 @@ header { position: sticky; top: 0; z-index: 5; background: var(--surface); borde
 .top .mark { margin-right: auto; }
 .field { display: flex; align-items: center; gap: 6px; }
 .who { display: flex; align-items: center; gap: 8px; }
-#mark-chip { display: inline-flex; align-items: center; gap: 6px; }
-#mark-chip:empty { display: none; }
+
 nav.tabs { display: flex; gap: 4px; padding: 0 16px; overflow-x: auto; }
 nav.tabs a { display: flex; align-items: center; height: 40px; padding: 0 12px; color: var(--fg2); font-weight: 500; border-bottom: 2px solid transparent; text-decoration: none; white-space: nowrap; }
 nav.tabs a.on { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
@@ -234,6 +233,12 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .kind.effort { border-style: dashed; } .kind.effort .kval { font-size: 18px; }
 .card > .legend { margin-top: 12px; }
 .prefs-wrap { position: relative; }
+#marks-open.on { border-color: var(--accent); background: var(--accent-soft); }
+.marklist { display: grid; gap: 4px; } .marklist > button, .markrow > button:first-child { width: 100%; justify-content: flex-start; gap: 8px; height: auto; min-height: 34px; padding: 6px 10px; text-align: left; }
+.marklist button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.markrow { display: flex; gap: 4px; align-items: center; }
+.markform { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; } .markform label { display: grid; gap: 2px; }
+.markform label:first-child { grid-column: 1 / -1; } .markform input { width: 100%; }
 .prefs { position: fixed; z-index: 20; width: min(380px, calc(100vw - 32px)); display: grid; gap: 12px; padding: 14px;
   background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.16); }
 .pref .faint { color: var(--faint); }
@@ -438,9 +443,10 @@ const L = PT ? {
     state: 'O login expirou. Tente de novo.', wrong: 'Senha errada.', limit: 'Muitas tentativas. Espere um minuto.' },
   signout: 'Sair', project: 'Projeto', period: 'Período', version: 'Versão', account: 'Conta', role: 'Papel', all: 'Todos', allf: 'Todas',
   day: '24 horas', days: (n) => `${n} dias`, user: 'usuário', removeUser: 'Tirar filtro de usuário',
-  mark: { start: 'Recomeçar daqui', startTip: 'Daqui para frente, o painel, os alertas e o relatório só olham o que vier depois. Nada é apagado.',
-    confirm: (p) => `Recomeçar ${p} a partir de agora? O que veio antes some do painel, mas não é apagado: dá para ver tudo ou desfazer.`,
-    since: (w) => `Contando desde ${w}`, showAll: 'Ver tudo', undo: 'Desfazer', allSince: (w) => `Vendo tudo, inclusive antes de ${w}`, back: 'Só desde o marco' },
+  mark: { button: 'Marcos', whole: 'Todo o período', since: (w) => `Desde ${w}`, untitled: 'Marco', title: 'Contar a partir de um marco',
+    hint: 'O painel, os alertas e o relatório só olham o que veio depois do marco escolhido. Nada é apagado: dá para trocar ou voltar ao período todo.',
+    name: 'Nome', namePh: 'ex.: Redesenho de Usuários', date: 'Data', create: 'Criar e usar', remove: 'Apagar marco', confirmRemove: (n) => `Apagar o marco ${n}?`,
+    future: 'Escolha uma data de hoje para trás.' },
   failureTab: {
     list: 'Falhas, das que atingem mais sessões para as que atingem menos', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
     none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
@@ -611,9 +617,10 @@ const L = PT ? {
     state: 'The sign-in expired. Try again.', wrong: 'Wrong password.', limit: 'Too many attempts. Wait a minute.' },
   signout: 'Sign out', project: 'Project', period: 'Period', version: 'Version', account: 'Account', role: 'Role', all: 'All', allf: 'All',
   day: '24 hours', days: (n) => `${n} days`, user: 'user', removeUser: 'Remove user filter',
-  mark: { start: 'Start afresh', startTip: 'From now on, the dashboard, alerts and report only look at what comes after. Nothing is deleted.',
-    confirm: (p) => `Start ${p} afresh from now? What came before leaves the dashboard but is not deleted: you can see it all or undo.`,
-    since: (w) => `Counting since ${w}`, showAll: 'See everything', undo: 'Undo', allSince: (w) => `Seeing everything, including before ${w}`, back: 'Only since the mark' },
+  mark: { button: 'Marks', whole: 'The whole period', since: (w) => `Since ${w}`, untitled: 'Mark', title: 'Count from a mark',
+    hint: 'The dashboard, alerts and report only look at what came after the chosen mark. Nothing is deleted: switch or go back to the whole period any time.',
+    name: 'Name', namePh: 'e.g. Users redesign', date: 'Date', create: 'Create and use', remove: 'Delete mark', confirmRemove: (n) => `Delete the mark ${n}?`,
+    future: 'Pick a date from today back.' },
   failureTab: {
     list: 'Failures, the ones hitting the most sessions first', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
     none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
@@ -897,7 +904,7 @@ function shell() {
         <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
         <label class="field"><span class="meta">${L.feature}</span><select id="feature"></select></label>
         <span class="prefs-wrap"><button id="prefs-open" aria-expanded="false" aria-controls="prefs">${PT ? 'Aparência' : 'Appearance'}</button></span>
-        <span id="mark-chip"></span>
+        <span class="prefs-wrap"><button id="marks-open" aria-expanded="false" aria-controls="marks"></button></span>
         <span id="user-chip"></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
       </div>
@@ -936,29 +943,68 @@ function shell() {
   })
   $('#content').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr.row')) e.target.click() })
   document.addEventListener('click', (e) => { if (e.target.closest('#remove-user')) { state.user = ''; render() } })
-  $('#mark-chip').addEventListener('click', (e) => { const b = e.target.closest('[data-mark]'); if (b) onMark(b.dataset.mark) })
+
 }
 
-// Fresh start: a mark per project; reads see only what came after it, unless "see everything" (all=1).
+// Marks: saved moments (a redesign, a version) the dashboard can count from, one at a time, or the whole period.
 const projectNow = () => state.me.projects.find((p) => p.name === $('#project').value)
+const dateOf = (at) => new Date(at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit', year: 'numeric' })
 function markChip() {
-  const mark = projectNow()?.mark, M = L.mark
-  $('#mark-chip').innerHTML = !mark
-    ? `<button class="small" data-mark="start" title="${esc(M.startTip)}">${M.start}</button>`
-    : state.all
-      ? `<span class="meta">${esc(M.allSince(when(mark)))}</span> <button class="small" data-mark="back">${M.back}</button>`
-      : `<span class="meta">${esc(M.since(when(mark)))}</span> <button class="small" data-mark="all">${M.showAll}</button> <button class="small" data-mark="undo">${M.undo}</button>`
+  const p = projectNow(), M = L.mark, active = (p?.marks ?? []).find((m) => m.at === p?.mark)
+  const b = $('#marks-open')
+  if (!b) return
+  b.textContent = p?.mark ? M.since(`${dateOf(p.mark)}${active?.name ? ' · ' + active.name : ''}`) : `${M.button}: ${M.whole}`
+  b.classList.toggle('on', !!p?.mark)
 }
-async function onMark(action) {
-  const project = projectNow()
-  if (action === 'all' || action === 'back') { state.all = action === 'all' ? '1' : ''; return render() }
-  if (action === 'start' && !confirm(L.mark.confirm(project.name))) return
-  const res = await fetch(`/api/mark?project=${encodeURIComponent(project.name)}${action === 'undo' ? '&clear=1' : ''}`, { method: 'POST' })
+const marksPanel = () => {
+  const p = projectNow(), M = L.mark
+  const today = new Date(), iso = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+  return `<div class="prefs" id="marks" role="dialog" aria-label="${M.title}"><div><b>${M.title}</b><div class="meta">${M.hint}</div></div>
+    <div class="marklist"><button data-mark-use="" aria-pressed="${!p.mark}">${M.whole}</button>
+      ${(p.marks ?? []).map((m) => `<div class="markrow"><button data-mark-use="${esc(m.id)}" aria-pressed="${p.mark === m.at}" ${m.id ? '' : 'disabled'}>
+        <b>${esc(m.name || M.untitled)}</b> <span class="meta">${esc(when(m.at))}</span></button>
+        ${m.id ? `<button class="small" data-mark-del="${esc(m.id)}" aria-label="${M.remove}" title="${M.remove}">×</button>` : ''}</div>`).join('')}</div>
+    <form id="mark-new" class="markform"><label><span class="meta">${M.name}</span><input name="name" placeholder="${M.namePh}" maxlength="80"></label>
+      <label><span class="meta">${M.date}</span><input name="date" type="date" value="${iso}" max="${iso}" required></label>
+      <button class="primary" type="submit">${M.create}</button></form>
+    <p class="error" id="mark-error" hidden></p></div>`
+}
+async function markAction(body) {
+  const p = projectNow()
+  const res = await fetch(`/api/mark?project=${encodeURIComponent(p.name)}`, { method: 'POST', body: JSON.stringify(body) })
   if (res.status === 401) return boot()
-  project.mark = (await res.json()).mark
-  state.all = ''
+  const out = await res.json()
+  if (!res.ok) { const e = $('#mark-error'); if (e) { e.textContent = L.mark.future; e.hidden = false }; return }
+  p.mark = out.mark; p.marks = out.marks; state.all = ''
+  $('#marks')?.remove(); $('#marks-open')?.setAttribute('aria-expanded', 'false')
   render()
 }
+document.addEventListener('click', (e) => {
+  const open = e.target.closest?.('#marks-open'), panel = $('#marks')
+  if (open) {
+    if (panel) panel.remove()
+    else {
+      open.insertAdjacentHTML('afterend', marksPanel())
+      const box = $('#marks'), r = open.getBoundingClientRect()
+      box.style.top = r.bottom + 6 + 'px'; box.style.left = Math.max(16, Math.min(r.left, innerWidth - box.offsetWidth - 16)) + 'px'
+    }
+    open.setAttribute('aria-expanded', String(!panel)); return
+  }
+  const use = e.target.closest?.('[data-mark-use]')
+  if (use && !use.disabled) return markAction(use.dataset.markUse ? { action: 'use', id: use.dataset.markUse } : { action: 'none' })
+  const del = e.target.closest?.('[data-mark-del]')
+  if (del) { const m = projectNow().marks.find((x) => x.id === del.dataset.markDel); if (confirm(L.mark.confirmRemove(m?.name || dateOf(m.at)))) markAction({ action: 'delete', id: del.dataset.markDel }); return }
+  if (panel && !e.target.closest('#marks')) { panel.remove(); $('#marks-open')?.setAttribute('aria-expanded', 'false') }
+})
+document.addEventListener('submit', (e) => {
+  if (e.target.id !== 'mark-new') return
+  e.preventDefault()
+  const f = e.target, [y, m, d] = f.date.value.split('-').map(Number)
+  const day = new Date(y, m - 1, d), now = new Date()
+  // Today: from this moment; a past day: from its start.
+  const at = day.toDateString() === now.toDateString() ? now.getTime() : day.getTime()
+  markAction({ action: 'create', name: f.name.value, at })
+})
 
 const personName = (id) => NM().people?.[id] ?? ''
 const featureName = (id) => (NM().features ?? []).find((x) => x.id === id)?.name ?? id

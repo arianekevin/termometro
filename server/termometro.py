@@ -37,7 +37,8 @@ and the API:
                        (with ?account=, also that account's day by day)
   POST /api/features   {id?, name, rules: [{kind: screen|control|action|track, key}]} or {id, delete: true}
                        ?feature=<id> on any read above narrows it to what belongs to that feature
-  POST /api/mark       start the project afresh from now (?project=), or ?clear=1 to undo ┘
+  POST /api/mark       saved marks (?project=): {action: create, name, at?} | {action: use, id} | {action: none} |
+                       {action: delete, id}; without a body, a mark now (or ?clear=1, none) ┘
                        every read above sees only what came after the mark, unless ?all=1
   GET  /  /map.js  /termometro.js
 
@@ -189,6 +190,8 @@ def connect() -> sqlite3.Connection:
             day TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL, route TEXT NOT NULL, type TEXT NOT NULL,
             n INTEGER NOT NULL, PRIMARY KEY (day, project, version, route, type));
         CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS marks (
+            project TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (project, id));
         CREATE TABLE IF NOT EXISTS features (
             project TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, rules TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, id));
@@ -283,6 +286,43 @@ MARKS: dict[str, int] = {}
 
 def mark_of(q: dict) -> int:
     return 0 if q.get("all") == "1" else MARKS.get(q.get("project", ""), 0)
+
+
+def marks_of(con, project: str) -> list[dict]:
+    """The project's saved marks, newest first; the one in use is the one whose time MARKS holds."""
+    rows = [{"id": i, "name": n, "at": a} for i, n, a in con.execute(
+        "SELECT id, name, at FROM marks WHERE project = ? ORDER BY at DESC", (project,))]
+    active = MARKS.get(project)
+    if active and not any(r["at"] == active for r in rows):  # a mark from before marks had names
+        rows.insert(0, {"id": "", "name": "", "at": active})
+    return rows
+
+
+def mark_action(con, project: str, item: dict) -> int | None:
+    """Saved marks: create {name, at?} (and use it), use {id}, none (the whole period), delete {id}. Returns the time in use."""
+    action = item.get("action")
+    if action == "create":
+        name = " ".join(str(item.get("name", "")).split())[:MAX_NAME]
+        at = int(item["at"]) if isinstance(item.get("at"), (int, float)) else int(time.time() * 1000)
+        if at > time.time() * 1000 + 60_000 or at < 0:
+            raise ValueError("a mark is a moment that already came")
+        con.execute("INSERT INTO marks (project, id, name, at) VALUES (?, ?, ?, ?)", (project, secrets.token_hex(4), name, at))
+        set_mark(con, project, at)
+    elif action == "use":
+        row = con.execute("SELECT at FROM marks WHERE project = ? AND id = ?", (project, str(item.get("id", "")))).fetchone()
+        if not row:
+            raise ValueError("no such mark")
+        set_mark(con, project, row[0])
+    elif action == "none":
+        set_mark(con, project, None)
+    elif action == "delete":
+        row = con.execute("SELECT at FROM marks WHERE project = ? AND id = ?", (project, str(item.get("id", "")))).fetchone()
+        con.execute("DELETE FROM marks WHERE project = ? AND id = ?", (project, str(item.get("id", ""))))
+        if row and MARKS.get(project) == row[0]:
+            set_mark(con, project, None)
+    else:
+        raise ValueError("action")
+    return MARKS.get(project)
 
 
 def set_mark(con, project: str, at: int | None) -> None:
@@ -2021,10 +2061,19 @@ class Handler(BaseHTTPRequestHandler):
             q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
             if q.get("project") not in CONFIG.by_name:
                 return self.json(404, {"error": "project"})
-            at = None if q.get("clear") == "1" else int(time.time() * 1000)
-            with connect() as con:
-                set_mark(con, q["project"], at)
-            return self.json(200, {"mark": at})
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                item = json.loads(self.body()) if size else {}
+                if not isinstance(item, dict):
+                    raise ValueError("not an object")
+                if not item.get("action"):  # the first version: a mark now, or ?clear=1 for none
+                    item = {"action": "none" if q.get("clear") == "1" else "create"}
+                with connect() as con:
+                    at = mark_action(con, q["project"], item)
+                    marks = marks_of(con, q["project"])
+            except (ValueError, KeyError, UnicodeDecodeError) as error:
+                return self.json(400, {"error": str(error)})
+            return self.json(200, {"mark": at, "marks": marks})
         if path == "/api/map-token":
             if not self.signed_in():
                 return self.json(401, {"error": "sign in"})
@@ -2092,15 +2141,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.google_callback(q)
         if url.path == "/api/me":
             who = self.session()
-            with connect():
+            with connect() as con:
                 marks = dict(MARKS)
+                saved = {p["name"]: marks_of(con, p["name"]) for p in CONFIG.projects.values()} if who else {}
             return self.json(200, {"signed_in": who is not None, "email": who["email"] if who else "",
                                    "methods": {"google": CONFIG.google, "password": bool(CONFIG.password)},
                                    "no_auth": CONFIG.no_auth,
                                    # The key is public by design (it ships in the app's bundle); the dashboard shows it
                                    # to whoever signed in, for the setup snippet.
                                    "projects": [{"name": p["name"], "url": p["url"], "key": k, "origins": p["origins"],
-                                                 "mark": marks.get(p["name"])}
+                                                 "mark": marks.get(p["name"]), "marks": saved.get(p["name"], [])}
                                                 for k, p in CONFIG.projects.items()]
                                    if who else []})
         if url.path not in READS and url.path not in ("/api/filters", "/api/status", "/api/names", "/api/dictionary"):

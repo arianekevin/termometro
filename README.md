@@ -179,12 +179,12 @@ Up to 19 is low, 20–49 medium, 50+ high. (The API calls it `score`.)
 An **action** is a write your backend accepted (POST, PUT, PATCH, DELETE answered 2xx/3xx), with the clicks and
 time since the previous one; two idle minutes start the count again, and a write nobody clicked for is ignored.
 
-## Start afresh
+## Marks
 
-After a redesign or a big fix, **Start afresh** (next to the filters) puts a mark on the project: from then on the
-dashboard, the alerts, the report and "new failure" only count what came after it. Nothing is deleted: **See
-everything** shows what came before (`all=1` on any read), **Undo** removes the mark, and old data still leaves
-with the retention.
+After a redesign, a version or a big fix, save a **mark** (Marks, at the top): a name and a date — today or any
+day before. The dashboard, the alerts, the report and "new failure" then count only what came after the mark in
+use; pick another one, or the whole period, at any time. Nothing is deleted, and old data still leaves with the
+retention. (`all=1` on any read still shows everything.)
 
 ## Known limits
 

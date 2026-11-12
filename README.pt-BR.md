@@ -154,12 +154,12 @@ formulário abandonado 2, voltou na hora 1, resposta lenta 1 (requisição de 3 
 usuário, uma vez por endereço por visita). A frustração da tela é a soma dos pontos dividida pelas visitas, vezes 20,
 de 0 a 100: quanto maior, pior. Até 19 é baixa, de 20 a 49 moderada, de 50 para cima alta. (Na API, `score`.)
 
-## Recomeçar
+## Marcos
 
-Depois de um redesenho ou de uma correção grande, **Recomeçar daqui** (ao lado dos filtros) põe um marco no
-projeto: dali em diante o painel, os alertas, o relatório e "falha nova" só contam o que veio depois. Nada é
-apagado: **Ver tudo** mostra o que veio antes (`all=1` em qualquer leitura), **Desfazer** tira o marco, e o
-dado antigo continua saindo pela retenção.
+Depois de um redesenho, uma versão ou uma correção grande, guarde um **marco** (Marcos, no topo): um nome e uma
+data — hoje ou qualquer dia antes. O painel, os alertas, o relatório e "falha nova" passam a contar só o que veio
+depois do marco em uso; troque por outro, ou volte ao período todo, quando quiser. Nada é apagado, e o dado antigo
+continua saindo pela retenção. (`all=1` em qualquer leitura ainda mostra tudo.)
 
 ## Licença
 

@@ -128,6 +128,32 @@ class Server(unittest.TestCase):
         self.assertIsNone(self.read("/api/me")["projects"][0]["mark"])
         self.assertEqual(self.read("/api/summary?project=shop&days=1")["overall"]["visits"], 2)
 
+    def test_marks_are_saved_by_date_and_picked_one_at_a_time(self):
+        day = 86400 * 1000
+        self.send([{"type": "page", "route": "/old"}])
+        self.age(10)
+        self.send([{"type": "page", "route": "/mid"}])
+        self.age(3)
+        self.send([{"type": "page", "route": "/new"}])
+        now = int(time.time() * 1000)
+        mark = lambda body: json.loads(call(self.base, "/api/mark?project=shop", body, cookie=self.cookie)[2])
+        m = mark({"action": "create", "name": "Redesenho", "at": now - 5 * day})
+        self.assertEqual([x["name"] for x in m["marks"]], ["Redesenho"])
+        visits = lambda: sorted(r["key"] for r in self.read("/api/summary?project=shop&days=30")["routes"])
+        self.assertEqual(visits(), ["/mid", "/new"])  # since 5 days ago
+        m = mark({"action": "create", "name": "Versão 2", "at": now - day})
+        self.assertEqual([x["name"] for x in m["marks"]], ["Versão 2", "Redesenho"])  # newest first, the new one in use
+        self.assertEqual(visits(), ["/new"])
+        first = next(x for x in m["marks"] if x["name"] == "Redesenho")
+        mark({"action": "use", "id": first["id"]})
+        self.assertEqual(visits(), ["/mid", "/new"])
+        mark({"action": "none"})
+        self.assertEqual(visits(), ["/mid", "/new", "/old"])
+        m = mark({"action": "delete", "id": first["id"]})
+        self.assertEqual([x["name"] for x in m["marks"]], ["Versão 2"])
+        self.assertEqual(self.read("/api/me")["projects"][0]["marks"][0]["name"], "Versão 2")
+        self.assertEqual(call(self.base, "/api/mark?project=shop", {"action": "create", "at": now + 10 * day}, cookie=self.cookie)[0], 400)
+
     def test_a_fresh_start_needs_a_signed_in_user_and_a_known_project(self):
         self.assertEqual(call(self.base, "/api/mark?project=shop", {})[0], 401)
         self.assertEqual(call(self.base, "/api/mark?project=nope", {}, cookie=self.cookie)[0], 404)
@@ -667,8 +693,8 @@ class Server(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(self.read("/api/me", cookie=None), {"signed_in": False, "email": "", "no_auth": False,
                                                              "methods": {"google": False, "password": True}, "projects": []})
-        self.assertEqual(self.read("/api/me")["projects"], [{"name": "shop", "url": ORIGIN, "key": KEY, "origins": [ORIGIN], "mark": None},
-                                                            {"name": "blog", "url": "", "key": "tk_blog", "origins": [], "mark": None}])
+        self.assertEqual(self.read("/api/me")["projects"], [{"name": "shop", "url": ORIGIN, "key": KEY, "origins": [ORIGIN], "mark": None, "marks": []},
+                                                            {"name": "blog", "url": "", "key": "tk_blog", "origins": [], "mark": None, "marks": []}])
         forged = "termometro_session=s.9999999999.AAAA"
         self.assertEqual(call(self.base, "/api/summary?project=shop", cookie=forged)[0], 401)
 
