@@ -1757,7 +1757,7 @@ class Handler(BaseHTTPRequestHandler):
             # The collector and the map run inside other sites: any origin may load them.
             extra = {"Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache"} if name != "index.html" else {
                 "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
-                "X-Frame-Options": "DENY"}
+                "X-Frame-Options": "DENY", "Cache-Control": "no-cache"}  # an update shows on the next plain reload
             return self.send(200, file.read_bytes(), kind, extra)
         if url.path == "/auth/google" and CONFIG.google:
             return self.google_start()

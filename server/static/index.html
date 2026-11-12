@@ -205,6 +205,7 @@ code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace
 .h5 { background: var(--bad); }
 .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 .group .insights li { align-items: center; }
+button.demand { margin-top: 6px; }
 .mag { flex: none; font-weight: 700; font-size: 15px; color: var(--fg); }
 .tip { position: fixed; z-index: 50; max-width: 320px; padding: 6px 10px; border-radius: 8px; background: var(--fg); color: var(--surface);
   font-size: 12px; line-height: 16px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
@@ -330,6 +331,23 @@ const L = PT ? {
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
     seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
     nScreens: (n) => `${n} ${n === 1 ? 'tela' : 'telas'}`, since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
+  demand: { copy: 'Copiar como demanda', problem: 'Problema', who: 'Quem é afetado', since: 'Desde', suggestion: 'Sugestão', accept: 'Critério de aceite',
+    evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', period: (d) => `nos últimos ${d} dias`,
+    reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`].filter(Boolean).join(' · '),
+    kinds: {
+      version_worse: ['A versão nova deixou a tela mais frustrante', 'Comparar o que mudou na tela entre as duas versões e corrigir o que gerou os sinais (veja "Onde irrita" na aba Frustração).', (i) => `A frustração da tela volta para perto de ${i.before} na versão seguinte.`],
+      screen_worse: ['Tela ficou mais frustrante', 'Ver na aba Frustração qual elemento concentra os sinais e o que falhou logo depois do clique.', (i) => `A frustração da tela volta para perto de ${i.before} em 7 dias de uso.`],
+      screen_frustrating: ['Tela com frustração alta', 'Ver na aba Frustração qual elemento concentra os sinais e o que falhou logo depois do clique.', () => 'A frustração da tela fica abaixo de 20 em 7 dias de uso.'],
+      failure_new: ['Falha nova', 'Reproduzir com os passos registrados na aba Falhas e corrigir.', () => 'A falha não aparece mais depois da versão com a correção.'],
+      failure_recurring: ['Falha recorrente', 'Reproduzir com os passos registrados na aba Falhas e corrigir a causa, não o sintoma.', () => 'A falha não aparece mais depois da versão com a correção.'],
+      element_irritating: ['Elemento que irrita', 'Ver no mapa de calor onde o elemento fica e o que acontece ao clicar: resposta lenta, nada visível ou erro.', () => 'Rage clicks e cliques sem resposta no elemento caem pela metade.'],
+      action_laborious: ['Ação que dá trabalho', 'Ver em Jornadas o caminho até a ação e cortar passos.', (i) => `A ação passa a precisar de menos de ${Math.max(2, Math.round(i.clicks / 2))} cliques no caso típico.`],
+      reach_far: ['Algo muito usado e longe', 'Trazer para perto de onde as pessoas já estão (atalho, botão na tela anterior).', () => 'Cliques até chegar caem pela metade.'],
+      pair_linked: ['Duas ações que andam juntas', 'Avaliar juntar as duas num passo só ou aproximar uma da outra.', () => 'Cliques entre as duas caem pela metade.'],
+      account_fading: ['Conta esfriando', 'Contato do CS para entender o motivo antes que vire cancelamento.', (i) => `Pessoas por dia voltam para perto de ${i.before}.`],
+      account_feature_drop: ['Conta usando menos uma feature', 'Contato do CS para entender o motivo; ver se algo mudou na feature para essa conta.', (i) => `Os usos voltam para perto de ${i.before} no período.`],
+      screen_better: ['Tela melhorou', 'Registrar o que funcionou.', () => '—'],
+    } },
   feature: 'Feature',
   feat: { title: 'Features vigiadas', hint: 'O que importa para o negócio, acompanhado de perto: uso, quem usa, adoção, frustração e falhas. Analise uma para filtrar o painel inteiro por ela.',
     none: 'Nenhuma feature vigiada ainda. Crie a primeira: dê um nome e diga quais telas, botões ou ações formam a feature.', create: 'Nova feature', edit: 'Editar', remove: 'Remover',
@@ -446,6 +464,23 @@ const L = PT ? {
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
     seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
     nScreens: (n) => `${n} ${n === 1 ? 'screen' : 'screens'}`, since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
+  demand: { copy: 'Copy as a request', problem: 'Problem', who: 'Who is affected', since: 'Since', suggestion: 'Suggestion', accept: 'Acceptance criteria',
+    evidence: 'See it on Termometro', tech: 'Technical detail', period: (d) => `in the last ${d} days`,
+    reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`].filter(Boolean).join(' · '),
+    kinds: {
+      version_worse: ['The new version made the screen more frustrating', 'Compare what changed on the screen between the two versions and fix what caused the signals (see "Where it irritates" on the Frustration tab).', (i) => `The screen's frustration goes back near ${i.before} in the next version.`],
+      screen_worse: ['Screen got more frustrating', 'See on the Frustration tab which element gathers the signals and what failed right after the click.', (i) => `The screen's frustration goes back near ${i.before} within 7 days of use.`],
+      screen_frustrating: ['Highly frustrating screen', 'See on the Frustration tab which element gathers the signals and what failed right after the click.', () => 'The screen\'s frustration stays under 20 over 7 days of use.'],
+      failure_new: ['New failure', 'Reproduce it with the steps recorded on the Failures tab and fix it.', () => 'The failure no longer shows up after the version with the fix.'],
+      failure_recurring: ['Recurring failure', 'Reproduce it with the steps recorded on the Failures tab and fix the cause, not the symptom.', () => 'The failure no longer shows up after the version with the fix.'],
+      element_irritating: ['An element that irritates', 'See on the heat map where it sits and what happens on click: slow answer, nothing visible or an error.', () => 'Rage and dead clicks on it drop by half.'],
+      action_laborious: ['A laborious action', 'See the path to it on Journeys and cut steps.', (i) => `The action takes fewer than ${Math.max(2, Math.round(i.clicks / 2))} clicks in the typical case.`],
+      reach_far: ['Used a lot and far away', 'Bring it close to where people already are (a shortcut, a button on the screen before).', () => 'Clicks to get there drop by half.'],
+      pair_linked: ['Two actions that go together', 'Consider merging them into one step or bringing them closer.', () => 'Clicks between them drop by half.'],
+      account_fading: ['Account cooling down', 'A call from customer success to learn why before it turns into a cancellation.', (i) => `People a day go back near ${i.before}.`],
+      account_feature_drop: ['Account using a feature less', 'A call from customer success to learn why; check whether something changed in the feature for this account.', (i) => `Uses go back near ${i.before} in the period.`],
+      screen_better: ['Screen improved', 'Write down what worked.', () => '—'],
+    } },
   feature: 'Feature',
   feat: { title: 'Watched features', hint: 'What matters to the business, watched closely: use, who uses it, adoption, frustration and failures. Analyse one to narrow the whole dashboard to it.',
     none: 'No watched feature yet. Create the first: give it a name and say which screens, buttons or actions make it up.', create: 'New feature', edit: 'Edit', remove: 'Remove',
@@ -570,7 +605,8 @@ function nameFields(i, raw = false) {
   if (i.account) out.account = e(accountText(i.account))
   return out
 }
-const techOf = (i) => [...new Set([i.route, i.target, i.action, i.key, i.kind === 'pair_linked' && i.a, i.kind === 'pair_linked' && i.b].filter(Boolean))]
+const techOf = (i) => [...new Set([i.route, i.target, i.action, i.key, i.kind === 'pair_linked' && i.a, i.kind === 'pair_linked' && i.b,
+  i.account && `account=${i.account}`].filter(Boolean))]
   .map((x) => `<code>${esc(x)}</code>`).join(' · ')
 const signals = (s) => {
   const items = Object.entries(s).sort((a, b) => b[1] - a[1])
@@ -766,6 +802,23 @@ function wireSearch() {
   })
 }
 
+// An insight as a request for the backlog: the business story first, the technical detail last.
+function demandOf(i, sentenceHtml, days) {
+  const M = L.demand, k = M.kinds[i.kind] ?? ['', '', () => '']
+  const plain = Object.assign(document.createElement('div'), { innerHTML: sentenceHtml }).textContent.replace(/\s+/g, ' ').trim()
+  const named = nameFields(i, true)
+  const where = named.route || named.account || named.action || named.key || ''
+  const url = location.origin + location.pathname + hashFor(i.link.tab, i.link.params)
+  return [`## ${k[0]}${where ? ': ' + where : ''}`, '',
+    `**${M.problem}:** ${plain}`,
+    `**${M.who}:** ${M.reach(i) || '—'}${i.account ? '' : ' ' + M.period(days)}`,
+    ...(i.b || i.first_version ? [`**${M.since}:** ${i.b || i.first_version}`] : []),
+    `**${M.suggestion}:** ${k[1]}`,
+    `**${M.accept}:** ${k[2](i)}`,
+    `**${M.evidence}:** ${url}`, '',
+    `---`, `${M.tech}: ${techOf(i).replace(/<[^>]+>/g, '')}${i.detail ? ' · ' + i.detail : ''}`].join('\n')
+}
+
 // Overview -------------------------------------------------------------------------------------------------
 const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['version_worse', 'screen_worse', 'screen_frustrating', 'element_irritating', 'action_laborious'],
   engagement: ['account_fading', 'account_feature_drop'], ideas: ['reach_far', 'pair_linked'], better: ['screen_better'] }
@@ -862,7 +915,8 @@ async function overview() {
   const groups = Object.keys(GROUPS).filter((g) => grouped[g])
   const insights = o.insights.length ? `<div class="groups">${groups.map((g, n) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}${n ? '' : help('whatToSee')}</div>
       <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
-        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
+        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div>
+          <button class="small demand" data-copy="${esc(demandOf(i, sentence(i), o.days))}">${L.demand.copy}</button></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
     : ''
 
   return `
@@ -1525,7 +1579,8 @@ async function render() {
 function onContentClick(e) {
   const copy = e.target.closest('[data-copy]')
   if (copy) {
-    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = L.copy }, 1500) })
+    const was = copy.textContent
+    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = was }, 1500) })
     return
   }
   const flow = e.target.closest('[data-flow]')
