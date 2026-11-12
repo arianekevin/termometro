@@ -192,6 +192,9 @@ with the retention.
 - Selectors are short (the element and up to two ancestors). Identical elements, like table rows, add up under
   one selector; the heat map shows `×N` when that happens.
 - An automatic write right after a click (e.g. "mark as read" on open) takes that click as its effort.
+  List such writes in `requests.notActions` and they stop counting.
+- Only a person's clicks count (mouse, touch, Enter or Space on a control): a click the app fires by code
+  (`el.click()`, `dispatchEvent`) is not usage, effort, a dead click or a rage click.
 - Stacks come from the built code: minified names and positions. Look them up in your source maps.
 - Collectors before 0.2.1 send no time per event, stack or kind of screen: their trails keep the order but not the gaps.
 

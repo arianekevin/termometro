@@ -50,6 +50,8 @@ export interface Options {
   flushIntervalMs?: number
   /** Your router calls `page()` for the first screen too (Vue Router's `afterEach` does); otherwise it is counted here. */
   pagesFromRouter?: boolean
+  /** Count clicks fired by code too (`el.click()`, `dispatchEvent`). Off: only a person's clicks count. For tests. */
+  countScriptedClicks?: boolean
   /** A request slower than this is a "slow" signal. Default: 3000 ms; 0 turns it off (long polling, big exports). */
   slowMs?: number
   /** Requests that are not the user's experience of the app. Each item is `"METHOD /path"` or `"/path"`: the path is
@@ -443,6 +445,9 @@ export function start(options: Options): Termometro {
 
   // Clicks: usage, rage, dead, and the effort of the next action.
   listen(document, 'click', (e) => {
+    // Only what a person did: a click the app fires by code (el.click(), dispatchEvent) is not usage, not
+    // effort and not a dead or rage click. Mouse, touch and Enter/Space on a control are trusted.
+    if (!e.isTrusted && !options.countScriptedClicks) return
     const target = e.target instanceof Element ? e.target : null
     if (target?.closest(OVERLAY)) return
     const now = Date.now()

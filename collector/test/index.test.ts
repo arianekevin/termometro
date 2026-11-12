@@ -29,7 +29,7 @@ describe('termometro', () => {
   })
 
   function start(pagesFromRouter = true, identity?: () => Identity | null) {
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', version: '1.0', pagesFromRouter, identity, flushIntervalMs: 1000 })
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, version: '1.0', pagesFromRouter, identity, flushIntervalMs: 1000 })
     return termometro
   }
 
@@ -224,7 +224,7 @@ describe('termometro', () => {
 
   it('requests.ignore: never a failure, slow or action (host and case do not matter)', async () => {
     scripted((url) => (url.includes('/api/beacon') ? 500 : 200), 3500)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { ignore: ['POST /api/beacon', 'get /api/quiet'] } })
     termometro.page('/x')
     document.body.innerHTML = '<button id="a">a</button>'
@@ -238,7 +238,7 @@ describe('termometro', () => {
   it('requests.background: one failure per episode, never slow, never an action', async () => {
     let down = true
     scripted(() => (down ? 503 : 200), 3500)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { background: ['/api/poll'] } })
     termometro.page('/x')
     document.body.innerHTML = '<button id="a">a</button>'
@@ -258,7 +258,7 @@ describe('termometro', () => {
 
   it('requests.notActions: not an action, and the next action counts the clicks from before it', async () => {
     scripted(() => 200)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { notActions: ['/api/heartbeat'] } })
     termometro.page('/x')
     document.body.innerHTML = '<button id="a">a</button>'
@@ -274,7 +274,7 @@ describe('termometro', () => {
 
   it('requests.notActions: a failed write still counts as a failure', async () => {
     scripted(() => 500)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { notActions: ['/api/heartbeat'] } })
     termometro.page('/x')
     await call('/api/heartbeat', { method: 'POST' })
@@ -283,7 +283,7 @@ describe('termometro', () => {
 
   it('a request rule with a method only matches that method', async () => {
     scripted(() => 500)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { ignore: ['post /api/things'] } })
     termometro.page('/x')
     await call('/api/things', { method: 'POST' })
@@ -294,7 +294,7 @@ describe('termometro', () => {
 
   it('a request rule can use :id and matches by prefix', async () => {
     scripted(() => 500)
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000,
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000,
       requests: { ignore: ['/api/tickets/:id/presence'] } })
     termometro.page('/x')
     await call('/api/tickets/4821/presence', { method: 'PUT' })
@@ -345,7 +345,7 @@ describe('termometro', () => {
       await new Promise((r) => setTimeout(r, 5000))
       return new Response(null, { status: 200 })
     }) as typeof fetch
-    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000, slowMs: 0 })
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000, slowMs: 0 })
     termometro.page('/poll')
     const p = fetch('/api/long-poll'); await vi.advanceTimersByTimeAsync(5000); await p
     expect((await events()).some((e) => e.type === 'slow')).toBe(false)
@@ -508,6 +508,16 @@ describe('termometro', () => {
     t.page('/b')
     await events()
     expect(sent.map((b) => [b.account, b.user, b.role])).toEqual([['9', 'u-2', 'admin'], ['', '', '']])
+  })
+
+  it('counts only clicks a person made, not the ones the app fires by code', async () => {
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', pagesFromRouter: true, flushIntervalMs: 1000 })
+    termometro.page('/x')
+    document.body.innerHTML = '<button id="auto">Salvar</button>'
+    const b = document.querySelector('button')!
+    for (let i = 0; i < 4; i++) b.click() // scripted: isTrusted is false
+    await vi.advanceTimersByTimeAsync(1500)
+    expect((await events()).filter((e) => ['click', 'rage', 'dead'].includes(e.type))).toEqual([])
   })
 
   it('tracks a business event by name only', async () => {
