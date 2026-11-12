@@ -28,6 +28,7 @@ and the API:
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
+  GET  /api/ways       the way to each control and action: screens gone through before, against the usual
   GET  /api/patterns   click patterns: the field clicked first on arrival, the click that follows another, typing
                        then a button instead of Enter, controls that needed a second click, near misses
   GET  /api/product    per product area: share of visits, adoption, score, failures; little-used buttons; what is new
@@ -796,6 +797,15 @@ def overview(con, f: Filter) -> dict:
     for p in [p for p in j["pairs"] if p["linked"]][:2]:
         add("pair_linked", "idea", 60 + p["share"] * 10, {"tab": "journeys", "params": {}}, a=p["a"], b=p["b"],
             share=p["share"], n=p["n"], clicks=p["clicks_median"], screens=p["screens_median"])
+    said = set()  # a button and the write it fires share their way: said once, by the button
+    for w in sorted([w for w in ways(con, f)["ways"] if w["looked_elsewhere"]], key=lambda w: w["kind"] != "control"):
+        x = w["looked_elsewhere"][0]
+        if (w["route"], x["route"]) in said or len(said) >= 3:
+            continue
+        said.add((w["route"], x["route"]))
+        add("looked_elsewhere", "idea", 80 + (x["share"] - x["normal"]) * 10, {"tab": "journeys", "params": {}},
+            kind_of=w["kind"], route=w["route"], key=w["key"], uses=w["uses"], via=x["route"], share=x["share"], normal=x["normal"],
+            browsed=x["browsed"])
     pat = patterns(con, f)
     for x in pat["focus"][:3]:
         add("focus_candidate", "idea", 75 + x["share"] * 10, {"tab": "journeys", "params": {}}, **x)
@@ -1095,6 +1105,76 @@ def patterns(con, f: Filter) -> dict:
     no_enter.sort(key=lambda x: -x["typed"])
     return {"focus": focus[:20], "follows": after[:30], "no_enter": no_enter[:20], "retry": counted("retry"),
             "near_miss": counted("near_miss")}
+
+
+VIA_MIN_USES = 20   # uses of a control or action before its way says anything
+VIA_SHARE = 0.25    # a screen on the way to it this often...
+VIA_RATIO = 2       # ...at least twice as often as on the way to anything else...
+VIA_LIFT = 0.15     # ...and by this much: people look for it there
+
+
+def ways(con, f: Filter) -> dict:
+    """The way to each control and action: the screens people went through since their last saved action before
+    using it (the first use in a visit), and how much more often than on the way to anything else — a screen that
+    shows up far more than usual is where people look for that thing first."""
+    uses: dict = {}
+    via: dict = {}
+    browsed: dict = {}
+    session = current = None
+    window: dict = {}
+    used_here: set = set()
+
+    def count(key, route):
+        path = [r for r in window if r != route]
+        uses[key] = uses.get(key, 0) + 1
+        v, b = via.setdefault(key, {}), browsed.setdefault(key, {})
+        for r in path:
+            v[r] = v.get(r, 0) + 1
+            if window[r] >= 2:
+                b[r] = b.get(r, 0) + 1
+    for sid, kind, route, target, detail in con.execute(f"""SELECT session, type, route, target, detail FROM events WHERE {f.sql}
+            AND type IN ('page', 'click', 'action') ORDER BY session, at, id""", f.args):
+        if sid != session:
+            session, current, window, used_here = sid, None, {}, set()
+        if kind == "page":
+            current, used_here = route, set()
+            window.setdefault(route, 0)
+            continue
+        if kind == "click" and target:
+            if (route, target) not in used_here:
+                used_here.add((route, target))
+                count(("control", route, target), route)
+            window[route] = window.get(route, 0) + 1
+            continue
+        if kind == "action":
+            count(("action", route, detail), route)
+            window = {route: 0}  # a saved action: what follows is a new way
+    # The usual share of a screen on the way: the mean over everything used on other screens (a hub's own buttons
+    # never have the hub on their way, and would make it look rare).
+    known = {k: n for k, n in uses.items() if n >= VIA_MIN_USES / 4}
+    usual: dict = {}
+
+    def normal_of(r):
+        if r not in usual:
+            others = [via.get(k, {}).get(r, 0) / n for k, n in known.items() if k[1] != r]
+            usual[r] = sum(others) / len(others) if others else 0
+        return usual[r]
+    out = []
+    for key, n in uses.items():
+        if n < VIA_MIN_USES:
+            continue
+        rows = []
+        for r, c in sorted(via.get(key, {}).items(), key=lambda kv: -kv[1])[:5]:
+            share = c / n
+            normal = normal_of(r)
+            rows.append({"route": r, "share": round(share, 2), "normal": round(normal, 2), "browsed": round(browsed[key].get(r, 0) / n, 2)})
+        if rows:
+            kind, route, name = key
+            out.append({"kind": kind, "route": route, "key": name, "uses": n, "via": rows,
+                        "looked_elsewhere": [x for x in rows if x["share"] >= VIA_SHARE and x["share"] >= VIA_RATIO * x["normal"]
+                                                and x["share"] - x["normal"] >= VIA_LIFT]})
+    out.sort(key=lambda x: (-len(x["looked_elsewhere"]), -x["uses"]))
+    return {"ways": out[:200]}
 
 
 SEARCH_LIMIT = 8
@@ -1694,7 +1774,7 @@ def engagement_read(con, f: Filter) -> dict:
     return out
 
 
-READS = {"/api/patterns": patterns, "/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
+READS = {"/api/ways": ways, "/api/patterns": patterns, "/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
          "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
          "/api/report": report}

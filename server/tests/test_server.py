@@ -386,6 +386,25 @@ class Server(unittest.TestCase):
         e = self.read("/api/overview?project=shop&days=1")["kinds"]["effort"]["now"]
         self.assertEqual((e["clicks"], e["here_median"], e["path_median"]), (5, 2, 3))
 
+    def test_the_way_to_a_button_shows_where_people_looked_for_it_first(self):
+        page = lambda r: {"type": "page", "route": r}
+        clk = lambda r, t: {"type": "click", "route": r, "target": t}
+        for i in range(20):  # everyone starts at home; most look in Reports before finding Export in Stats
+            evs = [page("/"), clk("/", "a#menu")]
+            if i < 14:
+                evs += [page("/reports"), clk("/reports", "button#filter"), clk("/reports", "button#tab")]
+            evs += [page("/stats"), clk("/stats", "button#export")]
+            self.send(evs, session=f"e{i}")
+        for i in range(20):  # the way to something else: home only
+            self.send([page("/"), clk("/", "a#menu"), page("/users"), clk("/users", "button#new")], session=f"o{i}")
+        ways = {(w["route"], w["key"]): w for w in self.read("/api/ways?project=shop&days=1")["ways"]}
+        export = ways[("/stats", "button#export")]
+        [looked] = export["looked_elsewhere"]
+        self.assertEqual((looked["route"], looked["share"], looked["browsed"]), ("/reports", 0.7, 0.7))
+        self.assertEqual(ways[("/users", "button#new")]["looked_elsewhere"], [])  # home is on every way: not a sign
+        kinds = [i for i in self.read("/api/overview?project=shop&days=1")["insights"] if i["kind"] == "looked_elsewhere"]
+        self.assertEqual((kinds[0]["key"], kinds[0]["via"]), ("button#export", "/reports"))
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
