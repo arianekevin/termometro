@@ -240,6 +240,7 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .seg { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .seg button { height: 32px; font-size: 13px; border-radius: 8px; }
 .seg button[aria-pressed="true"] { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+.why { font-size: 12px; line-height: 16px; color: var(--fg2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
 .chips button { height: 30px; border-radius: 999px; font-size: 13px; display: inline-flex; gap: 6px; }
 .chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
@@ -323,7 +324,7 @@ const HELP_PT = {
   byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
   accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
-  kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa.'],
+  kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa. Em Irritação, o "por quê" é o motivo provável de cada rajada de cliques: esperando resposta, deu erro, nada aconteceu, parece clicável mas não é, botão desabilitado, sem retorno claro.'],
   areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a adoção entre as pessoas ativas, a frustração e as falhas de cada uma. A área de cada tela se ajusta no Dicionário.', 'Área com muita adoção e frustração alta é onde o time mais incomoda gente. Área com pouca adoção pode ser nicho ou algo difícil de achar.'],
   low: ['O que é', 'Botões que muitas sessões viram e quase ninguém clicou.', 'Construído e pouco usado: candidato a sair, mudar de lugar ou ser explicado. Confira se não é de uso raro por natureza.'],
   news: ['O que é', 'O que apareceu pela primeira vez no período, e a parte das sessões que viram e usaram.', 'Novidade com uso baixo depois de alguns dias pede divulgação, ajuste ou revisão do valor.'],
@@ -353,7 +354,7 @@ const HELP_EN = {
   byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
   accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
-  kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs.'],
+  kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs. Under Irritation, "why" is each burst\'s likely reason: waiting for an answer, it failed, nothing happened, looks clickable but is not, disabled button, no clear feedback.'],
   areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, adoption among the people active, frustration and failures. Each screen\'s area is set in the Dictionary.', 'An area with wide adoption and high frustration is where the product bothers the most people. Low adoption may be a niche or something hard to find.'],
   low: ['What it is', 'Buttons many sessions saw and almost nobody clicked.', 'Built and little used: a candidate to remove, move or explain. Check it is not rare by nature.'],
   news: ['What it is', 'What showed up for the first time in the period, and the share of the sessions that saw it and used it.', 'Something new still little used after a few days needs announcing, adjusting or a second look at its value.'],
@@ -459,7 +460,15 @@ const L = PT ? {
     names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
     effort: 'Esforço', effortUnit: (n) => `${num(n)} ${n === 1 ? 'clique' : 'cliques'} por ação`, effortWhat: 'cliques até concluir uma ação, no caso típico',
-    effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}` },
+    effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}`, why: 'por quê' },
+  rageWhy: { waiting: 'esperando resposta', error: 'deu erro', nothing: 'nada aconteceu', not_clickable: 'parece clicável, mas não é',
+    disabled: 'botão desabilitado', unclear: 'sem retorno claro' },
+  rageFix: { waiting: 'Mostrar que está carregando logo no primeiro clique e travar o botão até a resposta; ver se a requisição pode ser mais rápida.',
+    error: 'Corrigir a falha que acontece logo depois do clique (veja a aba Falhas) e mostrar uma mensagem quando falhar.',
+    nothing: 'Ver se o botão faz algo visível ao clicar; se depende de uma condição, dizer qual.',
+    not_clickable: 'O elemento parece um botão ou link e não é: torná-lo clicável ou mudar a aparência.',
+    disabled: 'Explicar por que o botão está desabilitado e o que falta para liberar.',
+    unclear: 'A tela muda, mas a pessoa não percebe que deu certo: deixar o retorno mais claro (mensagem, destaque, navegação).' },
   demand: { copy: 'Copiar como demanda', problem: 'Problema', who: 'Quem é afetado', since: 'Desde', suggestion: 'Sugestão', accept: 'Critério de aceite',
     evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', period: (d) => `nos últimos ${d} dias`,
     reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`].filter(Boolean).join(' · '),
@@ -523,7 +532,7 @@ const L = PT ? {
     action_laborious: (i) => `<b>${i.action}</b> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
     reach_far: (i) => `${i.kind_of === 'action' ? '<b>' + i.key + '</b>' : '<b>' + i.key + '</b> em <b>' + i.route + '</b>'} é muito usado (${i.uses}×) e fica longe: ${i.clicks} cliques e ${i.screens} ${i.screens === 1 ? 'tela' : 'telas'} até chegar.`,
     pair_linked: (i) => `Depois de <b>${i.a}</b>, ${Math.round(i.share * 100)}% das vezes vem <b>${i.b}</b> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
-    element_irritating: (i) => `<b>${i.target}</b> em <b>${i.route}</b> irrita: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} cliques sem resposta`].filter(Boolean).join(' e ')}.`,
+    element_irritating: (i) => `<b>${i.target}</b> em <b>${i.route}</b> irrita: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} cliques sem resposta`].filter(Boolean).join(' e ')}${i.reason ? ` (na maioria, ${L.rageWhy[i.reason] ?? i.reason})` : ''}.`,
   },
   help: { rage: '3 cliques no mesmo ponto em 1 s', dead: 'Clique num botão ou link que não mudou nada em 1 s', js_error: 'Erro de JavaScript não tratado', http_5xx: 'Requisição com erro 5xx ou falha de rede', http_4xx: 'Requisição recusada com 4xx (401 não conta)', abandon: 'Começou a preencher um formulário e saiu sem salvar', bounce: 'Voltou em menos de 4 s', slow: 'Requisição que levou 3 s ou mais com a tela à frente' },
   csv: 'CSV', csvTip: 'Baixar esta tabela em CSV',
@@ -597,7 +606,15 @@ const L = PT ? {
     names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
     effort: 'Effort', effortUnit: (n) => `${num(n)} ${n === 1 ? 'click' : 'clicks'} per action`, effortWhat: 'clicks to get an action done, in the typical case',
-    effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}` },
+    effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}`, why: 'why' },
+  rageWhy: { waiting: 'waiting for an answer', error: 'it failed', nothing: 'nothing happened', not_clickable: 'looks clickable, is not',
+    disabled: 'disabled button', unclear: 'no clear feedback' },
+  rageFix: { waiting: 'Show it is loading on the first click and lock the button until the answer; see whether the request can be faster.',
+    error: 'Fix the failure right after the click (see the Failures tab) and show a message when it fails.',
+    nothing: 'Check the button does something visible on click; if it depends on a condition, say which.',
+    not_clickable: 'It looks like a button or link and is not: make it clickable or change how it looks.',
+    disabled: 'Explain why the button is disabled and what is missing to enable it.',
+    unclear: 'The screen changes but people do not notice it worked: make the feedback clearer (message, highlight, navigation).' },
   demand: { copy: 'Copy as a request', problem: 'Problem', who: 'Who is affected', since: 'Since', suggestion: 'Suggestion', accept: 'Acceptance criteria',
     evidence: 'See it on Termometro', tech: 'Technical detail', period: (d) => `in the last ${d} days`,
     reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`].filter(Boolean).join(' · '),
@@ -661,7 +678,7 @@ const L = PT ? {
     action_laborious: (i) => `<b>${i.action}</b> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
     reach_far: (i) => `${i.kind_of === 'action' ? '<b>' + i.key + '</b>' : '<b>' + i.key + '</b> on <b>' + i.route + '</b>'} is used a lot (${i.uses}×) and sits far away: ${i.clicks} clicks and ${i.screens} ${i.screens === 1 ? 'screen' : 'screens'} to get there.`,
     pair_linked: (i) => `After <b>${i.a}</b>, ${Math.round(i.share * 100)}% of the time comes <b>${i.b}</b> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
-    element_irritating: (i) => `<b>${i.target}</b> on <b>${i.route}</b> irritates: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} dead clicks`].filter(Boolean).join(' and ')}.`,
+    element_irritating: (i) => `<b>${i.target}</b> on <b>${i.route}</b> irritates: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} dead clicks`].filter(Boolean).join(' and ')}${i.reason ? ` (mostly ${L.rageWhy[i.reason] ?? i.reason})` : ''}.`,
   },
   help: { rage: '3 clicks on the same spot within 1 s', dead: 'A click on a button or link that changed nothing within 1 s', js_error: 'An uncaught JavaScript error', http_5xx: 'A request answered with 5xx, or a network failure', http_4xx: 'A request refused with 4xx (401 left out)', abandon: 'Started filling a form and left without saving', bounce: 'Went back within 4 s', slow: 'A request that took 3 s or more while on screen' },
   csv: 'CSV', csvTip: 'Download this table as CSV',
@@ -950,7 +967,7 @@ function demandOf(i, sentenceHtml, days) {
     `**${M.problem}:** ${plain}`,
     `**${M.who}:** ${M.reach(i) || '—'}${i.account ? '' : ' ' + M.period(days)}`,
     ...(i.b || i.first_version ? [`**${M.since}:** ${i.b || i.first_version}`] : []),
-    `**${M.suggestion}:** ${k[1]}`,
+    `**${M.suggestion}:** ${i.kind === 'element_irritating' && i.reason && L.rageFix[i.reason] ? L.rageFix[i.reason] : k[1]}`,
     `**${M.accept}:** ${k[2](i)}`,
     `**${M.evidence}:** ${url}`, '',
     `---`, `${M.tech}: ${techOf(i).replace(/<[^>]+>/g, '')}${i.detail ? ' · ' + i.detail : ''}`].join('\n')
@@ -963,6 +980,9 @@ const C = () => L.cat
 const kindBar = (cats, total) => { const sum = KINDS.reduce((a, k) => a + (cats?.[k] ?? 0), 0) || 1
   return `<div class="kbar" role="img" aria-label="${esc(KINDS.filter((k) => cats?.[k]).map((k) => `${C().names[k]} ${cats[k]}`).join(', '))}">${KINDS.filter((k) => cats?.[k]).map((k) =>
     `<i class="k-${k}" style="width:${cats[k] / sum * Math.min(100, total)}%" data-tip="${esc(`${C().names[k]}: ${cats[k]}`)}"></i>`).join('')}</div>` }
+// The likely reasons of the rage clicks, most common first: "62% waiting for an answer · 30% nothing happened".
+const reasonsText = (r, top = 2) => { const total = Object.values(r ?? {}).reduce((a, b) => a + b, 0)
+  return total ? Object.entries(r).sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, n]) => `${Math.round(n / total * 100)}% ${L.rageWhy[k] ?? k}`).join(' · ') : '' }
 const kindLegend = () => `<div class="legend">${KINDS.map((k) => `<span><i class="sw k-${k}"></i>${C().names[k]}</span>`).join('')}</div>`
 
 function kindsCard(o) {
@@ -976,6 +996,7 @@ function kindsCard(o) {
         <span class="kval">${k.now[c]}${delta(k.now[c], k.before[c])}</span>
         ${spark(k.daily.map((d) => d[c]), `${C().names[c]}: ${L.perDay}`, 96, 24)}
         <span class="meta">${C().what[c]} · ${C().share(Math.round(k.now[c] / total * 100))}</span>
+        ${c === 'irritation' && reasonsText(k.rage_reasons) ? `<span class="why">${C().why}: ${esc(reasonsText(k.rage_reasons))}</span>` : ''}
         <span class="kshare"><i class="k-${c}" style="width:${k.now[c] / total * 100}%"></i></span></a>`).join('')}
       <div class="kind effort"><span class="kname">${C().effort}</span>
         <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions && e.now.clicks !== e.before.clicks
@@ -1128,7 +1149,7 @@ async function frustration() {
   const routes = cat ? [...r.routes].sort((a, b) => (b.categories?.[cat] ?? 0) - (a.categories?.[cat] ?? 0)) : r.routes
   const worst = routes.find((x) => x.visits)
   const detail = (x) => {
-    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${a.n}×</li>`).join('')}</ul>` : ''
+    const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${a.n}×${reasonsText(a.reasons) ? `<div class="why">${C().why}: ${esc(reasonsText(a.reasons, 3))}</div>` : ''}</li>`).join('')}</ul>` : ''
     const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
       <div class="meta">${esc(L.seen(f.first_version, f.last_version, ago(f.last_at)))}</div></li>`).join('')}</ul>` : ''
     return where + failed || `<span class="meta">${L.noDetail}</span>`

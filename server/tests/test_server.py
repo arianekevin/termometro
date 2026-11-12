@@ -343,6 +343,17 @@ class Server(unittest.TestCase):
         k = self.read("/api/overview?project=shop&days=1")["kinds"]
         self.assertEqual((k["now"]["irritation"], k["effort"]["now"]["clicks"], len(k["daily"])), (12, 5, 1))
 
+    def test_rage_clicks_carry_their_likely_reason(self):
+        rage = lambda why: {"type": "rage", "route": "/cart", "target": "button#pay", "detail": why}
+        self.send([{"type": "page", "route": "/cart"}] * 10 + [rage("waiting")] * 3 + [rage("nothing")] + [rage("")] * 2
+                  + [{"type": "rage", "route": "/cart", "target": "button#pay"}] * 2)
+        [pay] = [t for t in self.read("/api/summary?project=shop&days=1")["routes"][0]["targets"] if t["type"] == "rage"]
+        self.assertEqual((pay["n"], pay["reasons"]), (8, {"waiting": 3, "nothing": 1}))  # older collectors send no reason
+        o = self.read("/api/overview?project=shop&days=1")
+        self.assertEqual(o["kinds"]["rage_reasons"], {"waiting": 3, "nothing": 1})
+        [irr] = [i for i in o["insights"] if i["kind"] == "element_irritating"]
+        self.assertEqual(irr["reason"], "waiting")
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

@@ -9,7 +9,9 @@
  * on any element keeps its labels home. Every long number, e-mail address or identifier becomes `:id`. Who the
  * user is travels only as the ids you hand to `identity` (account, user, role).
  *
- * Signals: rage (3 clicks on the same spot within 1 s), dead (a click on a button or link that changed nothing
+ * Signals: rage (3 clicks on the same spot within 1 s, with its likely reason in `detail`: waiting — a request of the
+ * user's still open or slower than 1 s —, error, nothing — no change, request or navigation —, not_clickable,
+ * disabled, unclear — something changed and they kept clicking —; three clicks selecting text are not rage), dead (a click on a button or link that changed nothing
  * within 1 s), js_error, http_4xx / http_5xx (401 is left out: an expired session is not frustration), abandon
  * (started filling a form or dialog and left the screen without saving), bounce (went back within 4 s) and slow
  * (a request that answered after 3 s while the page was in front of the user).
@@ -106,6 +108,7 @@ interface Queued { event: TrackedEvent; who: Who }
 const RAGE_CLICKS = 3
 const RAGE_WINDOW_MS = 1000
 const RAGE_RADIUS_PX = 30
+const RAGE_WAIT_MS = 1000 // an answer this slow during a burst reads as "waiting"
 const DEAD_WAIT_MS = 1000
 const BOUNCE_MS = 4000
 const AFTER_CLICK_MS = 2000
@@ -297,6 +300,17 @@ export function start(options: Options): Termometro {
   let arrivedAt = Date.now()
   // Counters, not clocks: a change in the same millisecond as the click still counts as its reaction.
   let networkCount = 0
+  // For the likely reason of a rage click: requests of the user's still open, failures so far, the last slow answer,
+  // and how things stood at the burst's first click.
+  let inflight = 0
+  let failures = 0
+  let lastSlowAt = 0
+  let burst = { t: 0, mutations: 0, network: 0, href: '', failures: 0 }
+  const userRequest = (method: string, url: string) => {
+    if (url.startsWith(base)) return false
+    const verb = method.toUpperCase(), path = pathOf(url)
+    return !matches(ignore, verb, path) && !matches(background, verb, path)
+  }
   let mutationCount = 0
   let clicks: Array<{ t: number; x: number; y: number }> = []
   let rageInBurst = false
@@ -359,6 +373,7 @@ export function start(options: Options): Termometro {
     const detail = scrub(`${err.name}: ${err.message}`).slice(0, 200)
     const times = (errorsSeen.get(detail) ?? 0) + 1
     errorsSeen.set(detail, times)
+    failures++
     if (times <= MAX_SAME_ERROR) record({ type: 'js_error', route: currentRoute, target: recentClick(), detail, stack: stackOf(err) || undefined })
   }
 
@@ -377,6 +392,7 @@ export function start(options: Options): Termometro {
       backgroundDown.add(where)
     } else {
       networkCount++
+      if (ms >= RAGE_WAIT_MS) lastSlowAt = Date.now()
     }
     if (!isBackground && slowMs > 0 && ms >= slowMs && ok && document.visibilityState === 'visible' && !slowSeen.has(where)) {
       slowSeen.add(where)
@@ -393,8 +409,22 @@ export function start(options: Options): Termometro {
       }
     }
     if (status === 401 || ok) return
+    failures++
     const type = status >= 400 && status < 500 ? 'http_4xx' : 'http_5xx'
     record({ type, route: currentRoute, target: recentClick(), detail: `${where} ${status || 'network failure'}` })
+  }
+
+  // Why someone clicked three times, as far as the page can tell — or null when it was selecting text, not rage.
+  function rageReason(target: Element | null): string | null {
+    const clickable = target?.closest(CLICKABLE)
+    const selected = typeof getSelection === 'function' ? String(getSelection() ?? '').trim() : ''
+    if (selected && !clickable) return null
+    if (target?.closest('[disabled],[aria-disabled="true"]')) return 'disabled'
+    if (failures > burst.failures) return 'error'
+    if (inflight > 0 || lastSlowAt >= burst.t) return 'waiting'
+    if (!clickable) return 'not_clickable'
+    const reacted = mutationCount !== burst.mutations || networkCount !== burst.network || location.href !== burst.href
+    return reacted ? 'unclear' : 'nothing'
   }
 
   function leaveForm() {
@@ -465,11 +495,15 @@ export function start(options: Options): Termometro {
     lastClickAt = now
 
     clicks = clicks.filter((c) => now - c.t < RAGE_WINDOW_MS && Math.hypot(c.x - e.clientX, c.y - e.clientY) < RAGE_RADIUS_PX)
-    if (!clicks.length) rageInBurst = false
+    if (!clicks.length) {
+      rageInBurst = false
+      burst = { t: now, mutations: mutationCount, network: networkCount, href: location.href, failures }
+    }
     clicks.push({ t: now, x: e.clientX, y: e.clientY })
     if (clicks.length >= RAGE_CLICKS && !rageInBurst) {
       rageInBurst = true
-      record({ type: 'rage', route: currentRoute, target: selectorOf(target), label: labelOf(target) || undefined })
+      const reason = rageReason(target)
+      if (reason) record({ type: 'rage', route: currentRoute, target: selectorOf(target), label: labelOf(target) || undefined, detail: reason })
     }
 
     if (!clickable) return
@@ -511,11 +545,15 @@ export function start(options: Options): Termometro {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     const sent = performance.now()
+    const mine = userRequest(method, url)
+    if (mine) inflight++
     try {
       const response = await nativeFetch.call(window, input, init)
+      if (mine) inflight--
       network(method, url, response.status, performance.now() - sent)
       return response
     } catch (failure) {
+      if (mine) inflight--
       if (!(failure instanceof DOMException && failure.name === 'AbortError')) network(method, url, 0, performance.now() - sent)
       throw failure
     }
@@ -535,8 +573,13 @@ export function start(options: Options): Termometro {
     if (req) {
       let aborted = false
       const sent = performance.now()
+      const mine = userRequest(req.method, req.url)
+      if (mine) inflight++
       this.addEventListener('abort', () => { aborted = true })
-      this.addEventListener('loadend', () => { if (!aborted) network(req.method, req.url, this.status, performance.now() - sent) })
+      this.addEventListener('loadend', () => {
+        if (mine) inflight--
+        if (!aborted) network(req.method, req.url, this.status, performance.now() - sent)
+      })
     }
     return sendOriginal.call(this, body)
   }

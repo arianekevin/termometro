@@ -112,7 +112,7 @@ describe('termometro', () => {
     for (let i = 0; i < 5; i++) click(button)
     await vi.advanceTimersByTimeAsync(1500)
     const signals = (await events()).filter((e) => e.type !== 'page' && e.type !== 'click' && e.type !== 'inventory')
-    expect(signals).toEqual([{ type: 'rage', route: '/tickets', target: 'button#save', label: 'Salvar' }])
+    expect(signals).toEqual([{ type: 'rage', route: '/tickets', target: 'button#save', label: 'Salvar', detail: 'nothing' }])
   })
 
   it('reports a dead click when nothing changes after it', async () => {
@@ -518,6 +518,45 @@ describe('termometro', () => {
     for (let i = 0; i < 4; i++) b.click() // scripted: isTrusted is false
     await vi.advanceTimersByTimeAsync(1500)
     expect((await events()).filter((e) => ['click', 'rage', 'dead'].includes(e.type))).toEqual([])
+  })
+
+  it('says why someone rage clicked, as far as the page can tell', async () => {
+    scripted((url) => (url.includes('/fail') ? 500 : 200), 3000) // every request takes 3 s
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000 })
+    termometro.page('/x')
+    document.body.innerHTML = `<button id="save">Salvar</button><button id="err">Enviar</button><p id="txt">um texto</p>
+      <button id="off" aria-disabled="true">Excluir</button><button id="moves">Abrir</button>`
+    // People click about 100 ms apart, and the page gets to react in between.
+    const burst = async (el: Element, x: number) => { for (let i = 0; i < 3; i++) { click(el, x, 10); await vi.advanceTimersByTimeAsync(100) } }
+    const save = document.querySelector('#save')!
+    save.addEventListener('click', () => { fetch('/api/save', { method: 'POST' }).catch(() => {}) }, { once: true })
+    await burst(save, 10) // the first click opened a request still running: waiting
+    await vi.advanceTimersByTimeAsync(4000)
+    const err = document.querySelector('#err')!
+    err.addEventListener('click', () => { window.dispatchEvent(new ErrorEvent('error', { error: new TypeError('x is undefined') })) }, { once: true })
+    await burst(err, 200) // it failed right away: error
+    await vi.advanceTimersByTimeAsync(1500)
+    await burst(document.querySelector('#txt')!, 400) // text that is not a control: not_clickable
+    await vi.advanceTimersByTimeAsync(1500)
+    await burst(document.querySelector('#off')!, 600) // disabled
+    await vi.advanceTimersByTimeAsync(1500)
+    const moves = document.querySelector('#moves')!
+    moves.addEventListener('click', () => { document.body.append(document.createElement('span')) })
+    await burst(moves, 800) // the page reacted and they kept clicking: unclear
+    await vi.advanceTimersByTimeAsync(1500)
+    expect((await events()).filter((e) => e.type === 'rage').map((e) => [e.target, e.detail])).toEqual([
+      ['button#save', 'waiting'], ['button#err', 'error'], ['p#txt', 'not_clickable'], ['button#off', 'disabled'], ['button#moves', 'unclear']])
+  })
+
+  it('three clicks that select text are not a rage click', async () => {
+    start().page('/x')
+    document.body.innerHTML = '<p id="txt">um parágrafo para copiar</p>'
+    const p = document.querySelector('#txt')!
+    click(p); click(p)
+    getSelection()?.selectAllChildren(p) // the browser selects the paragraph on the third click
+    click(p)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect((await events()).filter((e) => e.type === 'rage')).toEqual([])
   })
 
   it('tracks a business event by name only', async () => {

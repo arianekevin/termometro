@@ -500,7 +500,9 @@ def kinds(con, f: Filter) -> dict:
     for d, c in con.execute(f"""SELECT date(at / 1000, 'unixepoch'), clicks FROM events WHERE {f.sql} AND type = 'action'
             AND clicks IS NOT NULL""", f.args):
         per_day_clicks.setdefault(d, []).append(c)
-    return {"now": whole(f), "before": whole(prev), "daily": [{"day": g["key"], **g["categories"]} for g in days if g["visits"]],
+    rage_reasons = dict(con.execute(f"""SELECT detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'rage' AND detail != ''
+        GROUP BY detail ORDER BY 2 DESC""", f.args))
+    return {"now": whole(f), "before": whole(prev), "rage_reasons": rage_reasons, "daily": [{"day": g["key"], **g["categories"]} for g in days if g["visits"]],
             "effort": {"now": effort(f), "before": effort(prev),
                        "daily": [{"day": d, "clicks": median(c)} for d, c in sorted(per_day_clicks.items())]}}
 
@@ -518,11 +520,16 @@ def summary(con, f: Filter) -> dict:
         SELECT route, type, detail, target, COUNT(*) n, MAX(at), version, AVG(duration_ms) FROM events
         WHERE {f.sql} AND type IN {FAILURES}
         GROUP BY route, type, detail, target ORDER BY n DESC""", f.args).fetchall()
+    # Why the rage clicks happened, per element (the collector's guess; older collectors send none).
+    reasons: dict[tuple, dict] = {}
+    for route, target, reason, n in con.execute(f"""SELECT route, target, detail, COUNT(*) FROM events WHERE {f.sql}
+            AND type = 'rage' AND detail != '' GROUP BY route, target, detail""", f.args):
+        reasons.setdefault((route, target), {})[reason] = n
     per_route: dict[str, dict] = {}
     for route, target, kind, n in targets:
         lst = per_route.setdefault(route, {"targets": [], "failures": []})["targets"]
         if len(lst) < 5:
-            lst.append({"target": target, "type": kind, "n": n})
+            lst.append({"target": target, "type": kind, "n": n, **({"reasons": reasons.get((route, target), {})} if kind == "rage" else {})})
     for route, kind, detail, target, n, last_at, last_version, ms in failures:
         lst = per_route.setdefault(route, {"targets": [], "failures": []})["failures"]
         if len(lst) < 5:
@@ -761,8 +768,10 @@ def overview(con, f: Filter) -> dict:
             SELECT route, target, SUM(type = 'rage'), SUM(type = 'dead') FROM events
             WHERE {f.sql} AND type IN ('rage', 'dead') AND target != '' GROUP BY route, target
             HAVING COUNT(*) >= {INSIGHT_IRRITATION} ORDER BY COUNT(*) DESC LIMIT 5""", f.args):
+        why = con.execute(f"""SELECT detail FROM events WHERE {f.sql} AND type = 'rage' AND route = ? AND target = ? AND detail != ''
+            GROUP BY detail ORDER BY COUNT(*) DESC LIMIT 1""", f.args + [route, target]).fetchone()
         add("element_irritating", "warn", 80 + min(rage + dead, 99), {"tab": "usage", "params": {"route": route}},
-            route=route, target=target, rage=rage, dead=dead)
+            route=route, target=target, rage=rage, dead=dead, **({"reason": why[0]} if why else {}))
     j = journeys(con, f)
     far = {}
     for r in j["reach"]:  # one line per button or action, from the screen where it is used the most
@@ -1244,6 +1253,10 @@ GLOSSARY = {
         "action": "a write (POST/PUT/PATCH/DELETE) the backend accepted after at least one click, with the clicks and time "
                   "since the previous one (or since 2 idle minutes)",
     },
+    "rage_reasons": "the likely reason of each rage click, as the collector saw it: waiting (a request of the user's still "
+                    "open or slower than 1 s), error (a failure right after the first click), nothing (no change, request or "
+                    "navigation), not_clickable (text or an image that looks clickable), disabled, unclear (the page changed "
+                    "and they kept clicking)",
     "score": f"the frustration level (higher is worse), per screen: sum of signal weights / visits x {FACTOR}, 0 to {CAP}. "
              "0-19 low, 20-49 moderate, 50+ high. Weights: " + ", ".join(f"{k} {w}" for k, w in WEIGHTS.items()),
     "reach": "clicks and screens since the last saved action (or the start of the session) until a button or action is "
