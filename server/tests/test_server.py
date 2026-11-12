@@ -329,6 +329,20 @@ class Server(unittest.TestCase):
             t.apply_retention(con)
             self.assertEqual(con.execute("SELECT COUNT(*) FROM people").fetchone()[0], 0)
 
+    def test_frustration_splits_by_kind_and_effort_stays_apart(self):
+        self.send([{"type": "page", "route": "/cart"}] * 10
+                  + [{"type": "rage", "route": "/cart", "target": "b"}] * 2 + [{"type": "dead", "route": "/cart", "target": "b"}]
+                  + [{"type": "http_5xx", "route": "/cart", "detail": "POST /x 500"}, {"type": "slow", "route": "/cart", "detail": "GET /y"}]
+                  + [{"type": "abandon", "route": "/cart", "target": "form"}]
+                  + [{"type": "action", "route": "/cart", "detail": "POST /o", "clicks": c} for c in (3, 5, 9)])
+        cart = self.read("/api/summary?project=shop&days=1")["routes"][0]
+        # (2x3 + 2 + 5 + 1 + 2) / 10 visits x 20 = 32; each kind is its own points over the same visits
+        self.assertEqual((cart["score"], cart["categories"]),
+                         (32, {"irritation": 12, "no_effect": 4, "failure": 10, "slowness": 2, "giving_up": 4}))
+        self.assertEqual(cart["effort"], {"clicks": 5, "actions": 3})
+        k = self.read("/api/overview?project=shop&days=1")["kinds"]
+        self.assertEqual((k["now"]["irritation"], k["effort"]["now"]["clicks"], len(k["daily"])), (12, 5, 1))
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

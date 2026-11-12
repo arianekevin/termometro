@@ -413,6 +413,15 @@ def p90(values: list) -> float:
     return ordered[min(len(ordered) - 1, int(len(ordered) * 0.9))]
 
 
+# The kinds of frustration, each a part of the frustration level (same points over the same visits): what is hurting.
+CATEGORIES = {"irritation": ("rage",), "no_effect": ("dead",), "failure": ("js_error", "http_5xx", "http_4xx"),
+              "slowness": ("slow",), "giving_up": ("abandon", "bounce")}
+
+
+def categories_of(signals: dict, visits: int) -> dict:
+    return {c: score(sum(signals.get(t, 0) * WEIGHTS[t] for t in types), visits) for c, types in CATEGORIES.items()}
+
+
 WEIGHT_CASE = "CASE type " + " ".join(f"WHEN '{t}' THEN {w}" for t, w in WEIGHTS.items()) + " ELSE 0 END"
 SIGNALS = "(" + ",".join(f"'{t}'" for t in WEIGHTS) + ")"
 
@@ -462,7 +471,38 @@ def frustration_by(con, f: Filter, key: str) -> list[dict]:
             g["points"] += n * WEIGHTS[kind]
     for g in groups.values():
         g["score"] = score(g["points"], g["visits"])
+        g["categories"] = categories_of(g["signals"], g["visits"])
     return sorted(groups.values(), key=lambda g: (-g["score"], -g["points"]))
+
+
+def effort_by_route(con, f: Filter) -> dict:
+    """Effort, apart from frustration: the clicks a typical accepted write took (median), per screen where it happened."""
+    per: dict[str, list] = {}
+    for route, clicks in con.execute(f"SELECT route, clicks FROM events WHERE {f.sql} AND type = 'action' AND clicks IS NOT NULL", f.args):
+        per.setdefault(route, []).append(clicks)
+    return {r: {"clicks": median(c), "actions": len(c)} for r, c in per.items()}
+
+
+def kinds(con, f: Filter) -> dict:
+    """The frustration level split by kind for the whole period, now and before, and per day; and the effort (clicks per
+    typical action), now and before, and per day."""
+    prev = Filter(f.q, before=True)
+
+    def whole(fl):
+        g = frustration_by(con, fl, "project")
+        return g[0]["categories"] if g else {c: 0 for c in CATEGORIES}
+
+    def effort(fl):
+        clicks = [c for (c,) in con.execute(f"SELECT clicks FROM events WHERE {fl.sql} AND type = 'action' AND clicks IS NOT NULL", fl.args)]
+        return {"clicks": median(clicks), "actions": len(clicks)}
+    days = sorted(frustration_by(con, f, "date(at / 1000, 'unixepoch')"), key=lambda g: g["key"])
+    per_day_clicks: dict[str, list] = {}
+    for d, c in con.execute(f"""SELECT date(at / 1000, 'unixepoch'), clicks FROM events WHERE {f.sql} AND type = 'action'
+            AND clicks IS NOT NULL""", f.args):
+        per_day_clicks.setdefault(d, []).append(c)
+    return {"now": whole(f), "before": whole(prev), "daily": [{"day": g["key"], **g["categories"]} for g in days if g["visits"]],
+            "effort": {"now": effort(f), "before": effort(prev),
+                       "daily": [{"day": d, "clicks": median(c)} for d, c in sorted(per_day_clicks.items())]}}
 
 
 def summary(con, f: Filter) -> dict:
@@ -495,7 +535,10 @@ def summary(con, f: Filter) -> dict:
     visits, points = con.execute(f"""
         SELECT COALESCE(SUM(type = 'page'), 0), COALESCE(SUM({WEIGHT_CASE}), 0) FROM events WHERE {f.sql}""", f.args).fetchone()
     sessions = con.execute(f"SELECT COUNT(DISTINCT session) FROM events WHERE {f.sql}", f.args).fetchone()[0]
-    return {"days": f.days, "weights": WEIGHTS, "factor": FACTOR,
+    effort = effort_by_route(con, f)
+    for r in routes:
+        r["effort"] = effort.get(r["key"])
+    return {"days": f.days, "weights": WEIGHTS, "factor": FACTOR, "categories": {c: list(t) for c, t in CATEGORIES.items()},
             "overall": {"visits": visits, "sessions": sessions, "points": points, "score": score(points, visits)},
             "routes": routes,
             "versions": sorted(frustration_by(con, f, "version") if not f.q.get("version") else [], key=lambda g: g["key"])}
@@ -743,7 +786,7 @@ def overview(con, f: Filter) -> dict:
                         feature=d["name"], before=d["before"], now=d["now"])
     insights.sort(key=lambda i: -i["weight"])
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
-            "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f),
+            "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f), "kinds": kinds(con, f),
             "insights": insights[:15]}
 
 

@@ -7,21 +7,67 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z' fill='%23e5484d'/%3E%3C/svg%3E">
 <style>
 /* No web fonts and no third-party requests: the dashboard of a privacy tool should not call anyone. */
+/* Palettes: Nectar is the default; the viewer may pick warm, cold or high contrast (kept in the browser). Each has its
+   light and dark steps; --k1..--k5 are the kinds of frustration, validated for colour blindness in both modes. */
 :root {
-  --canvas: #f6f6f8; --surface: #ffffff; --sunken: #f1f1f4; --line: #e7e7ec; --line-strong: #d6d6de;
-  --fg: #18181b; --fg2: #4b4b55; --faint: #6b6b76;
-  --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0ff; --on-accent: #ffffff; --brand: #e5484d;
+  --canvas: #faf7f0; --surface: #ffffff; --sunken: #f7f2e7; --line: #e6dfd0; --line-strong: #cfc6b2;
+  --fg: #1f1a14; --fg2: #4a4235; --faint: #6b6152;
+  --accent: #8a5e00; --accent-hover: #6e4b00; --accent-soft: #fff1c2; --on-accent: #ffffff; --fill: #fec10d; --on-fill: #1f1a14;
+  --ok: #1d6b45; --ok-soft: #e2f2e9; --warn: #b3400a; --warn-soft: #fde8dc; --bad: #a81c3f; --bad-soft: #fbe3ea;
+  --k1: #2a78d6; --k2: #eb6834; --k3: #1baf7a; --k4: #eda100; --k5: #e87ba4;
+  --brand: #e5484d; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04); --ease: cubic-bezier(.16,1,.3,1);
+}
+:root[data-palette="warm"] {
+  --canvas: #fbf5ef; --surface: #ffffff; --sunken: #f6ece3; --line: #ecdccd; --line-strong: #d9c2ad;
+  --fg: #2a1a12; --fg2: #5a4034; --faint: #7a5f50;
+  --accent: #b3400a; --accent-hover: #8f330a; --accent-soft: #fde8dc; --on-accent: #ffffff; --fill: #c2410c; --on-fill: #ffffff;
+  --ok: #1d6b45; --ok-soft: #e2f2e9; --warn: #a15c07; --warn-soft: #fdf0dc; --bad: #a81c3f; --bad-soft: #fbe3ea;
+  --k1: #c2410c; --k2: #e87ba4; --k3: #eda100; --k4: #a8326e; --k5: #b45309;
+}
+:root[data-palette="cold"] {
+  --canvas: #f4f7fb; --surface: #ffffff; --sunken: #eef2f8; --line: #e1e7f0; --line-strong: #c9d3e2;
+  --fg: #111827; --fg2: #3b4658; --faint: #5b6678;
+  --accent: #1d4ed8; --accent-hover: #1e40af; --accent-soft: #e8efff; --on-accent: #ffffff; --fill: #2563eb; --on-fill: #ffffff;
   --ok: #15803d; --ok-soft: #e8f7ee; --warn: #a16207; --warn-soft: #fdf4e3; --bad: #c2262e; --bad-soft: #fdecec;
-  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04); --ease: cubic-bezier(.16,1,.3,1);
+  --k1: #2a78d6; --k2: #16a34a; --k3: #6250d6; --k4: #06b6d4; --k5: #4338ca;
+}
+:root[data-palette="contrast"] {
+  --canvas: #ffffff; --surface: #ffffff; --sunken: #f2f2f2; --line: #000000; --line-strong: #000000;
+  --fg: #000000; --fg2: #000000; --faint: #333333;
+  --accent: #0040c0; --accent-hover: #002f8f; --accent-soft: #e6eeff; --on-accent: #ffffff; --fill: #000000; --on-fill: #ffffff;
+  --ok: #006b2e; --ok-soft: #e3f5ea; --warn: #8a4b00; --warn-soft: #fff0d6; --bad: #b00020; --bad-soft: #fde6ea;
+  --k1: #2a78d6; --k2: #eb6834; --k3: #1baf7a; --k4: #eda100; --k5: #e87ba4;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #111114; --surface: #1a1a1f; --sunken: #15151a; --line: #2a2a31; --line-strong: #3a3a43;
-    --fg: #f4f4f5; --fg2: #c9c9d1; --faint: #9b9ba6;
-    --accent: #a5b4fc; --accent-hover: #c7d2fe; --accent-soft: #23243d; --on-accent: #111114; --brand: #ff6b70;
-    --ok: #6ee7a0; --ok-soft: #12261b; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
-    --shadow: none;
-  }
+  --canvas: #15120d; --surface: #1e1a14; --sunken: #191610; --line: #3a3328; --line-strong: #5a4f3e;
+  --fg: #f1ebe0; --fg2: #d6cdbd; --faint: #ada290;
+  --accent: #fec10d; --accent-hover: #ffd24d; --accent-soft: #2a2412; --on-accent: #1f1a14; --fill: #fec10d; --on-fill: #1f1a14;
+  --ok: #7fd1a5; --ok-soft: #173327; --warn: #ff9a6b; --warn-soft: #3d2215; --bad: #ff8fab; --bad-soft: #3d1a26;
+  --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
+  --brand: #ff6b70; --shadow: none; color-scheme: dark;
+}
+  :root[data-palette="warm"] {
+  --canvas: #17110e; --surface: #201713; --sunken: #1a1310; --line: #3b2a22; --line-strong: #5a4033;
+  --fg: #f5e9e1; --fg2: #dbc6b8; --faint: #b39a8a;
+  --accent: #ff9a6b; --accent-hover: #ffb48f; --accent-soft: #3d2215; --on-accent: #1f1410; --fill: #ea6a2a; --on-fill: #1f1410;
+  --ok: #7fd1a5; --ok-soft: #173327; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8fab; --bad-soft: #3d1a26;
+  --k1: #d95926; --k2: #c75b9b; --k3: #c98500; --k4: #b8407a; --k5: #b86a12;
+}
+  :root[data-palette="cold"] {
+  --canvas: #0f131a; --surface: #161a22; --sunken: #12161d; --line: #262d3a; --line-strong: #384254;
+  --fg: #eef2f8; --fg2: #c5cfdd; --faint: #94a0b4;
+  --accent: #8ab4ff; --accent-hover: #b0cbff; --accent-soft: #1c2740; --on-accent: #0f131a; --fill: #8ab4ff; --on-fill: #0f131a;
+  --ok: #6ee7a0; --ok-soft: #12261b; --warn: #f5c451; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
+  --k1: #3987e5; --k2: #1f9d55; --k3: #8b7cf0; --k4: #14a3bd; --k5: #6d6ee8;
+}
+  :root[data-palette="contrast"] {
+  --canvas: #000000; --surface: #000000; --sunken: #111111; --line: #ffffff; --line-strong: #ffffff;
+  --fg: #ffffff; --fg2: #ffffff; --faint: #dddddd;
+  --accent: #ffd400; --accent-hover: #ffe666; --accent-soft: #222222; --on-accent: #000000; --fill: #ffffff; --on-fill: #000000;
+  --ok: #6ee7a0; --ok-soft: #0c2416; --warn: #ffd166; --warn-soft: #2b2312; --bad: #ff8a8f; --bad-soft: #2f1618;
+  --k1: #3987e5; --k2: #d95926; --k3: #199e70; --k4: #c98500; --k5: #d55181;
+}
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -30,8 +76,8 @@ body { font: 400 14px/20px system-ui, -apple-system, "Segoe UI", Roboto, Helveti
 select, button, input { font: inherit; color: inherit; height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); }
 button, .button { color: var(--fg); cursor: pointer; font-weight: 500; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
 button:hover { background: var(--sunken); }
-.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.primary:hover { background: var(--accent-hover); }
+.primary { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+.primary:hover { background: var(--fill); filter: brightness(.94); }
 :is(select, button, input, a):focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .mark svg { width: 20px; height: 20px; color: var(--brand); }
@@ -145,7 +191,7 @@ button.link { border: 0; background: none; padding: 0; height: auto; color: var(
 .feditor { display: grid; gap: 14px; max-width: 860px; } .feditor .stack { display: grid; gap: 4px; } .feditor input#feat-name { max-width: 420px; }
 .rules-edit { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; } .rules-edit li { display: flex; gap: 8px; align-items: flex-start; }
 .addrule { display: flex; gap: 8px; flex-wrap: wrap; } .addrule select#rule-key, .addrule input#rule-key { flex: 1; min-width: 240px; }
-.chart.small { height: 110px; margin-right: 0; } .cols i.acc { background: var(--accent); }
+.chart.small { height: 110px; margin-right: 0; } .cols i.acc { background: var(--fill); }
 .error { color: var(--bad); margin: 0; }
 tr.off { display: none; }
 .pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
@@ -159,6 +205,19 @@ button.gl:hover, button.gl[aria-expanded="true"] { color: var(--fg); border-colo
   font-size: 13px; line-height: 19px; color: var(--fg); max-width: 640px; }
 .gl-pop p { margin: 0; } .gl-pop p + p { margin-top: 4px; }
 @media (pointer: coarse) { button.gl { width: 26px; height: 26px; font-size: 13px; } }
+.k-irritation { background: var(--k1); } .k-no_effect { background: var(--k2); } .k-failure { background: var(--k3); }
+.k-slowness { background: var(--k4); } .k-giving_up { background: var(--k5); }
+.kbar { display: flex; gap: 2px; height: 8px; margin-top: 6px; } .kbar i { display: block; height: 100%; border-radius: 999px; min-width: 3px; }
+.kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; }
+.kind { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--fg); text-decoration: none; }
+a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none; }
+.kind .kname { display: flex; align-items: center; gap: 6px; font-weight: 600; } .kind .kval { font-size: 22px; line-height: 28px; font-weight: 700; }
+.kind .kshare { display: block; height: 4px; border-radius: 999px; background: var(--sunken); overflow: hidden; } .kind .kshare i { display: block; height: 100%; }
+.kind.effort { border-style: dashed; } .kind.effort .kval { font-size: 18px; }
+.card > .legend { margin-top: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.chips button { height: 30px; border-radius: 999px; font-size: 13px; display: inline-flex; gap: 6px; }
+.chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
 .dict-name { width: 100%; min-width: 180px; } .dict-name.saved { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .nm { display: block; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
 code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); overflow-wrap: anywhere; }
@@ -239,6 +298,7 @@ const HELP_PT = {
   byAccount: ['O que é', 'Os usos da feature em cada conta, agora contra o período anterior.', 'Conta que usava muito e caiu merece contato antes que vire cancelamento.'],
   accounts: ['O que é', 'Para cada conta: pessoas e sessões por dia e uso das features vigiadas, contra o período anterior. "Caiu" é 60% ou menos do que era e além da oscilação normal.', 'Conta que esfria costuma avisar antes de cancelar. Abra a conta para ver o dia em que começou a cair.'],
   usersDay: ['O que é', 'A média de pessoas diferentes que usaram o app por dia, nos dias com dados.', 'Queda aqui é o sinal mais cedo de que a conta está deixando o produto.'],
+  kinds: ['O que é', 'A frustração separada pelo que a causa: Irritação (rage click), Clique sem efeito, Falha (erros e pedidos recusados), Lentidão e Desistência (formulário abandonado, voltou na hora). Cada tipo usa os mesmos pontos e as mesmas visitas, então as partes somam o total. O Esforço é outra medida: cliques até concluir uma ação, no caso típico.', 'O tipo que mais pesa diz quem resolve: Falha e Lentidão são do dev; Clique sem efeito e Irritação costumam ser de experiência; Desistência e Esforço, de fluxo e produto. Clique num tipo para ver as telas em que ele pesa.'],
   areas: ['O que é', 'O produto dividido em áreas (grupos de telas), com a parte das visitas, a adoção entre as pessoas ativas, a frustração e as falhas de cada uma. A área de cada tela se ajusta no Dicionário.', 'Área com muita adoção e frustração alta é onde o time mais incomoda gente. Área com pouca adoção pode ser nicho ou algo difícil de achar.'],
   low: ['O que é', 'Botões que muitas sessões viram e quase ninguém clicou.', 'Construído e pouco usado: candidato a sair, mudar de lugar ou ser explicado. Confira se não é de uso raro por natureza.'],
   news: ['O que é', 'O que apareceu pela primeira vez no período, e a parte das sessões que viram e usaram.', 'Novidade com uso baixo depois de alguns dias pede divulgação, ajuste ou revisão do valor.'],
@@ -268,6 +328,7 @@ const HELP_EN = {
   byAccount: ['What it is', 'The feature\'s uses in each account, now against the period before.', 'An account that used it a lot and dropped deserves a call before it turns into a cancellation.'],
   accounts: ['What it is', 'Per account: people and sessions a day and the use of watched features, against the period before. "Dropped" is 60% or less of before and beyond the usual ups and downs.', 'An account cooling down usually warns before it cancels. Open it to see the day it started falling.'],
   usersDay: ['What it is', 'The average number of different people who used the app per day, over the days with data.', 'A drop here is the earliest sign an account is leaving the product.'],
+  kinds: ['What it is', 'Frustration split by what causes it: Irritation (rage click), Clicks with no effect, Failure (errors and refused requests), Slowness and Giving up (abandoned form, quick back). Each kind uses the same points over the same visits, so the parts add up to the total. Effort is another measure: clicks to get an action done, in the typical case.', 'The kind that weighs the most says who fixes it: Failure and Slowness belong to developers; Clicks with no effect and Irritation are usually experience; Giving up and Effort, flow and product. Click a kind to see the screens where it weighs.'],
   areas: ['What it is', 'The product split in areas (groups of screens), with each one\'s share of the visits, adoption among the people active, frustration and failures. Each screen\'s area is set in the Dictionary.', 'An area with wide adoption and high frustration is where the product bothers the most people. Low adoption may be a niche or something hard to find.'],
   low: ['What it is', 'Buttons many sessions saw and almost nobody clicked.', 'Built and little used: a candidate to remove, move or explain. Check it is not rare by nature.'],
   news: ['What it is', 'What showed up for the first time in the period, and the share of the sessions that saw it and used it.', 'Something new still little used after a few days needs announcing, adjusting or a second look at its value.'],
@@ -292,6 +353,17 @@ document.addEventListener('click', (e) => {
 const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>'
 const PT = /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
+// The colours: Nectar by default, or the viewer's pick, kept in this browser.
+const PALETTES = PT ? { nectar: 'Nectar', warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' }
+  : { nectar: 'Nectar', warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }
+const palette = () => { try { return localStorage.getItem('termometro.palette') || 'nectar' } catch { return 'nectar' } }
+const usePalette = (k) => { if (k === 'nectar') delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = k }
+usePalette(palette())
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'palette') return
+  try { localStorage.setItem('termometro.palette', e.target.value) } catch {}
+  usePalette(e.target.value)
+})
 const L = PT ? {
   signinTitle: 'Entre para ver seus projetos', google: 'Entrar com Google', password: 'Senha', enter: 'Entrar', or: 'ou',
   errors: { not_allowed: 'Este e-mail não tem acesso. Peça a quem cuida desta instalação.', google: 'O Google não confirmou o login. Tente de novo.',
@@ -331,6 +403,11 @@ const L = PT ? {
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
     seen: 'Sessões que viram', clicked: 'Clicaram', none: 'Nada pouco usado neste período.', news: 'Novidades', newsHint: 'Botões que apareceram pela primeira vez no período, e quanto das sessões que os viram já usou.',
     nScreens: (n) => `${n} ${n === 1 ? 'tela' : 'telas'}`, since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…' },
+  cat: { title: 'Frustração por tipo', hint: 'O que está pesando: cada tipo é uma parte da frustração. O esforço fica à parte.', all: 'Todos os tipos',
+    names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
+    what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
+    effort: 'Esforço', effortUnit: (n) => `${num(n)} ${n === 1 ? 'clique' : 'cliques'} por ação`, effortWhat: 'cliques até concluir uma ação, no caso típico',
+    effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}` },
   demand: { copy: 'Copiar como demanda', problem: 'Problema', who: 'Quem é afetado', since: 'Desde', suggestion: 'Sugestão', accept: 'Critério de aceite',
     evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', period: (d) => `nos últimos ${d} dias`,
     reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`].filter(Boolean).join(' · '),
@@ -464,6 +541,11 @@ const L = PT ? {
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
     seen: 'Sessions that saw it', clicked: 'Clicked', none: 'Nothing little-used in this period.', news: 'What is new', newsHint: 'Buttons that showed up for the first time in the period, and how much of the sessions that saw them already used them.',
     nScreens: (n) => `${n} ${n === 1 ? 'screen' : 'screens'}`, since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…' },
+  cat: { title: 'Frustration by kind', hint: 'What is weighing: each kind is a part of the frustration. Effort stays apart.', all: 'All kinds',
+    names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
+    what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
+    effort: 'Effort', effortUnit: (n) => `${num(n)} ${n === 1 ? 'click' : 'clicks'} per action`, effortWhat: 'clicks to get an action done, in the typical case',
+    effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}` },
   demand: { copy: 'Copy as a request', problem: 'Problem', who: 'Who is affected', since: 'Since', suggestion: 'Suggestion', accept: 'Acceptance criteria',
     evidence: 'See it on Termometro', tech: 'Technical detail', period: (d) => `in the last ${d} days`,
     reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`].filter(Boolean).join(' · '),
@@ -613,11 +695,11 @@ const signals = (s) => {
   return items.length ? `<div class="signals">${items.map(([k, n]) => `<span title="${esc(L.help[k] ?? '')}">${esc(L.names[k] ?? k)} <b>${n}</b></span>`).join('')}</div>` : `<span class="meta">${L.none}</span>`
 }
 
-const state = { me: null, tab: 'overview', user: '', all: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
+const state = { me: null, tab: 'overview', user: '', all: '', cat: '', route: '', action: '', a: '', b: '', signal: '', detail: '', funnel: '', hash: new URLSearchParams(), focus: false }
 
 // Address: #tab?project=…&days=…&route=… — every view can be linked to and the back button works.
 const FILTERS = ['project', 'days', 'version', 'account', 'role', 'feature']
-const PARAMS = ['user', 'all', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
+const PARAMS = ['user', 'all', 'cat', 'route', 'action', 'a', 'b', 'signal', 'detail', 'funnel']
 function readHash() {
   const [tab, qs] = location.hash.slice(1).split('?')
   state.tab = TABS[tab] ? tab : 'overview'
@@ -674,6 +756,8 @@ function shell() {
         <label class="field"><span class="meta">${L.account}</span><select id="account"></select></label>
         <label class="field"><span class="meta">${L.role}</span><select id="role"></select></label>
         <label class="field"><span class="meta">${L.feature}</span><select id="feature"></select></label>
+        <label class="field"><span class="meta">${PT ? 'Cores' : 'Colours'}</span><select id="palette">${Object.entries(PALETTES).map(([k, v]) =>
+          `<option value="${k}" ${k === palette() ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         <span id="mark-chip"></span>
         <span id="user-chip"></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
@@ -697,6 +781,8 @@ function shell() {
   $('#content').addEventListener('click', onContentClick)
   $('#content').addEventListener('click', (e) => {
     if (e.target.closest('[data-feat="no-account"]')) { $('#account').value = ''; keep('account', ''); return render() }
+    const c = e.target.closest('[data-cat]')
+    if (c) { state.cat = c.dataset.cat; return render() }
     if (state.tab === 'features' || state.tab === 'accounts') onFeatureClick(e)
   })
   $('#content').addEventListener('input', (e) => {
@@ -819,6 +905,35 @@ function demandOf(i, sentenceHtml, days) {
     `---`, `${M.tech}: ${techOf(i).replace(/<[^>]+>/g, '')}${i.detail ? ' · ' + i.detail : ''}`].join('\n')
 }
 
+// Kinds of frustration: a fixed colour per kind (categorical slots 1-5), always with its name beside it.
+const KINDS = ['irritation', 'no_effect', 'failure', 'slowness', 'giving_up']
+const C = () => L.cat
+// One whole split in its parts: a thin bar, a part per kind, its name and value in the tooltip.
+const kindBar = (cats, total) => { const sum = KINDS.reduce((a, k) => a + (cats?.[k] ?? 0), 0) || 1
+  return `<div class="kbar" role="img" aria-label="${esc(KINDS.filter((k) => cats?.[k]).map((k) => `${C().names[k]} ${cats[k]}`).join(', '))}">${KINDS.filter((k) => cats?.[k]).map((k) =>
+    `<i class="k-${k}" style="width:${cats[k] / sum * Math.min(100, total)}%" data-tip="${esc(`${C().names[k]}: ${cats[k]}`)}"></i>`).join('')}</div>` }
+const kindLegend = () => `<div class="legend">${KINDS.map((k) => `<span><i class="sw k-${k}"></i>${C().names[k]}</span>`).join('')}</div>`
+
+function kindsCard(o) {
+  const k = o.kinds, total = KINDS.reduce((a, c) => a + k.now[c], 0) || 1
+  const comparable = o.before_daily.length >= Math.max(1, Math.ceil(o.daily.length / 2))
+  const delta = (now, before) => !comparable || now === before ? '' : `<span class="delta ${now > before ? 'bad' : 'ok'}">${now > before ? '▲ +' : '▼ '}${now - before}</span>`
+  const e = k.effort
+  return `<section class="card"><div class="head"><div><div class="label">${C().title}${help('kinds')}</div><div class="meta">${C().hint}</div></div></div>
+    <div class="kinds">${KINDS.map((c) => `<a class="kind" ${linkAttrs({ tab: 'frustration', params: { cat: c } })}>
+        <span class="kname"><i class="sw k-${c}"></i>${C().names[c]}</span>
+        <span class="kval">${k.now[c]}${delta(k.now[c], k.before[c])}</span>
+        ${spark(k.daily.map((d) => d[c]), `${C().names[c]}: ${L.perDay}`, 96, 24)}
+        <span class="meta">${C().what[c]} · ${C().share(Math.round(k.now[c] / total * 100))}</span>
+        <span class="kshare"><i class="k-${c}" style="width:${k.now[c] / total * 100}%"></i></span></a>`).join('')}
+      <div class="kind effort"><span class="kname">${C().effort}</span>
+        <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions && e.now.clicks !== e.before.clicks
+          ? `<span class="delta ${e.now.clicks > e.before.clicks ? 'bad' : 'ok'}">${e.now.clicks > e.before.clicks ? '▲' : '▼'}&nbsp;${FT().before(num(e.before.clicks))}</span>` : ''}</span>
+        ${spark(e.daily.map((d) => d.clicks), `${C().effort}: ${L.perDay}`, 96, 24)}
+        <span class="meta">${C().effortWhat} · ${num(e.now.actions)} ${PT ? 'ações' : 'actions'}</span></div>
+    </div></section>`
+}
+
 // Overview -------------------------------------------------------------------------------------------------
 const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['version_worse', 'screen_worse', 'screen_frustrating', 'element_irritating', 'action_laborious'],
   engagement: ['account_fading', 'account_feature_drop'], ideas: ['reach_far', 'pair_linked'], better: ['screen_better'] }
@@ -928,6 +1043,7 @@ async function overview() {
       ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', vs)}
       ${tile(L.failures, num(n.failures), n.failures ? 'bad' : 'ok', diff(n.failures, b.failures, true), 'failures', vs)}
     </section>
+    ${kindsCard(o)}
     ${scoreChart(o)}
     ${heatMap(o)}
     ${insights}
@@ -956,7 +1072,10 @@ async function frustration() {
   const r = await read('/api/summary')
   const o = r.overall
   if (!o.visits && !r.routes.length) return empty(L.noVisits)
-  const worst = r.routes.find((x) => x.visits)
+  const cat = KINDS.includes(state.cat) ? state.cat : ''
+  // A kind picked: screens by that kind, its value leading and the total beside it.
+  const routes = cat ? [...r.routes].sort((a, b) => (b.categories?.[cat] ?? 0) - (a.categories?.[cat] ?? 0)) : r.routes
+  const worst = routes.find((x) => x.visits)
   const detail = (x) => {
     const where = x.targets.length ? `<div class="meta">${L.where}</div><ul>${x.targets.map((a) => `<li>${esc(L.names[a.type] ?? a.type)} — ${ctl(x.key, a.target)} ${a.n}×</li>`).join('')}</ul>` : ''
     const failed = x.failures.length ? `<div class="meta">${L.whatFailed}</div><ul>${x.failures.map((f) => `<li><a ${linkAttrs({ tab: 'failures', params: { signal: f.type, detail: f.detail } })}>${esc(L.names[f.type] ?? f.type)}</a>: <code>${esc(f.detail)}</code>${f.after ? ` ${L.after} ${esc(controlLabel(x.key, f.after) || f.after)}` : ''} — ${f.n}×${f.seconds ? `, ${L.average(f.seconds)}` : ''}
@@ -971,13 +1090,16 @@ async function frustration() {
         <div class="meta">${worst ? L.scoreIn(worst.score, L.visitsN(worst.visits)) : ''}</div></div>
     </section>
     <section class="card">
-      <div class="label">${L.screensByFrustration}${help('screensByFrustration')}</div><div class="meta">${L.openRow}</div>
-      ${table(`<th>${L.screen}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.routes.map((x, i) => `
+      <div class="label">${L.screensByFrustration}${help('screensByFrustration')}</div><div class="meta">${L.openRow}${cat ? ' · ' + C().by(C().names[cat]) : ''}</div>
+      <div class="chips" role="group" aria-label="${C().title}"><button data-cat="" aria-pressed="${!cat}">${C().all}</button>${KINDS.map((k) =>
+        `<button data-cat="${k}" aria-pressed="${cat === k}"><i class="sw k-${k}"></i>${C().names[k]}</button>`).join('')}</div>
+      ${table(`<th>${L.screen}</th><th class="n">${cat ? esc(C().names[cat]) : L.score}</th><th class="n">${L.visits}</th><th class="n">${C().effortCol}</th><th>${L.signals}</th>`, routes.map((x, i) => `
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${scr(x.key)}</div></td>
-          <td class="n">${scoreHtml(x.score)}<div class="bar"><i style="width:${x.score}%;background:var(--${band(x.score)})"></i></div></td>
-          <td class="n">${x.visits}</td><td>${signals(x.signals)}</td></tr>
-        <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="4">${detail(x)}</td></tr>`).join(''))}
+          <td class="n">${cat ? `<b>${x.categories?.[cat] ?? 0}</b><div class="meta">${L.score} ${x.score}</div>` : scoreHtml(x.score)}${kindBar(x.categories, x.score)}</td>
+          <td class="n">${x.visits}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
+        <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="5">${detail(x)}</td></tr>`).join(''))}
+      ${kindLegend()}
     </section>
     ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}${help('byVersion')}</div><div class="meta">${L.versionHint}</div>
       ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
@@ -1176,7 +1298,7 @@ async function journeys() {
     <section class="card"><div class="label">${J().funnel}${help('funnel')}</div><div class="meta">${J().funnelHint}</div>
       <div class="funnel">${fu.steps.map((x, i) => `<div class="fstep">
           <div class="fhead"><span>${i + 1}. ${esc(stepLabel(x.step))}</span><button class="small" data-funnel-remove="${i}" aria-label="${J().removeStep}">×</button></div>
-          <div class="bar big"><i style="width:${pct(x.share)}%;background:var(--accent)"></i></div>
+          <div class="bar big"><i style="width:${pct(x.share)}%;background:var(--fill)"></i></div>
           <div class="meta">${J().reached(x.sessions, pct(x.share))}${i && fu.steps[i - 1].sessions ? ` · <span class="${x.sessions < fu.steps[i - 1].sessions * 0.7 ? 'bad' : ''}">${J().lost(Math.round((1 - x.sessions / fu.steps[i - 1].sessions) * 100))}</span>` : ''}</div>
         </div>`).join('')}
         ${steps.length < 8 ? `<select id="funnel-add" aria-label="${J().addStep}"><option value="">${J().addStep}</option>
@@ -1203,7 +1325,7 @@ async function usage() {
         <div class="label">${L.screensByUse}${help('screensByUse')}</div><div class="meta">${L.pickScreen}</div>
         ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
-            <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--accent)"></i></div></td>
+            <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--fill)"></i></div></td>
             <td class="n">${s.visits}</td><td class="n">${s.clicks}</td><td class="n">${s.users}</td><td class="n">${scoreHtml(s.score)}</td></tr>`).join(''))}
       </div>
       <div class="card">
@@ -1324,7 +1446,7 @@ async function product() {
       ${table(`<th>${PR().area}</th><th class="n">${L.visits}</th><th class="n">${PR().adoption}</th><th class="n">${PR().score}</th><th class="n">${PR().failures}</th><th>${PR().trend}</th>`,
         p.areas.map((a, i) => `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
           <td class="n">${num(a.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
-          <td class="n">${Math.round(a.adoption * 100)}%<div class="bar"><i style="width:${a.adoption * 100}%;background:var(--accent)"></i></div></td>
+          <td class="n">${Math.round(a.adoption * 100)}%<div class="bar"><i style="width:${a.adoption * 100}%;background:var(--fill)"></i></div></td>
           <td class="n">${scoreHtml(a.score)}</td><td class="n">${num(a.failures)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`)}</td></tr>
           <tr class="detail" data-of="a${i}" hidden><td colspan="6"><ul class="counts">${a.screens.map((r) => `<li><a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })}>${esc(screenText(r.route) || r.route)}</a>
             <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>`).join(''))}
@@ -1336,7 +1458,7 @@ async function product() {
     <section class="card"><div class="label">${PR().news}${help('news')}</div><div class="meta">${PR().newsHint}</div>
       ${p.new.length ? table(`<th>${L.element}</th><th>${PR().since}</th><th class="n">${PR().seen}</th><th class="n">${PR().used}</th>`,
         p.new.map((x) => `<tr><td>${ctl(x.route, x.target)}</td><td>${esc(when(x.first_seen))}</td><td class="n">${num(x.sessions)}</td>
-          <td class="n">${pctOf(x.share)}<div class="bar"><i style="width:${x.share * 100}%;background:var(--accent)"></i></div></td></tr>`).join(''))
+          <td class="n">${pctOf(x.share)}<div class="bar"><i style="width:${x.share * 100}%;background:var(--fill)"></i></div></td></tr>`).join(''))
         : `<p class="meta">${PR().noNews}</p>`}</section>`
 }
 
@@ -1377,7 +1499,7 @@ async function features() {
       <div class="row"><div><div class="big">${num(ft.uses)}</div><div class="meta">${FT().uses} ${change(ft.uses, ft.before)}</div></div>
         ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`)}</div>
       <div class="adopt"><div class="meta">${FT().adoption} ${Math.round(ft.adoption * 100)}% · ${FT().adoptionHint(r.active_users)}</div>
-        <div class="bar"><i style="width:${ft.adoption * 100}%;background:var(--accent)"></i></div></div>
+        <div class="bar"><i style="width:${ft.adoption * 100}%;background:var(--fill)"></i></div></div>
       <div class="meta">${num(ft.users)} ${FT().people.toLowerCase()} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}</div>
       <div class="actions-row"><button class="primary small" data-feat="open" data-id="${esc(ft.id)}">${FT().analyse}</button>
         <button class="small" data-feat="edit" data-id="${esc(ft.id)}">${FT().edit}</button></div>
