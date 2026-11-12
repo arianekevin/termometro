@@ -10,7 +10,7 @@ não coleta o que o usuário digita ou vê e roda no seu próprio servidor.
 
 - **Um início que explica:** o período contra o anterior e a lista do que merece atenção — tela que piorou, falha
   nova, ação trabalhosa, botão muito usado e longe — cada item levando ao detalhe.
-- **Uma nota por tela**, de 0 a 100, para saber por onde começar.
+- **Um nível de frustração por tela**, de 0 a 100 (quanto maior, pior), para saber por onde começar.
 - **Onde irrita:** o elemento de cada rage click e qual requisição falhou depois de qual clique.
 - **Falhas que o dev consegue corrigir:** agrupadas por mensagem, com o stack do código, navegadores, versões, tipo de
   tela, o que foi clicado logo antes e os passos das últimas sessões até ela — copiadas em Markdown para uma issue.
@@ -77,7 +77,7 @@ A configuração completa (login com Google, quem pode entrar, retenção) está
 
 **Aviso depois do deploy:** com `TERMOMETRO_WEBHOOK_URL` (um webhook de entrada do Slack ou do Google Chat; cada
 projeto pode ter o seu `webhook`) e `TERMOMETRO_LANGUAGE=pt-BR`, o servidor confere de hora em hora se a última
-versão piorou em relação à anterior e avisa uma vez sobre cada tela cuja nota subiu 15 ou mais (com 30 visitas em
+versão piorou em relação à anterior e avisa uma vez sobre cada tela cuja frustração subiu 15 ou mais (com 30 visitas em
 cada versão) e sobre cada erro novo que já aconteceu 5 vezes.
 Para entrar com Google: no Google Cloud Console, crie um cliente OAuth do tipo *Aplicativo da Web* com o URI de
 redirecionamento `https://SEU-SERVIDOR/auth/google/callback` e defina `TERMOMETRO_GOOGLE_CLIENT_ID`,
@@ -146,12 +146,12 @@ Sem bundler:
 <script src="https://termometro.exemplo.com/termometro.js" data-key="tk_TROCAR" async></script>
 ```
 
-## Como a nota funciona
+## Como a frustração é medida
 
 Cada sinal vale pontos: rage click 3, clique sem resposta 2, erro na tela 5, erro do servidor 5, pedido recusado 2,
 formulário abandonado 2, voltou na hora 1, resposta lenta 1 (requisição de 3 s ou mais com a página na frente do
-usuário, uma vez por endereço por visita). A nota da tela é a soma dos pontos dividida pelas visitas, vezes 20,
-com teto 100. Até 19 está tranquilo, de 20 a 49 pede atenção, de 50 para cima é muita frustração.
+usuário, uma vez por endereço por visita). A frustração da tela é a soma dos pontos dividida pelas visitas, vezes 20,
+de 0 a 100: quanto maior, pior. Até 19 é baixa, de 20 a 49 moderada, de 50 para cima alta. (Na API, `score`.)
 
 ## Recomeçar
 

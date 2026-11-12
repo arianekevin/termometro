@@ -10,7 +10,7 @@ collects what users type or see, and it runs on your own server.
 
 - **An overview that explains:** this period against the one before, and a list of what deserves a look —
   a screen that got worse, a new failure, a laborious action, a button used a lot and far away — each linking to the details.
-- **A score per screen**, 0 to 100, so you know where to look first.
+- **A frustration level per screen**, 0 to 100 (the higher, the worse), so you know where to look first.
 - **Where it irritates:** the element behind each rage click, and which request failed after which click.
 - **Failures a developer can fix:** grouped by message, with the code stack, browsers, versions, kind of screen, what
   was clicked right before and the steps of the last sessions up to it — copied as Markdown for an issue.
@@ -93,7 +93,7 @@ At least one way in — Google or a password — is required unless `TERMOMETRO_
 **Warnings after a deploy:** with a webhook, the server checks every hour whether the latest version (the one that
 started sending last) is worse than the one before, and posts once about each of these:
 
-- a screen whose score went up by 15 or more, with at least 30 visits in each version;
+- a screen whose frustration went up by 15 or more, with at least 30 visits in each version;
 - a screen error or server error the previous version never had, that already happened 5 times.
 
 **Google sign-in:** in Google Cloud Console, create an OAuth client of type *Web application* with the
@@ -168,12 +168,12 @@ Tools: `report` (start there), `overview`, `search`, `frustration`, `failures`, 
 `funnel`, `usage`, `effort`, `people`, `compare_versions` and `list_projects`. The token reads every project of the
 instance; keep it like a password.
 
-## How the score works
+## How frustration is measured
 
 Each signal weighs points: rage click 3, dead click 2, screen error 5, server error 5, refused request 2,
 abandoned form 2, quick back 1, slow response 1 (a request that took 3 s or more while the page was in front of the
-user, counted once per endpoint per visit). A screen's score is its points divided by its visits, times 20, capped at 100.
-Up to 19 is calm, 20–49 needs attention, 50+ is very frustrating.
+user, counted once per endpoint per visit). A screen's frustration is its points divided by its visits, times 20, from 0 to 100: the higher, the worse.
+Up to 19 is low, 20–49 medium, 50+ high. (The API calls it `score`.)
 
 An **action** is a write your backend accepted (POST, PUT, PATCH, DELETE answered 2xx/3xx), with the clicks and
 time since the previous one; two idle minutes start the count again, and a write nobody clicked for is ignored.

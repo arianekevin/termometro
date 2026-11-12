@@ -1201,8 +1201,8 @@ GLOSSARY = {
         "action": "a write (POST/PUT/PATCH/DELETE) the backend accepted after at least one click, with the clicks and time "
                   "since the previous one (or since 2 idle minutes)",
     },
-    "score": f"per screen: sum of signal weights / visits x {FACTOR}, capped at {CAP}. 0-19 calm, 20-49 attention, 50+ very "
-             "frustrating. Weights: " + ", ".join(f"{k} {w}" for k, w in WEIGHTS.items()),
+    "score": f"the frustration level (higher is worse), per screen: sum of signal weights / visits x {FACTOR}, 0 to {CAP}. "
+             "0-19 low, 20-49 moderate, 50+ high. Weights: " + ", ".join(f"{k} {w}" for k, w in WEIGHTS.items()),
     "reach": "clicks and screens since the last saved action (or the start of the session) until a button or action is "
              f"used. 'far' = used {FAR_USES}+ times and a median of {FAR_CLICKS}+ clicks or {FAR_SCREENS}+ screens.",
     "pairs": f"action B right after action A in the same session; share = how often A is followed by B. 'linked' = {PAIR_SHARE:.0%}+.",
@@ -1434,9 +1434,9 @@ def daily_retention():
 
 
 ALERT_TEXT = {
-    "en": {"title": "Termometro · {project} {b} got worse than {a}", "screen": "• {route}: score {sa} → {sb} ({visits} visits)",
+    "en": {"title": "Termometro · {project} {b} got worse than {a}", "screen": "• {route}: frustration {sa} → {sb} ({visits} visits)",
            "failure": "• New failure on {route}: {detail} ({n}×)"},
-    "pt": {"title": "Termometro · {project} {b} piorou em relação à {a}", "screen": "• {route}: nota {sa} → {sb} ({visits} visitas)",
+    "pt": {"title": "Termometro · {project} {b} piorou em relação à {a}", "screen": "• {route}: frustração {sa} → {sb} ({visits} visitas)",
            "failure": "• Falha nova em {route}: {detail} ({n}×)"},
 }
 

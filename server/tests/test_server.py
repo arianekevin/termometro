@@ -642,7 +642,7 @@ class Alerts(unittest.TestCase):
         self.assertEqual(url, "https://hooks.example/x")
         self.assertEqual(message.splitlines(), [
             "Termometro · shop 1.1 got worse than 1.0",
-            "• /cart: score 6 → 45 (40 visits)",  # 4 x 3 / 40 * 20 = 6; (20 x 3 + 6 x 5) / 40 * 20 = 45
+            "• /cart: frustration 6 → 45 (40 visits)",  # 4 x 3 / 40 * 20 = 6; (20 x 3 + 6 x 5) / 40 * 20 = 45
             "• New failure on /cart: TypeError: new in 1.1 (6×)",
             "https://t.example/#versions"])
         self.assertEqual(self.check(), 0)  # already warned
@@ -668,7 +668,7 @@ class Alerts(unittest.TestCase):
         self.deploy("1.1", rage=20)
         self.assertEqual(self.check(), 1)
         self.assertEqual(self.messages[0][0], "https://chat.example/y")
-        self.assertEqual(self.messages[0][1].splitlines()[:2], ["Termometro · shop 1.1 piorou em relação à 1.0", "• /cart: nota 6 → 30 (40 visitas)"])
+        self.assertEqual(self.messages[0][1].splitlines()[:2], ["Termometro · shop 1.1 piorou em relação à 1.0", "• /cart: frustração 6 → 30 (40 visitas)"])
 
 
 class FakeGoogle(BaseHTTPRequestHandler):
