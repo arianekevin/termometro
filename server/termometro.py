@@ -532,11 +532,38 @@ def totals(con, f: Filter) -> dict:
 
 
 def daily(con, f: Filter) -> list[dict]:
-    """Score and visits per day of the period, oldest first; a day without visits is left out."""
+    """Score, visits, people and failures per day of the period, oldest first; a day without visits is left out."""
     rows = con.execute(f"""
-        SELECT date(at / 1000, 'unixepoch') d, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0), SUM(type IN {FAILURES})
+        SELECT date(at / 1000, 'unixepoch') d, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0), SUM(type IN {FAILURES}),
+               COUNT(DISTINCT NULLIF(user_id, ''))
         FROM events WHERE {f.sql} GROUP BY d ORDER BY d""", f.args).fetchall()
-    return [{"day": d, "visits": v, "score": score(p, v), "failures": n} for d, v, p, n in rows if v]
+    return [{"day": d, "visits": v, "score": score(p, v), "failures": n, "users": u} for d, v, p, n, u in rows if v]
+
+
+HEAT_SCREENS = 8  # screens in the screen-by-day map: the ones with the most frustration points
+
+
+def screens_daily(con, f: Filter) -> list[dict]:
+    """The screens that hurt the most in the period, each with its score per day: where the heat is and since when."""
+    rows = con.execute(f"""
+        SELECT route, date(at / 1000, 'unixepoch') d, SUM(type = 'page'), COALESCE(SUM({WEIGHT_CASE}), 0)
+        FROM events WHERE {f.sql} AND (type = 'page' OR type IN {SIGNALS}) GROUP BY route, d""", f.args).fetchall()
+    by: dict[str, dict] = {}
+    for route, d, v, p in rows:
+        g = by.setdefault(route, {"route": route, "points": 0, "visits": 0, "days": {}})
+        g["points"] += p
+        g["visits"] += v
+        if v:
+            g["days"][d] = {"score": score(p, v), "visits": v}
+    top = sorted((g for g in by.values() if g["visits"] >= INSIGHT_MIN_VISITS), key=lambda g: -g["points"])[:HEAT_SCREENS]
+    return [{"route": g["route"], "score": score(g["points"], g["visits"]), "visits": g["visits"], "days": g["days"]} for g in top]
+
+
+def deploys(con, f: Filter) -> list[dict]:
+    """When each version first sent something inside the period: the marks on the charts."""
+    return [{"version": v, "at": at, "day": d} for v, at, d in con.execute(f"""
+        SELECT version, MIN(at), date(MIN(at) / 1000, 'unixepoch') FROM events WHERE {f.sql} AND version != '?'
+        GROUP BY version ORDER BY MIN(id)""", f.args)]
 
 
 def overview(con, f: Filter) -> dict:
@@ -550,8 +577,18 @@ def overview(con, f: Filter) -> dict:
     def add(kind, severity, weight, link, **facts):
         insights.append({"kind": kind, "severity": severity, "weight": weight, "link": link, **facts})
 
+    # What the newest version made worse than the one before, screen by screen: usually the first thing to look at.
+    by_version = set()
+    if not f.q.get("version"):
+        c = compare(con, f)
+        for r in c["routes"]:
+            a, b = r["a"] or {}, r["b"] or {}
+            if (r["delta"] or 0) >= INSIGHT_RISE and a.get("visits", 0) >= INSIGHT_MIN_VISITS and b.get("visits", 0) >= INSIGHT_MIN_VISITS:
+                by_version.add(r["route"])
+                add("version_worse", "bad", 290 + r["delta"], {"tab": "versions", "params": {"a": c["a"], "b": c["b"]}},
+                    route=r["route"], a=c["a"], b=c["b"], before=a["score"], now=b["score"], visits=b["visits"])
     for route, g in now_routes.items():
-        if g["visits"] < INSIGHT_MIN_VISITS:
+        if g["visits"] < INSIGHT_MIN_VISITS or route in by_version:
             continue
         old = old_routes.get(route)
         top = max(g["signals"].items(), key=lambda kv: kv[1] * WEIGHTS[kv[0]])[0] if g["signals"] else ""
@@ -590,7 +627,11 @@ def overview(con, f: Filter) -> dict:
         add("element_irritating", "warn", 80 + min(rage + dead, 99), {"tab": "usage", "params": {"route": route}},
             route=route, target=target, rage=rage, dead=dead)
     j = journeys(con, f)
-    for r in [r for r in j["reach"] if r["far"]][:3]:
+    far = {}
+    for r in j["reach"]:  # one line per button or action, from the screen where it is used the most
+        if r["far"] and r["key"] not in far:
+            far[r["key"]] = r
+    for r in list(far.values())[:3]:
         add("reach_far", "idea", 70 + min(r["uses"], 99) / 10, {"tab": "journeys", "params": {}}, kind_of=r["kind"],
             key=r["key"], route=r["route"], uses=r["uses"], clicks=r["clicks_median"], screens=r["screens_median"])
     for p in [p for p in j["pairs"] if p["linked"]][:2]:
@@ -598,6 +639,7 @@ def overview(con, f: Filter) -> dict:
             share=p["share"], n=p["n"], clicks=p["clicks_median"], screens=p["screens_median"])
     insights.sort(key=lambda i: -i["weight"])
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
+            "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f),
             "insights": insights[:15]}
 
 

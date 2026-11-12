@@ -192,6 +192,24 @@ class Server(unittest.TestCase):
                          (50, 100, "js_error", {"tab": "frustration", "params": {"route": "/cart"}}))
         self.assertEqual(len(o["daily"]), 1)
 
+    def test_overview_says_which_version_made_a_screen_worse_and_draws_the_days(self):
+        page = {"type": "page", "route": "/cart"}
+        self.send([page] * 10 + [{"type": "rage", "route": "/cart", "target": "button#pay"}] * 1, version="1.0", user="u1")
+        time.sleep(0.01)
+        self.send([page] * 10 + [{"type": "rage", "route": "/cart", "target": "button#pay"}] * 6, version="1.1", user="u2")
+        o = self.read("/api/overview?project=shop&days=7")
+        worse = o["insights"][0]
+        self.assertEqual({k: worse[k] for k in ("kind", "severity", "route", "a", "b", "before", "now")},
+                         {"kind": "version_worse", "severity": "bad", "route": "/cart", "a": "1.0", "b": "1.1", "before": 6, "now": 36})
+        self.assertNotIn("screen_frustrating", [i["kind"] for i in o["insights"]])  # the same screen is said once
+        self.assertEqual([d["version"] for d in o["deploys"]], ["1.0", "1.1"])
+        self.assertEqual(o["daily"][0]["users"], 2)
+        [cart] = o["screens"]
+        self.assertEqual((cart["route"], cart["score"], list(cart["days"].values())[0]["visits"]), ("/cart", 21, 20))
+        self.assertEqual(o["before_daily"], [])
+        filtered = self.read("/api/overview?project=shop&days=7&version=1.1")["insights"]
+        self.assertNotIn("version_worse", [i["kind"] for i in filtered])  # one version picked: nothing to compare
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

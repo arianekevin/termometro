@@ -28,7 +28,7 @@ html, body { margin: 0; }
 body { font: 400 14px/20px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--canvas); color: var(--fg);
   -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
 select, button, input { font: inherit; color: inherit; height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); }
-button, .button { cursor: pointer; font-weight: 500; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+button, .button { color: var(--fg); cursor: pointer; font-weight: 500; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
 button:hover { background: var(--sunken); }
 .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .primary:hover { background: var(--accent-hover); }
@@ -134,11 +134,50 @@ button.small { height: 28px; font-size: 12px; }
 .insights .text { flex: 1; min-width: 0; }
 .insights a { white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
 .insights a:hover { text-decoration: underline; }
-.trend { display: block; width: 100%; height: 72px; margin-top: 8px; }
-.trend rect.day { fill: var(--accent); }
-.trend rect.hit { fill: transparent; }
-.trend g:hover rect.day { fill: var(--accent-hover); }
-.trend line { stroke: var(--line-strong); stroke-width: 1; }
+.verdict { display: flex; gap: 14px; align-items: center; border-left: 4px solid var(--ok); }
+.verdict.warn { border-left-color: var(--warn); } .verdict.bad { border-left-color: var(--bad); }
+.verdict .dot { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-weight: 700; background: var(--ok-soft); color: var(--ok); }
+.verdict.warn .dot { background: var(--warn-soft); color: var(--warn); } .verdict.bad .dot { background: var(--bad-soft); color: var(--bad); }
+.verdict .vh { font-size: 18px; line-height: 24px; font-weight: 600; }
+.verdict .meta a { color: var(--fg2); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.verdict .meta a:hover { color: var(--accent); }
+.tile .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.tile .big { font-variant-numeric: normal; white-space: nowrap; }
+.spark { flex: none; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--line-strong); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 12px; color: var(--fg2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.sw.ok, .cols i.ok { background: var(--ok); } .sw.warn, .cols i.warn { background: var(--warn); } .sw.bad, .cols i.bad { background: var(--bad); }
+.chart { position: relative; height: 140px; margin: 28px 28px 4px 0; border-bottom: 1px solid var(--line-strong); }
+.cols { position: absolute; inset: 0; display: flex; align-items: flex-end; }
+.cols .c { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; outline: none; }
+.cols i { display: block; width: 100%; max-width: 24px; border-radius: 4px 4px 0 0; }
+.cols .c:hover i, .cols .c:focus-visible i { filter: brightness(1.15); }
+.cols .c:focus-visible { background: var(--accent-soft); }
+.rule { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
+.rule span { position: absolute; right: -28px; top: -9px; font-size: 11px; color: var(--faint); }
+.deploy { position: absolute; top: -22px; bottom: 0; border-left: 1px solid var(--fg2); z-index: 1; }
+.deploy span { position: absolute; top: 0; left: 4px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--fg2); white-space: nowrap; }
+.heat { display: grid; grid-template-columns: minmax(90px, 200px) 1fr; gap: 3px 10px; margin-top: 12px; align-items: center; }
+.heat .vers, .heat .cells { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; }
+.heat .vers span { font-size: 11px; font-weight: 600; color: var(--fg2); white-space: nowrap; overflow: visible; }
+.heat .hl { color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.heat .hl:hover { color: var(--accent); }
+.heat .cells i { display: block; height: 22px; border-radius: 3px; outline: none; }
+.heat .cells i.dep { box-shadow: inset 2px 0 0 var(--fg2); }
+.heat .cells i:hover, .heat .cells i:focus-visible { box-shadow: 0 0 0 2px var(--fg); }
+.h0 { background: var(--sunken); }
+.h1 { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); } .h2 { background: color-mix(in srgb, var(--bad) 28%, var(--surface)); }
+.h3 { background: color-mix(in srgb, var(--bad) 48%, var(--surface)); } .h4 { background: color-mix(in srgb, var(--bad) 72%, var(--surface)); }
+.h5 { background: var(--bad); }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.group .insights li { align-items: center; }
+.mag { flex: none; font-weight: 700; font-size: 15px; color: var(--fg); }
+.tip { position: fixed; z-index: 50; max-width: 320px; padding: 6px 10px; border-radius: 8px; background: var(--fg); color: var(--surface);
+  font-size: 12px; line-height: 16px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+@media (max-width: 640px) { .chart { margin-right: 24px; } .heat { grid-template-columns: 90px 1fr; } .tile .row { flex-direction: column; align-items: flex-start; } .tile .spark { width: 100%; height: auto; } }
 </style>
 </head>
 <body>
@@ -188,8 +227,18 @@ const L = PT ? {
   scoreByDay: 'Nota por dia', peak: (n) => `pior dia: nota ${n}`, dayTip: (d, s, v) => `${d}: nota ${s} em ${v} visitas`,
   whatToSee: 'O que merece atenção', insightsHint: 'Do mais grave para o menos. Cada item leva aonde dá para ver mais.', nothing: 'Nada fora do normal neste período.',
   sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' },
+  verdict: { bad: (n) => `${n} ${n === 1 ? 'coisa precisa' : 'coisas precisam'} de você`, warn: (n) => `${n} ${n === 1 ? 'ponto' : 'pontos'} de atenção, nada grave`,
+    ok: 'Tudo tranquilo neste período', okHint: 'Nenhuma falha nova, nenhuma tela piorou ou passou de 50.' },
+  short: { version_worse: (i) => `${i.route} piorou na ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} piorou (${i.before} → ${i.now})`,
+    screen_frustrating: (i) => `${i.route} com nota ${i.now}`, failure_new: (i) => `falha nova em ${i.route} (${i.n}×)`, failure_recurring: (i) => `falha recorrente em ${i.route}` },
+  groups: { bugs: 'Bugs', irritation: 'Irritação', ideas: 'Sugestões', better: 'Melhorou' },
+  noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'média de todas as telas',
+  bands: { ok: 'tranquilo (até 19)', warn: 'atenção (20–49)', bad: 'muita frustração (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
+  heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, pior a nota daquele dia. Clique na tela para ver os detalhes.',
+  heatTip: (r, d, x) => x ? `${r} · ${d}: nota ${x.score} em ${x.visits} visitas` : `${r} · ${d}: sem visitas`, heatScale: 'Nota do dia',
   forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
+    version_worse: (i) => `<b>${i.route}</b> piorou na ${i.b}: nota ${i.before} → ${i.now} contra a ${i.a} (${i.visits} visitas na ${i.b}).`,
     screen_worse: (i, s) => `<b>${i.route}</b> piorou: nota ${i.before} → ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> está frustrante: nota ${i.now} em ${i.visits} visitas. Pesa mais: ${s}.`,
     screen_better: (i) => `<b>${i.route}</b> melhorou: nota ${i.before} → ${i.now} em ${i.visits} visitas.`,
@@ -198,7 +247,7 @@ const L = PT ? {
     action_laborious: (i) => `<code>${i.action}</code> dá trabalho: ${i.clicks} cliques e ${i.seconds} s no caso típico (${i.times} vezes).`,
     reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> em <b>' + i.route + '</b>'} é muito usado (${i.uses}×) e fica longe: ${i.clicks} cliques e ${i.screens} ${i.screens === 1 ? 'tela' : 'telas'} até chegar.`,
     pair_linked: (i) => `Depois de <code>${i.a}</code>, ${Math.round(i.share * 100)}% das vezes vem <code>${i.b}</code> (${i.n}×), com ${i.clicks} cliques entre elas: aproximar ou juntar?`,
-    element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${i.rage} rage clicks e ${i.dead} cliques sem resposta.`,
+    element_irritating: (i) => `<code>${i.target}</code> em <b>${i.route}</b> irrita: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} cliques sem resposta`].filter(Boolean).join(' e ')}.`,
   },
   help: { rage: '3 cliques no mesmo ponto em 1 s', dead: 'Clique num botão ou link que não mudou nada em 1 s', js_error: 'Erro de JavaScript não tratado', http_5xx: 'Requisição com erro 5xx ou falha de rede', http_4xx: 'Requisição recusada com 4xx (401 não conta)', abandon: 'Começou a preencher um formulário e saiu sem salvar', bounce: 'Voltou em menos de 4 s', slow: 'Requisição que levou 3 s ou mais com a tela à frente' },
   csv: 'CSV', csvTip: 'Baixar esta tabela em CSV',
@@ -270,8 +319,18 @@ const L = PT ? {
   scoreByDay: 'Score per day', peak: (n) => `worst day: score ${n}`, dayTip: (d, s, v) => `${d}: score ${s} over ${v} visits`,
   whatToSee: 'What deserves a look', insightsHint: 'Most serious first. Each item leads where you can see more.', nothing: 'Nothing out of the ordinary in this period.',
   sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' },
+  verdict: { bad: (n) => `${n} ${n === 1 ? 'thing needs' : 'things need'} you`, warn: (n) => `${n} ${n === 1 ? 'point' : 'points'} of attention, nothing serious`,
+    ok: 'All calm in this period', okHint: 'No new failure, no screen got worse or went past 50.' },
+  short: { version_worse: (i) => `${i.route} got worse in ${i.b} (${i.before} → ${i.now})`, screen_worse: (i) => `${i.route} got worse (${i.before} → ${i.now})`,
+    screen_frustrating: (i) => `${i.route} at score ${i.now}`, failure_new: (i) => `new failure on ${i.route} (${i.n}×)`, failure_recurring: (i) => `recurring failure on ${i.route}` },
+  groups: { bugs: 'Bugs', irritation: 'Irritation', ideas: 'Suggestions', better: 'Improved' },
+  noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'across every screen',
+  bands: { ok: 'calm (up to 19)', warn: 'attention (20–49)', bad: 'very frustrating (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
+  heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the worse that day\'s score. Click a screen for the details.',
+  heatTip: (r, d, x) => x ? `${r} · ${d}: score ${x.score} over ${x.visits} visits` : `${r} · ${d}: no visits`, heatScale: 'Score of the day',
   forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
+    version_worse: (i) => `<b>${i.route}</b> got worse in ${i.b}: score ${i.before} → ${i.now} against ${i.a} (${i.visits} visits on ${i.b}).`,
     screen_worse: (i, s) => `<b>${i.route}</b> got worse: score ${i.before} → ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
     screen_frustrating: (i, s) => `<b>${i.route}</b> is frustrating: score ${i.now} over ${i.visits} visits. Weighs most: ${s}.`,
     screen_better: (i) => `<b>${i.route}</b> improved: score ${i.before} → ${i.now} over ${i.visits} visits.`,
@@ -280,7 +339,7 @@ const L = PT ? {
     action_laborious: (i) => `<code>${i.action}</code> is laborious: ${i.clicks} clicks and ${i.seconds} s in the typical case (${i.times} times).`,
     reach_far: (i) => `${i.kind_of === 'action' ? '<code>' + i.key + '</code>' : '<code>' + i.key + '</code> on <b>' + i.route + '</b>'} is used a lot (${i.uses}×) and sits far away: ${i.clicks} clicks and ${i.screens} ${i.screens === 1 ? 'screen' : 'screens'} to get there.`,
     pair_linked: (i) => `After <code>${i.a}</code>, ${Math.round(i.share * 100)}% of the time comes <code>${i.b}</code> (${i.n}×), with ${i.clicks} clicks between them: bring closer or merge?`,
-    element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${i.rage} rage clicks and ${i.dead} dead clicks.`,
+    element_irritating: (i) => `<code>${i.target}</code> on <b>${i.route}</b> irritates: ${[i.rage && `${i.rage} rage clicks`, i.dead && `${i.dead} dead clicks`].filter(Boolean).join(' and ')}.`,
   },
   help: { rage: '3 clicks on the same spot within 1 s', dead: 'A click on a button or link that changed nothing within 1 s', js_error: 'An uncaught JavaScript error', http_5xx: 'A request answered with 5xx, or a network failure', http_4xx: 'A request refused with 4xx (401 left out)', abandon: 'Started filling a form and left without saving', bounce: 'Went back within 4 s', slow: 'A request that took 3 s or more while on screen' },
   csv: 'CSV', csvTip: 'Download this table as CSV',
@@ -506,50 +565,138 @@ function wireSearch() {
 }
 
 // Overview -------------------------------------------------------------------------------------------------
+const GROUPS = { bugs: ['failure_new', 'failure_recurring'], irritation: ['version_worse', 'screen_worse', 'screen_frustrating', 'element_irritating', 'action_laborious'],
+  ideas: ['reach_far', 'pair_linked'], better: ['screen_better'] }
+const groupOf = (kind) => Object.keys(GROUPS).find((g) => GROUPS[g].includes(kind)) ?? 'ideas'
+const num = (n) => Number(n).toLocaleString(PT ? 'pt-BR' : 'en')
+
+// A 2px line of the values, oldest to newest, with a dot on the latest. Its tooltip names the range.
+function spark(values, tip, w = 120, h = 28) {
+  if (values.length < 2) return ''
+  const top = Math.max(...values), low = Math.min(...values), span = top - low || 1
+  const xy = values.map((v, i) => [i / (values.length - 1) * (w - 8) + 4, h - 4 - (v - low) / span * (h - 8)])
+  const [lx, ly] = xy[xy.length - 1]
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">
+    <polyline points="${xy.map((p) => p.join(',')).join(' ')}"/><circle cx="${lx}" cy="${ly}" r="4"/></svg>`
+}
+
+// Score per day: one column per day in its band's colour, the 20 and 50 lines, and a mark where each version began.
+function scoreChart(o) {
+  const days = o.daily, n = days.length
+  if (n < 2) return ''
+  const top = Math.max(25, ...days.map((d) => d.score)) * 1.1
+  const y = (v) => 100 - v / top * 100
+  const at = Object.fromEntries(days.map((d, i) => [d.day, i]))
+  const marks = o.deploys.filter((d) => d.day in at && at[d.day] > 0)
+  const col = 100 / n
+  return `<section class="card"><div class="head"><div><div class="label">${L.scoreByDay}</div>
+      <div class="meta">${esc(days[0].day)} → ${esc(days[n - 1].day)} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>
+      <div class="legend">${['ok', 'warn', 'bad'].map((b) => `<span><i class="sw ${b}"></i>${L.bands[b]}</span>`).join('')}</div></div>
+    <div class="chart">
+      ${[20, 50].filter((v) => v < top).map((v) => `<div class="rule" style="top:${y(v)}%"><span>${v}</span></div>`).join('')}
+      ${marks.map((d) => `<div class="deploy" style="left:${at[d.day] * col}%" data-tip="${esc(L.deployTip(d.version, when(d.at)))}"><span>${esc(d.version)}</span></div>`).join('')}
+      <div class="cols">${days.map((d) => `<div class="c" tabindex="0" data-tip="${esc(L.dayTip(d.day, d.score, d.visits))}">
+        <i class="${band(d.score)}" style="height:${Math.max(1.5, d.score / top * 100)}%"></i></div>`).join('')}</div>
+    </div></section>`
+}
+
+// Screens by day: the darker the cell, the worse that day's score (one hue, the scale below says how much).
+const HEAT = [[50, 5], [35, 4], [20, 3], [10, 2], [0, 1]]
+function heatMap(o) {
+  const days = o.daily.map((d) => d.day)
+  if (days.length < 3 || !o.screens.length) return ''
+  const at = new Set(o.deploys.map((d) => d.day))
+  const first = days[0]
+  return `<section class="card"><div class="head"><div><div class="label">${L.heat}</div><div class="meta">${L.heatHint}</div></div>
+      <div class="legend"><span class="meta">${L.heatScale}</span>${HEAT.slice().reverse().map(([v, k]) => `<span><i class="sw h${k}"></i>${v}${k === 5 ? '+' : ''}</span>`).join('')}</div></div>
+    <div class="heat" style="--n:${days.length}">
+      <div></div><div class="vers">${days.map((d) => `<span>${at.has(d) && d !== first ? esc(o.deploys.find((x) => x.day === d).version) : ''}</span>`).join('')}</div>
+      ${o.screens.map((r) => `<a class="hl" ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(r.route)}</a>
+        <div class="cells">${days.map((d) => { const x = r.days[d]; const k = x ? HEAT.find(([v]) => x.score >= v)[1] : 0
+          return `<i class="h${k}${at.has(d) && d !== first ? ' dep' : ''}" tabindex="0" data-tip="${esc(L.heatTip(r.route, d, x))}"></i>` }).join('')}</div>`).join('')}
+    </div></section>`
+}
+
 async function overview() {
   const o = await read('/api/overview')
   const n = o.now, b = o.before
   if (!n.visits && !b.visits) return empty(L.noVisits)
-  // Higher is worse for the score and the failures; for visits and people it is only change.
+  // Compare only when the period before has data on at least half as many days: otherwise +3000% says nothing.
+  const comparable = o.before_daily.length >= Math.max(1, Math.ceil(o.daily.length / 2))
   const diff = (now, before, worseUp) => {
-    if (!before) return ''
+    if (!comparable || !before) return ''
     const pct = Math.round((now - before) / before * 100)
     if (!pct) return `<span class="delta meta">=</span>`
     const cls = worseUp === undefined ? 'meta' : (pct > 0) === worseUp ? 'bad' : 'ok'
-    return `<span class="delta ${cls}">${pct > 0 ? '+' : ''}${pct}%</span>`
+    return `<span class="delta ${cls}">${pct > 0 ? '▲ +' : '▼ '}${pct}%</span>`
   }
   const points = n.score - b.score
-  const vs = o.days === 1 ? L.vsDay : L.vsBefore(o.days)
-  const W = 600, H = 72, gap = 2, days = o.daily, bw = days.length ? W / days.length : W
-  const top = Math.max(10, ...days.map((d) => d.score)) // scaled to the worst day, so small changes still show
-  const trend = days.length > 1 ? `<div class="card"><div class="label">${L.scoreByDay}</div>
-    <svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${L.scoreByDay}">
-      <line x1="0" x2="${W}" y1="${H - 0.5}" y2="${H - 0.5}"/>
-      ${days.map((d, i) => { const h = Math.max(2, d.score / top * (H - 4)); return `<g><title>${esc(L.dayTip(d.day, d.score, d.visits))}</title>
-        <rect class="hit" x="${i * bw}" y="0" width="${bw}" height="${H}"/>
-        <rect class="day" x="${i * bw + gap / 2}" y="${H - h}" width="${Math.max(1, bw - gap)}" height="${h}" rx="2"/></g>` }).join('')}
-    </svg><div class="meta">${esc(days[0].day)} → ${esc(days[days.length - 1].day)} · ${L.peak(Math.max(...days.map((d) => d.score)))}</div></div>` : ''
+  const vs = !comparable ? L.noCompare : o.days === 1 ? L.vsDay : L.vsBefore(o.days)
+  const series = (k) => o.daily.map((d) => d[k])
+  const tile = (label, value, cls, delta, key, foot) => `<div class="card tile"><div class="label">${label}</div>
+    <div class="row"><div class="big ${cls}">${value}${delta}</div>${spark(series(key), `${label} ${L.perDay}: ${Math.min(...series(key))}–${Math.max(...series(key))}`)}</div>
+    <div class="meta">${foot}</div></div>`
+
   const sentence = (i) => {
     const safe = Object.fromEntries(Object.entries(i).map(([k, v]) => [k, typeof v === 'string' ? esc(v) : v]))
     return L.insight[i.kind](safe, esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? ''))
   }
+  const bad = o.insights.filter((i) => i.severity === 'bad'), warn = o.insights.filter((i) => i.severity === 'warn')
+  const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
+  const headline = level === 'bad' ? L.verdict.bad(bad.length) : level === 'warn' ? L.verdict.warn(warn.length) : L.verdict.ok
+  const shortOf = (i) => (L.short[i.kind] ?? (() => ''))(i)
+  const top = (level === 'bad' ? bad : warn).filter((i) => L.short[i.kind]).slice(0, 4)
+  const icon = { bad: '!', warn: '•', ok: '✓' }[level]
+  const verdict = `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${icon}</span><div>
+      <div class="vh">${headline}</div>
+      <div class="meta">${top.length ? top.map((i) => `<a ${linkAttrs(i.link)}>${esc(shortOf(i))}</a>`).join(' · ') : level === 'ok' ? L.verdict.okHint : ''}</div></div></section>`
+
+  const byRoute = Object.fromEntries(o.screens.map((r) => [r.route, r]))
+  const mini = (i) => {
+    const r = i.route && byRoute[i.route]
+    if (i.n && i.type) return `<span class="mag">${num(i.n)}×</span>`
+    if (r) return spark(o.daily.map((d) => r.days[d.day]?.score ?? 0), `${i.route} ${L.perDay}`, 72, 22)
+    return ''
+  }
+  const grouped = {}
+  for (const i of o.insights) (grouped[groupOf(i.kind)] ??= []).push(i)
+  const groups = Object.keys(GROUPS).filter((g) => grouped[g])
+  const insights = o.insights.length ? `<div class="groups">${groups.map((g) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}</div>
+      <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
+        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
+    : ''
+
   return `
+    ${verdict}
     <section class="numbers">
-      <div class="card"><div class="label">${L.overall}</div><div class="big ${band(n.score)}">${n.score}${b.visits ? `<span class="delta ${points > 0 ? 'bad' : points < 0 ? 'ok' : 'meta'}">${points > 0 ? '+' : ''}${points || '='}</span>` : ''}</div>
-        <span class="pill ${band(n.score)}">${say(n.score)}</span></div>
-      <div class="card"><div class="label">${L.visits}</div><div class="big">${n.visits}${diff(n.visits, b.visits)}</div><div class="meta">${L.sessions(n.sessions)}</div></div>
-      <div class="card"><div class="label">${L.people}</div><div class="big">${n.users}${diff(n.users, b.users)}</div><div class="meta">${vs}</div></div>
-      <div class="card"><div class="label">${L.failures}</div><div class="big ${n.failures ? 'bad' : 'ok'}">${n.failures}${diff(n.failures, b.failures, true)}</div><div class="meta">${vs}</div></div>
+      ${tile(L.overall, n.score, band(n.score), comparable && b.visits ? `<span class="delta ${points > 0 ? 'bad' : points < 0 ? 'ok' : 'meta'}">${points > 0 ? '▲ +' : points < 0 ? '▼ ' : ''}${points || '='}</span>` : '', 'score',
+        `<span class="pill ${band(n.score)}">${say(n.score)}</span> ${L.allScreens}`)}
+      ${tile(L.visits, num(n.visits), '', diff(n.visits, b.visits), 'visits', L.sessions(n.sessions))}
+      ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', vs)}
+      ${tile(L.failures, num(n.failures), n.failures ? 'bad' : 'ok', diff(n.failures, b.failures, true), 'failures', vs)}
     </section>
-    ${trend}
-    <section class="card"><div class="label">${L.whatToSee}</div><div class="meta">${L.insightsHint}</div>
-      ${o.insights.length ? `<ul class="insights">${o.insights.map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
-        <div class="text">${sentence(i)}</div><a ${linkAttrs(i.link)}>${L.see} →</a></li>`).join('')}</ul>` : `<p class="meta">${L.nothing}</p>`}
-    </section>
+    ${scoreChart(o)}
+    ${heatMap(o)}
+    ${insights}
     <section class="card"><div class="head"><div style="flex:1;min-width:240px"><div class="label">${L.forAi}</div><div class="meta">${L.forAiHint}</div></div>
       <div class="field"><button id="copy-report" class="primary">${L.copyReport}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)"
         href="/api/report?${esc(query())}" download="termometro-${esc($('#project').value)}.json">${L.downloadJson}</a></div></div></section>`
 }
+
+// One tooltip for every mark with data-tip: hover or keyboard focus. Text only (textContent), never HTML.
+const tip = Object.assign(document.createElement('div'), { className: 'tip', role: 'tooltip' }); tip.hidden = true
+document.body.append(tip)
+function showTip(el) {
+  tip.textContent = el.dataset.tip; tip.hidden = false
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect()
+  tip.style.left = Math.min(innerWidth - t.width - 8, Math.max(8, r.left + r.width / 2 - t.width / 2)) + 'px'
+  tip.style.top = (r.top - t.height - 8 < 8 ? r.bottom + 8 : r.top - t.height - 8) + 'px'
+}
+for (const [on, off] of [['pointerover', 'pointerout'], ['focusin', 'focusout']]) {
+  document.addEventListener(on, (e) => { const el = e.target.closest?.('[data-tip]'); if (el) showTip(el) })
+  document.addEventListener(off, (e) => { if (e.target.closest?.('[data-tip]')) tip.hidden = true })
+}
+addEventListener('scroll', () => { tip.hidden = true }, { passive: true })
 
 // Frustration ----------------------------------------------------------------------------------------------
 async function frustration() {
