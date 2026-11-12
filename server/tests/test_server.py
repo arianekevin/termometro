@@ -323,6 +323,44 @@ class Server(unittest.TestCase):
         self.feature({"id": fid, "delete": True})
         self.assertEqual(self.read("/api/features?project=shop&days=7")["features"], [])
 
+    def test_a_followed_item_keeps_its_baseline_and_says_if_it_got_better(self):
+        page, rage = {"type": "page", "route": "/users"}, {"type": "rage", "route": "/users", "target": "button#save"}
+        fail = {"type": "http_5xx", "route": "/users", "detail": "POST /api/users 500"}
+        self.send([page, rage, rage, fail] * 5, session="s1", version="1.6")
+        follow = lambda body, q="project=shop&days=7": call(self.base, "/api/follow?" + q, body, cookie=self.cookie)
+        status, _, out = follow({"kind": "screen", "key": "/users", "label": "Usuários"})
+        self.assertEqual(status, 200, out)
+        sid = json.loads(out)["id"]
+        self.assertEqual(json.loads(follow({"kind": "screen", "key": "/users"})[2])["id"], sid)  # once per thing
+        fid = json.loads(follow({"kind": "failure", "key": "http_5xx\tPOST /api/users 500", "label": "Salvar"})[2])["id"]
+        items = {x["id"]: x for x in self.read("/api/follow?project=shop&days=7")["items"]}
+        s = items[sid]
+        self.assertEqual((s["label"], s["metric"], s["before"], s["version"], s["state"], s["now"]),
+                         ("Usuários", "score", 100, "1.6", "waiting", None))  # nothing since it was followed
+        self.assertEqual(items[fid]["before"], 500.0)  # 5 per session, per 100 sessions
+        self.assertEqual(items[fid]["link"], {"tab": "failures", "params": {"signal": "http_5xx", "detail": "POST /api/users 500"}})
+        # after the fix: calm visits, and the failure gone
+        for n in range(4):
+            self.send([page, page, page], session=f"n{n}", version="1.7")
+        items = {x["id"]: x for x in self.read("/api/follow?project=shop&days=7")["items"]}
+        self.assertEqual((items[sid]["now"], items[sid]["state"]), (0, "better"))
+        self.assertEqual((items[fid]["now"], items[fid]["state"]), (0, "better"))
+        # people only write; an unknown project or kind says no
+        self.assertEqual(call(self.base, "/api/follow?project=shop", {"kind": "screen", "key": "/x"})[0], 401)
+        self.assertEqual(follow({"kind": "screen", "key": "/x"}, "project=nope")[0], 404)
+        self.assertEqual(follow({"kind": "person", "key": "u1"})[0], 400)
+        self.assertEqual(call(self.base, f"/api/follow?project=shop&id={sid}", method="DELETE")[0], 401)
+        self.assertEqual(call(self.base, f"/api/follow?project=shop&id={sid}", method="DELETE", cookie=self.cookie)[0], 200)
+        self.assertEqual([x["id"] for x in self.read("/api/follow?project=shop&days=7")["items"]], [fid])
+
+    def test_follow_state_has_a_tolerance_per_metric(self):
+        self.assertEqual(t.follow_state("score", True, 60, 64), "same")
+        self.assertEqual(t.follow_state("score", True, 60, 50), "better")
+        self.assertEqual(t.follow_state("failure", True, 10, 11.5), "same")  # within 20%
+        self.assertEqual(t.follow_state("failure", True, 10, 13), "worse")
+        self.assertEqual(t.follow_state("people", False, 4, 6), "better")  # more people a day is better
+        self.assertEqual(t.follow_state("clicks", True, 3, 3.8), "same")  # within a click
+
     def test_engagement_shows_an_account_fading_in_people_and_in_a_feature(self):
         create = {"type": "action", "route": "/opp", "detail": "POST /api/opps", "clicks": 1}
         for u in ("u1", "u2", "u3"):  # the month before: 3 people, 12 creations

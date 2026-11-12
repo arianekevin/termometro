@@ -161,6 +161,14 @@ data — hoje ou qualquer dia antes. O painel, os alertas, o relatório e "falha
 depois do marco em uso; troque por outro, ou volte ao período todo, quando quiser. Nada é apagado, e o dado antigo
 continua saindo pela retenção. (`all=1` em qualquer leitura ainda mostra tudo.)
 
+## Acompanhar
+
+Decidiu corrigir algo da lista Para fazer, no Início? Clique em **Acompanhar** na linha. O valor de hoje vira a linha
+de base — a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da
+conta — e o cartão **Acompanhando** mede o mesmo número só no que veio depois, com os filtros em uso: Melhorou, Igual
+(até 5 pontos de frustração, ou 20%) ou Piorou, "desde dd/mm (versão x)". Só chaves ficam guardadas, nunca pessoas
+(`GET/POST/DELETE /api/follow`).
+
 ## Licença
 
 [AGPL-3.0](LICENSE). Você pode usar, alterar e hospedar o Termometro livremente; se oferecer uma versão alterada

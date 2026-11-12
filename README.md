@@ -186,6 +186,14 @@ day before. The dashboard, the alerts, the report and "new failure" then count o
 use; pick another one, or the whole period, at any time. Nothing is deleted, and old data still leaves with the
 retention. (`all=1` on any read still shows everything.)
 
+## Follow
+
+Decided to fix something on Início's to-do list? Click **Follow** on its row. Today's value becomes the baseline —
+the screen's frustration, failures per 100 sessions, the action's clicks per use or the account's people a day —
+and the **Following** card measures the same number on what came since, with the filters in use: Improved, Same
+(within 5 frustration points, or 20%) or Worse, "since dd/mm (version x)". Only keys are kept, never people
+(`GET/POST/DELETE /api/follow`).
+
 ## Known limits
 
 - A dead click is "nothing in the page changed within 1 s". On a screen that updates by itself (toasts, clocks,

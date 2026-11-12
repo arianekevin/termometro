@@ -41,6 +41,10 @@ and the API:
   POST /api/mark       saved marks (?project=): {action: create, name, at?} | {action: use, id} | {action: none} |
                        {action: delete, id}; without a body, a mark now (or ?clear=1, none) ┘
                        every read above sees only what came after the mark, unless ?all=1
+  GET  /api/follow     followed items (?project= and the filters): baseline against now, since it was followed;
+                       state better | same | worse | waiting
+  POST /api/follow     {kind: screen|element|failure|action|account, key, label}: follows it, baseline from the filters
+  DELETE /api/follow   ?project=&id= stops following it
   GET  /  /map.js  /termometro.js
 
 A screen's frustration score is the weighted signals divided by its visits, times 20, capped at 100. One rage
@@ -197,6 +201,10 @@ def connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS features (
             project TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, rules TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, id));
+        CREATE TABLE IF NOT EXISTS follows (
+            project TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, label TEXT NOT NULL,
+            metric TEXT NOT NULL, baseline REAL NOT NULL, base INTEGER NOT NULL, at INTEGER NOT NULL, version TEXT NOT NULL,
+            PRIMARY KEY (project, id), UNIQUE (project, kind, key));
         CREATE TABLE IF NOT EXISTS people (
             project TEXT NOT NULL, user_id TEXT NOT NULL, name TEXT NOT NULL, last_seen INTEGER NOT NULL,
             PRIMARY KEY (project, user_id));
@@ -2008,10 +2016,112 @@ def engagement_read(con, f: Filter) -> dict:
     return out
 
 
+# Followed items, per project: something from the to-do list a person decided to fix, with the value it had when
+# followed (the baseline), so the next weeks say whether it got better. Each kind has one metric, always normalized
+# (per visit, per session, per use, per day) so periods of different sizes compare. Only keys, never people.
+FOLLOW_KINDS = {  # kind: (metric, lower is better)
+    "screen": ("score", True),        # the screen's frustration score (0-100)
+    "element": ("irritation", True),  # rage and dead clicks on the element per 100 visits to its screen
+    "failure": ("failure", True),     # occurrences per 100 sessions
+    "action": ("clicks", True),       # clicks a typical use took (median)
+    "account": ("people", False),     # the account's people a day
+}
+FOLLOW_SAME = {"score": (5, 0), "irritation": (1, .2), "failure": (1, .2), "clicks": (1, .2), "people": (.5, .2)}
+MAX_FOLLOWS = 100
+
+
+def follow_value(con, f: Filter, kind: str, key: str, since: int = 0) -> tuple[float, int]:
+    """(value of the kind's metric, the base it was measured on: visits, sessions, uses or days) in the filter's window,
+    from `since` on. A base of 0 means nothing to measure yet."""
+    sql, args = f.sql + " AND at >= ?", f.args + [since]
+    if kind == "screen":
+        visits, points = con.execute(f"""SELECT COALESCE(SUM(type = 'page'), 0), COALESCE(SUM({WEIGHT_CASE}), 0) FROM events
+            WHERE {sql} AND route = ?""", args + [key]).fetchone()
+        return score(points, visits), visits
+    if kind == "element":
+        route, _, target = key.partition("\t")
+        visits, bad = con.execute(f"""SELECT COALESCE(SUM(type = 'page'), 0), COALESCE(SUM(type IN ('rage', 'dead') AND target = ?), 0)
+            FROM events WHERE {sql} AND route = ?""", [target] + args + [route]).fetchone()
+        return (round(bad / visits * 100, 1) if visits else 0), visits
+    if kind == "failure":
+        signal, _, detail = key.partition("\t")
+        sessions, n = con.execute(f"""SELECT COUNT(DISTINCT session), COALESCE(SUM(type = ? AND detail = ?), 0) FROM events
+            WHERE {sql}""", [signal, detail] + args).fetchone()
+        return (round(n / sessions * 100, 1) if sessions else 0), sessions
+    if kind == "action":
+        clicks = [c for (c,) in con.execute(f"SELECT clicks FROM events WHERE {sql} AND type = 'action' AND detail = ? AND clicks IS NOT NULL",
+                                             args + [key])]
+        return median(clicks), len(clicks)
+    if kind == "account":
+        days, people = con.execute(f"""SELECT COUNT(DISTINCT date(at / 1000, 'unixepoch')),
+            COUNT(DISTINCT CASE WHEN account = ? AND user_id != '' THEN user_id || date(at / 1000, 'unixepoch') END)
+            FROM events WHERE {sql}""", [key] + args).fetchone()
+        return (round(people / days, 1) if days else 0), days
+    raise ValueError("kind")
+
+
+def follow_state(metric: str, lower_better: bool, before: float, now: float) -> str:
+    """better, same or worse: same while the change is within the metric's tolerance (an absolute floor, or a share of before)."""
+    floor, share = FOLLOW_SAME[metric]
+    d = now - before
+    if abs(d) <= max(floor, share * before):
+        return "same"
+    return "better" if (d < 0) == lower_better else "worse"
+
+
+def follow_link(kind: str, key: str) -> dict:
+    if kind == "failure":
+        signal, _, detail = key.partition("\t")
+        return {"tab": "failures", "params": {"signal": signal, "detail": detail}}
+    if kind == "action":
+        return {"tab": "actions", "params": {"action": key}}
+    if kind == "account":
+        return {"tab": "accounts", "params": {"account": key}}
+    return {"tab": "frustration" if kind == "screen" else "usage", "params": {"route": key.partition("\t")[0]}}
+
+
+def follows_of(con, f: Filter) -> list[dict]:
+    """The project's followed items, newest first, each with its value now (the current filters, since it was followed)
+    against the baseline, and the state: better, same, worse, or waiting (nothing measured since)."""
+    out = []
+    for fid, kind, key, label, metric, before, base, at, version in con.execute(
+            "SELECT id, kind, key, label, metric, baseline, base, at, version FROM follows WHERE project = ? ORDER BY at DESC",
+            (f.q.get("project", ""),)):
+        lower = FOLLOW_KINDS[kind][1]
+        now, base_now = follow_value(con, f, kind, key, at)
+        out.append({"id": fid, "kind": kind, "key": key, "label": label, "metric": metric, "lower_better": lower,
+                    "before": before, "base_before": base, "now": now if base_now else None, "base_now": base_now,
+                    "at": at, "version": version, "link": follow_link(kind, key),
+                    "state": follow_state(metric, lower, before, now) if base_now else "waiting"})
+    return out
+
+
+def follow(con, f: Filter, item: dict) -> str:
+    """Follows {kind, key, label} from now on, its baseline measured with the filters of the request. Following the
+    same thing again keeps the first baseline. Returns its id."""
+    kind, key = str(item.get("kind", "")), str(item.get("key", ""))[:400]
+    if kind not in FOLLOW_KINDS or not key:
+        raise ValueError("kind and key")
+    project = f.q.get("project", "")
+    row = con.execute("SELECT id FROM follows WHERE project = ? AND kind = ? AND key = ?", (project, kind, key)).fetchone()
+    if row:
+        return row[0]
+    if con.execute("SELECT COUNT(*) FROM follows WHERE project = ?", (project,)).fetchone()[0] >= MAX_FOLLOWS:
+        raise ValueError("too many followed items")
+    value, base = follow_value(con, f, kind, key)
+    version = con.execute("SELECT version FROM events WHERE project = ? AND version != '?' ORDER BY at DESC LIMIT 1",
+                          (project,)).fetchone()
+    fid = secrets.token_hex(4)
+    con.execute("INSERT INTO follows (project, id, kind, key, label, metric, baseline, base, at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (project, fid, kind, key, " ".join(str(item.get("label", "")).split())[:MAX_NAME], FOLLOW_KINDS[kind][0],
+                 value, base, int(time.time() * 1000), version[0] if version else ""))
+    return fid
+
+
 READS = {"/api/ways": ways, "/api/patterns": patterns, "/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
          "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
-         "/api/report": report}
+         "/api/report": report, "/api/follow": lambda con, f: {"items": follows_of(con, f)}}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8"),
@@ -2171,6 +2281,22 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, UnicodeDecodeError) as error:
                 return self.json(400, {"error": str(error)})
             return self.json(200, {"id": fid})
+        if path == "/api/follow":
+            who = self.session()
+            if not who or who["email"] == "api":
+                return self.json(401, {"error": "sign in"})
+            q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+            if q.get("project") not in CONFIG.by_name:
+                return self.json(404, {"error": "project"})
+            try:
+                item = json.loads(self.body())
+                if not isinstance(item, dict):
+                    raise ValueError("not an object")
+                with connect() as con:
+                    fid = follow(con, Filter(q), item)
+            except (ValueError, UnicodeDecodeError) as error:
+                return self.json(400, {"error": str(error)})
+            return self.json(200, {"id": fid})
         if path == "/api/mark":
             if not self.signed_in():
                 return self.json(401, {"error": "sign in"})
@@ -2294,6 +2420,20 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200, READS[url.path](con, Filter(q)), headers)
 
     do_HEAD = do_GET
+
+    def do_DELETE(self):
+        url = urlparse(self.path)
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path != "/api/follow":
+            return self.json(404, {"error": "not found"})
+        who = self.session()
+        if not who or who["email"] == "api":
+            return self.json(401, {"error": "sign in"})
+        if q.get("project") not in CONFIG.by_name:
+            return self.json(404, {"error": "project"})
+        with connect() as con:
+            con.execute("DELETE FROM follows WHERE project = ? AND id = ?", (q["project"], q.get("id", "")))
+        return self.json(200, {"ok": True})
 
 
 def main(argv: list[str]) -> None:
