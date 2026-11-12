@@ -1401,9 +1401,12 @@ const dayAxis = (days, cls = '') => { const n = days.length, w = every(n, 16), m
 const scoreDelta = (now, before) => before === null || before === undefined ? '' : now === before ? `<span class="delta meta" title="${esc(FT().before(before))}">=</span>`
   : `<span class="delta ${now > before ? 'bad' : 'ok'}" title="${esc(FT().before(before))}">${now > before ? '▲ +' : '▼ −'}${Math.abs(now - before)}</span>`
 // A count now against before, in %: neither good nor bad by itself (visits), so no colour; the number before in the tooltip.
+// A small base makes a giant percent, as on Início: below 20 before, the value before; beyond ±500%, how many times.
 const countDelta = (now, before) => { if (before === null || before === undefined || !before) return ''
   const pct = Math.round((now - before) / before * 100)
-  return `<span class="delta meta" title="${esc(FT().before(num(before)))}">${pct ? `${pct > 0 ? '▲ +' : '▼ −'}${Math.abs(pct)}%` : '='}</span>` }
+  if (!pct) return `<span class="delta meta" title="${esc(FT().before(num(before)))}">=</span>`
+  const text = before < 20 ? L.dwas(num(before)) : Math.abs(pct) > 500 ? `×${num(Math.round(now / before))}` : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}%`
+  return `<span class="delta meta" title="${esc(FT().before(num(before)))} · ${esc(L.dtip(pct))}">${pct > 0 ? '▲' : '▼'} ${text}</span>` }
 
 // A 2px line of the values, oldest to newest, with a dot on the latest. Each point has a hover target as wide as its
 // slot, its value (and its day, when given) in the tooltip; the whole names the range.
