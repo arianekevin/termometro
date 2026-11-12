@@ -218,8 +218,9 @@ button.gl { display: inline-flex; align-items: center; justify-content: center; 
   border: 1px solid var(--line-strong); border-radius: 50%; background: none; color: var(--faint); font: 600 11px/1 system-ui, sans-serif;
   vertical-align: middle; text-transform: none; letter-spacing: 0; cursor: pointer; }
 button.gl:hover, button.gl[aria-expanded="true"] { color: var(--fg); border-color: var(--accent); }
-.gl-pop { margin: 8px 0 4px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--sunken); border-radius: 4px;
-  font-size: 13px; line-height: 19px; color: var(--fg); max-width: 640px; }
+.gl-pop { position: fixed; z-index: 30; width: min(360px, calc(100vw - 16px)); padding: 10px 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--accent);
+  background: var(--surface); border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.16); font-size: 13px; line-height: 19px; color: var(--fg); }
+:root[data-text="large"] .gl-pop { font-size: 15px; line-height: 21px; } :root[data-text="larger"] .gl-pop { font-size: 17px; line-height: 24px; }
 .gl-pop p { margin: 0; } .gl-pop p + p { margin-top: 4px; }
 @media (pointer: coarse) { button.gl { width: 26px; height: 26px; font-size: 13px; } }
 .k-irritation { background: var(--k1); } .k-no_effect { background: var(--k2); } .k-failure { background: var(--k3); }
@@ -304,6 +305,36 @@ code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace
 .group .insights li { align-items: center; }
 button.demand { margin-top: 6px; }
 .mag { flex: none; font-weight: 700; font-size: 15px; color: var(--fg); }
+/* Início: the to-do list, the release card, the banner's links and KPI tiles that never overflow. */
+.todos { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+.todo-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 8px 14px; align-items: start; padding: 12px 8px; margin: 0 -8px;
+  border-top: 1px solid var(--line); border-radius: 8px; transition: background .6s var(--ease); }
+.todo-row:first-child { border-top-color: transparent; } .todo-row[hidden] { display: none; }
+.todo-row.hit { background: var(--accent-soft); }
+.kchip { justify-self: start; margin-top: 1px; }
+.todo-say { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.todo-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--fg2); min-width: 0; }
+.todo-meta b { color: var(--fg); white-space: nowrap; } .todo-meta .tech { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
+.todo-acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.todo-acts .button, .rel-acts .button { height: 28px; padding: 0 10px; font-size: 12px; border: 1px solid var(--fill); white-space: nowrap; }
+.rel-acts .button { height: 36px; font-size: 14px; padding: 0 14px; }
+#todo-all { margin-top: 8px; }
+.todo .group { box-shadow: none; } .todo .groups { margin-top: 12px; }
+.pill.same { background: var(--sunken); color: var(--fg2); }
+.release { display: grid; gap: 10px; align-content: start; } .rel-nums { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.release .counts li a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } .release .counts li > span { flex: none; }
+.rel-acts { justify-content: flex-end; margin-top: 4px; }
+a.widen { min-height: 36px; padding: 6px 14px; border: 1px solid var(--fill); text-align: center; }
+.good .insights li { padding: 8px 0; font-size: 13px; }
+.verdict .meta button.link { color: var(--fg2); font: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.verdict .meta button.link:hover { color: var(--accent); }
+.tile { min-width: 0; } .tile .row > div:first-child { min-width: 0; }
+.tile .big { white-space: normal; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 2px; overflow-wrap: anywhere; }
+.tile .delta { margin-left: 4px; }
+@media (max-width: 640px) {
+  .todo-row { grid-template-columns: minmax(0, 1fr); }
+  .todo-acts { justify-content: flex-start; flex-wrap: wrap; }
+}
 .tip { position: fixed; z-index: 50; max-width: 320px; padding: 6px 10px; border-radius: 8px; background: var(--fg); color: var(--surface);
   font-size: 12px; line-height: 16px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
 @media (max-width: 640px) { .chart { margin-right: 24px; } .heat { grid-template-columns: 90px 1fr; } .tile .row { flex-direction: column; align-items: flex-start; } .tile .spark { width: 100%; height: auto; } }
@@ -330,6 +361,8 @@ const HELP_PT = {
   byUser: ['O que é', 'Uso e frustração por pessoa, só pelo id. Clique numa pessoa para filtrar o painel por ela.', 'Frustração alta em poucas pessoas costuma ser treinamento; espalhada por todos, é a tela.'],
   effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo. "Até a tela" são os cliques no caminho até a tela da ação; "na tela", os cliques nela.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
+  release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas a cada 100 sessões. O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
+  todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
   adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
   featureScore: ['O que é', 'A frustração da feature: sinais nas telas e botões dela, divididos pelos usos.', 'Feature importante com frustração alta é a melhor candidata a revisão de experiência.'],
@@ -364,6 +397,8 @@ const HELP_EN = {
   byUser: ['What it is', 'Use and frustration per person, by id only. Click a person to narrow the dashboard to them.', 'High frustration in a few people is usually training; spread over everyone, it is the screen.'],
   effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done. "On the way" are the clicks to reach the action\'s screen; "on the screen", the clicks on it.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
+  release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per 100 sessions. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
+  todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
   adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
   featureScore: ['What it is', 'The feature\'s frustration: signals on its screens and buttons, divided by its uses.', 'An important feature with high frustration is the best candidate for an experience review.'],
@@ -381,21 +416,45 @@ const HELP_EN = {
   dictionary: ['What it is', 'The name people use for each screen, button, action and account. Empty uses the name the app shows.', 'Name first the icons without a label and the detail screens: they are the ones shown raw on the dashboard.'],
 }
 const lookTitle = () => (PT ? 'O que olhar' : 'What to look at')
-// A "?" next to a section title: what the section is and what to look for in it, opened right under the title.
+// A "?" next to a section title: what the section is and what to look for in it, in a popover anchored to the "?". It floats
+// over the page, so opening it never moves the layout; Esc, a click outside or another "?" closes it.
 const help = (k) => (PT ? HELP_PT : HELP_EN)[k] ? `<button class="gl" data-help="${k}" aria-expanded="false" aria-label="${PT ? 'O que é isto?' : 'What is this?'}" title="${PT ? 'O que é isto?' : 'What is this?'}">?</button>` : ''
+let helpOpen = null
+function closeHelp(focus = false) {
+  if (!helpOpen) return
+  const { b, pop } = helpOpen
+  helpOpen = null; pop.remove(); b.setAttribute('aria-expanded', 'false'); b.removeAttribute('aria-describedby')
+  if (focus && b.isConnected) b.focus()
+}
+// Under the "?" (above it when there is no room below), clamped inside the viewport: it works on a phone too.
+function placeHelp() {
+  const { b, pop } = helpOpen
+  if (!b.isConnected) return closeHelp()
+  const r = b.getBoundingClientRect()
+  if (r.bottom < 0 || r.top > innerHeight) return closeHelp()
+  const w = pop.offsetWidth, h = pop.offsetHeight
+  pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - 24, innerWidth - w - 8)) + 'px'
+  pop.style.top = (r.bottom + 8 + h > innerHeight - 8 && r.top - h - 8 >= 8 ? r.top - h - 8 : r.bottom + 8) + 'px'
+}
 document.addEventListener('click', (e) => {
   const b = e.target.closest?.('button.gl[data-help]')
+  if (helpOpen && b !== helpOpen.b && !e.target.closest?.('.gl-pop')) closeHelp()
   if (!b) return
-  const label = b.closest('.label') ?? b.parentElement
-  const anchor = label.nextElementSibling?.classList.contains('meta') ? label.nextElementSibling : label
-  const open = anchor.nextElementSibling?.classList.contains('gl-pop') ? anchor.nextElementSibling : null
-  if (open) { open.remove(); b.setAttribute('aria-expanded', 'false'); return }
+  if (helpOpen) return closeHelp()
   const [what, text, look] = (PT ? HELP_PT : HELP_EN)[b.dataset.help]
-  const pop = Object.assign(document.createElement('div'), { className: 'gl-pop', role: 'note' })
+  const pop = Object.assign(document.createElement('div'), { className: 'gl-pop', id: 'help-pop', role: 'dialog' })
+  pop.setAttribute('aria-label', what)
   pop.append(Object.assign(document.createElement('p'), { innerHTML: `<b>${what}:</b> ` }), Object.assign(document.createElement('p'), { innerHTML: `<b>${lookTitle()}:</b> ` }))
   pop.children[0].append(text); pop.children[1].append(look)
-  anchor.after(pop); b.setAttribute('aria-expanded', 'true')
+  document.body.append(pop)
+  helpOpen = { b, pop }
+  b.setAttribute('aria-expanded', 'true'); b.setAttribute('aria-controls', 'help-pop'); b.setAttribute('aria-describedby', 'help-pop')
+  placeHelp()
 })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && helpOpen) closeHelp(true) })
+addEventListener('scroll', () => helpOpen && placeHelp(), { passive: true, capture: true })
+addEventListener('resize', () => helpOpen && placeHelp())
+addEventListener('hashchange', () => closeHelp())
 const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>'
 const PT = /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
@@ -607,6 +666,16 @@ const L = PT ? {
   compareHint: 'Mesmo período e filtros, separados por versão. Frustração maior na versão nova é piora.', change: 'Variação',
   screensCompared: 'Telas, da que mais piorou para a que mais melhorou', actionsCompared: 'Ações: cliques e tempo (medianas)',
   newFailures: 'Falhas que só a versão nova tem', noNewFailures: 'Nenhuma falha nova.', onlyIn: (v) => `só na ${v}`, worse: 'piorou', better: 'melhorou', same: 'igual',
+  rel: { title: (b, a) => `Versão ${b} vs ${a}`, scorePer: 'Frustração por visita', failPer: 'Falhas por 100 sessões', volume: (a, b) => `Volume: ${a} → ${b} visitas (só contexto: cada versão ficou no ar um tempo)`,
+    worst: 'Telas que mais pioraram', noWorse: 'Nenhuma tela piorou.', open: 'Ver em Versões', widened: (n) => `Comparadas em ${n} dias: a versão anterior saiu do período escolhido.`,
+    onlyOne: (b) => `Só a versão ${b} neste período.`, prevHint: (a, n) => `A anterior, ${a}, aparece ampliando o período para ${n} dias.`,
+    widen: (n) => `Comparar com a versão anterior (amplia para ${n} dias)`, noPrev: 'Não há versão anterior nos dados guardados.', sinceMark: 'Não há versão anterior desde o marco em uso. Escolha "Todo o período" em Marcos para ver as outras.',
+    markIt: 'Criar marco nesta versão', markTip: (v) => `Salva o início da ${v} nos Marcos, para contar a partir dela quando quiser. O período em uso não muda.`, marked: 'Marco salvo', markName: (v) => `Versão ${v}` },
+  todo: { title: 'Para fazer esta semana', hint: 'Da gravidade vezes o alcance (sessões e pessoas atingidas) para baixo.', all: (n) => `Ver todos (${n})`, fewer: 'Ver só os 5 primeiros',
+    byList: 'Por prioridade', byType: 'Ver por tipo', evidence: 'Ver evidência', none: 'Nada para fazer: nenhuma falha, tela ou conta fora do normal neste período.',
+    chip: { bugs: 'Bug', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestão', better: 'Melhorou' },
+    sessions: (n) => `${num(n)} ${n === 1 ? 'sessão' : 'sessões'}`, people: (n) => `${num(n)} ${n === 1 ? 'pessoa' : 'pessoas'}`, good: 'Melhorou', goodHint: 'Telas com menos frustração que no período anterior.' },
+  dnew: 'novo', dwas: (b) => `antes ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% contra o período anterior`,
   setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
   originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
@@ -781,6 +850,16 @@ const L = PT ? {
   compareHint: 'Same period and filters, split by version. More frustration on the new version is worse.', change: 'Change',
   screensCompared: 'Screens, most worsened first', actionsCompared: 'Actions: clicks and time (medians)',
   newFailures: 'Failures only the new version has', noNewFailures: 'No new failures.', onlyIn: (v) => `only in ${v}`, worse: 'worse', better: 'better', same: 'same',
+  rel: { title: (b, a) => `Version ${b} vs ${a}`, scorePer: 'Frustration per visit', failPer: 'Failures per 100 sessions', volume: (a, b) => `Volume: ${a} → ${b} visits (context only: each version was live for its own time)`,
+    worst: 'Screens that got worse the most', noWorse: 'No screen got worse.', open: 'See in Versions', widened: (n) => `Compared over ${n} days: the previous version is out of the chosen period.`,
+    onlyOne: (b) => `Only version ${b} in this period.`, prevHint: (a, n) => `The previous one, ${a}, shows up widening the period to ${n} days.`,
+    widen: (n) => `Compare with the previous version (widens to ${n} days)`, noPrev: 'There is no previous version in the kept data.', sinceMark: 'There is no previous version since the mark in use. Pick "Whole period" in Marks to see the others.',
+    markIt: 'Create a mark at this version', markTip: (v) => `Saves the start of ${v} in Marks, to count from it whenever you want. The period in use does not change.`, marked: 'Mark saved', markName: (v) => `Version ${v}` },
+  todo: { title: 'To do this week', hint: 'Severity times reach (sessions and people affected), highest first.', all: (n) => `See all (${n})`, fewer: 'See only the top 5',
+    byList: 'By priority', byType: 'See by type', evidence: 'See evidence', none: 'Nothing to do: no failure, screen or account out of the ordinary in this period.',
+    chip: { bugs: 'Bug', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestion', better: 'Improved' },
+    sessions: (n) => `${num(n)} ${n === 1 ? 'session' : 'sessions'}`, people: (n) => `${num(n)} ${n === 1 ? 'person' : 'people'}`, good: 'Improved', goodHint: 'Screens with less frustration than in the period before.' },
+  dnew: 'new', dwas: (b) => `before ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% against the period before`,
   setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
   originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
@@ -1177,18 +1256,98 @@ function heatMap(o) {
     </div></section>`
 }
 
+// To do this week: one list ordered by the server's impact (severity × reach), the top 5 first; the good news apart.
+const TODO_TOP = 5
+const plain = (html) => Object.assign(document.createElement('div'), { innerHTML: html }).textContent.replace(/\s+/g, ' ').trim()
+function todoRow(i, k, say, days) {
+  const T = L.todo
+  const reach = [i.reach_sessions && T.sessions(i.reach_sessions), i.reach_people && T.people(i.reach_people)].filter(Boolean).join(' · ')
+  return `<li class="todo-row" id="todo-${k}" ${k >= TODO_TOP ? 'hidden' : ''}>
+    <span class="pill ${i.severity} kchip" title="${esc(L.sev[i.severity])}">${T.chip[groupOf(i.kind)]}</span>
+    <div class="todo-main"><div class="todo-say" title="${esc(plain(say))}">${say}</div>
+      <div class="todo-meta">${reach ? `<b>${reach}</b>` : ''}<span class="tech">${techOf(i)}</span></div></div>
+    <div class="todo-acts"><button class="small" data-copy="${esc(demandOf(i, say, days))}">${L.demand.copy}</button>
+      <a class="button small primary" ${linkAttrs(i.link)}>${T.evidence}</a></div></li>`
+}
+function showTodos(open) {
+  document.querySelectorAll('.todo-row').forEach((r, k) => { if (k >= TODO_TOP) r.hidden = !open })
+  const b = $('#todo-all')
+  if (b) { b.setAttribute('aria-expanded', String(open)); b.textContent = open ? L.todo.fewer : L.todo.all(b.dataset.n) }
+}
+document.addEventListener('click', (e) => {
+  const v = e.target.closest?.('[data-todo-view]')
+  if (v) {
+    const card = v.closest('.todo'), list = v.dataset.todoView === 'list'
+    keep('todoView', v.dataset.todoView)
+    card.querySelectorAll('[data-todo-view]').forEach((x) => x.setAttribute('aria-pressed', String(x === v)))
+    card.querySelector('.todo-list').hidden = !list; card.querySelector('.todo-type').hidden = list
+    return
+  }
+  const all = e.target.closest?.('#todo-all')
+  if (all) return showTodos(all.getAttribute('aria-expanded') !== 'true')
+  const t = e.target.closest?.('[data-todo]')
+  const row = t && $('#todo-' + t.dataset.todo)
+  if (!row) return
+  if (row.closest('.todo-list').hidden) $('[data-todo-view="list"]')?.click()
+  if (row.hidden) showTodos(true)
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  row.classList.add('hit'); setTimeout(() => row.classList.remove('hit'), 2000)
+  row.querySelector('a.button')?.focus({ preventScroll: true })
+})
+
+// The latest release against the one before, on Início and in Versões: per visit and per session, never raw volume.
+const VERSION_SAME = 2 // points of frustration up or down that still count as the same
+const verdictOf = (d) => (d > VERSION_SAME ? 'worse' : d < -VERSION_SAME ? 'better' : 'same')
+const VERDICT_CLS = { worse: 'bad', better: 'ok', same: 'same' }
+// The smallest period on offer that holds `n` days (or the longest there is).
+const widenTo = (n) => { const o = [...$('#days').options].map((x) => +x.value); return o.find((x) => x >= n) ?? Math.max(...o) }
+async function lastRelease() {
+  let c = await read('/api/compare'), widened = 0
+  if (c.versions.length < 2 && c.previous) { widened = widenTo(c.previous.days); c = await read('/api/compare', { days: widened }) }
+  return c.a && c.b ? { c, widened } : null
+}
+const markVersionButton = (v, at, main = false) => !at ? '' : (projectNow()?.marks ?? []).some((m) => m.at === at) ? `<button disabled>${L.rel.marked}</button>`
+  : `<button ${main ? 'class="primary" ' : ''}data-mark-version="${esc(v)}" data-at="${at}" title="${esc(L.rel.markTip(v))}">${L.rel.markIt}</button>`
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest?.('[data-mark-version]')
+  if (!b) return
+  const p = projectNow(), was = p.mark, from = (p.marks ?? []).find((m) => m.at === was)
+  b.disabled = true
+  await markAction({ action: 'create', name: L.rel.markName(b.dataset.markVersion), at: Number(b.dataset.at) })
+  // Saved for later: the period keeps counting from where it was.
+  if (!was) markAction({ action: 'none' }); else if (from?.id) markAction({ action: 'use', id: from.id })
+})
+function releaseCard(rel) {
+  if (!rel) return ''
+  const { c, widened } = rel, a = c.overall.a, b = c.overall.b, R = L.rel, v = verdictOf(b.score - a.score)
+  const worst = c.routes.filter((r) => r.delta > 0).slice(0, 2)
+  return `<section class="card release"><div class="head"><div><div class="label">${esc(R.title(c.b, c.a))}${help('release')}</div>
+      ${widened ? `<div class="meta">${R.widened(widened)}</div>` : ''}</div><span class="pill ${VERDICT_CLS[v]}">${L[v]}</span></div>
+    <div class="rel-nums"><div><div class="meta">${R.scorePer}</div><div class="big">${scoreHtml(a.score)} → ${scoreHtml(b.score)}</div></div>
+      <div><div class="meta">${R.failPer}</div><div class="big">${num(a.failures_per_100)} → ${num(b.failures_per_100)}</div></div></div>
+    <div class="meta">${R.volume(num(a.visits), num(b.visits))}</div>
+    <div class="psec"><div class="meta">${R.worst}</div>${worst.length ? `<ul class="counts">${worst.map((r) => `<li>
+        <a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(screenText(r.route) || r.route)}</a>
+        <span>${scoreHtml(r.a.score)} → ${scoreHtml(r.b.score)} <span class="pill bad">+${r.delta}</span></span></li>`).join('')}</ul>` : `<p class="meta">${R.noWorse}</p>`}</div>
+    <div class="actions-row rel-acts">${markVersionButton(c.b, b.first_at)}
+      <a class="button primary" ${linkAttrs({ tab: 'versions', params: { a: c.a, b: c.b, ...(widened ? { days: String(widened) } : {}) } })}>${R.open} →</a></div></section>`
+}
+
 async function overview() {
-  const o = await read('/api/overview')
+  const [o, rel] = await Promise.all([read('/api/overview'), lastRelease().catch(() => null)])
   const n = o.now, b = o.before
   if (!n.visits && !b.visits) return empty(L.noVisits)
   // Compare only when the period before has data on at least half as many days: otherwise +3000% says nothing.
   const comparable = o.before_daily.length >= Math.max(1, Math.ceil(o.daily.length / 2))
+  // A small base makes a giant percent (10 → 200 is +1900%): below 20 before, the value before; beyond ±500%, how many times.
   const diff = (now, before, worseUp) => {
-    if (!comparable || !before) return ''
+    if (!comparable) return ''
+    if (!before) return now ? `<span class="delta ${worseUp ? 'bad' : 'meta'}">${L.dnew}</span>` : ''
     const pct = Math.round((now - before) / before * 100)
     if (!pct) return `<span class="delta meta">=</span>`
     const cls = worseUp === undefined ? 'meta' : (pct > 0) === worseUp ? 'bad' : 'ok'
-    return `<span class="delta ${cls}">${pct > 0 ? '▲ +' : '▼ '}${pct}%</span>`
+    const text = before < 20 ? L.dwas(num(before)) : Math.abs(pct) > 500 ? `×${num(Math.round(now / before))}` : `${pct > 0 ? '+' : ''}${pct}%`
+    return `<span class="delta ${cls}" title="${esc(L.dtip(pct))}">${pct > 0 ? '▲' : '▼'} ${text}</span>`
   }
   const points = n.score - b.score
   const vs = !comparable ? L.noCompare : o.days === 1 ? L.vsDay : L.vsBefore(o.days)
@@ -1204,9 +1363,11 @@ async function overview() {
   const shortOf = (i) => (L.short[i.kind] ?? (() => ''))(nameFields(i, true))
   const top = (level === 'bad' ? bad : warn).filter((i) => L.short[i.kind]).slice(0, 4)
   const icon = { bad: '!', warn: '•', ok: '✓' }[level]
+  const todo = o.insights.filter((i) => groupOf(i.kind) !== 'better'), good = o.insights.filter((i) => groupOf(i.kind) === 'better')
+  // Each item of the banner takes to its row in the list below.
   const verdict = `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${icon}</span><div>
       <div class="vh">${headline}</div>
-      <div class="meta">${top.length ? top.map((i) => `<a ${linkAttrs(i.link)}>${esc(shortOf(i))}</a>`).join(' · ') : level === 'ok' ? L.verdict.okHint : ''}</div></div></section>`
+      <div class="meta">${top.length ? top.map((i) => `<button class="link" data-todo="${todo.indexOf(i)}">${esc(shortOf(i))}</button>`).join(' · ') : level === 'ok' ? L.verdict.okHint : ''}</div></div></section>`
 
   const byRoute = Object.fromEntries(o.screens.map((r) => [r.route, r]))
   const mini = (i) => {
@@ -1218,11 +1379,21 @@ async function overview() {
   const grouped = {}
   for (const i of o.insights) (grouped[groupOf(i.kind)] ??= []).push(i)
   const groups = Object.keys(GROUPS).filter((g) => grouped[g])
-  const insights = o.insights.length ? `<div class="groups">${groups.map((g, n) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}${n ? '' : help('whatToSee')}</div>
+  const byType = o.insights.length ? `<div class="groups">${groups.map((g, n) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}</div>
       <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
         <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div>
           <button class="small demand" data-copy="${esc(demandOf(i, sentence(i), o.days))}">${L.demand.copy}</button></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
     : ''
+  const view = recall('todoView') === 'type' ? 'type' : 'list'
+  const insights = `<section class="card todo"><div class="head"><div><div class="label">${L.todo.title}${help('todo')}</div><div class="meta">${L.todo.hint}</div></div>
+      ${o.insights.length ? `<div class="seg" role="group">${[['list', L.todo.byList], ['type', L.todo.byType]].map(([v, t]) =>
+        `<button data-todo-view="${v}" aria-pressed="${view === v}">${t}</button>`).join('')}</div>` : ''}</div>
+    <div class="todo-list" ${view === 'list' ? '' : 'hidden'}>${todo.length ? `<ol class="todos">${todo.map((i, k) => todoRow(i, k, sentence(i), o.days)).join('')}</ol>
+      ${todo.length > TODO_TOP ? `<button class="small" id="todo-all" aria-expanded="false" data-n="${todo.length}">${L.todo.all(todo.length)}</button>` : ''}`
+      : `<p class="meta">${L.todo.none}</p>`}</div>
+    <div class="todo-type" ${view === 'type' ? '' : 'hidden'}>${byType}</div></section>
+    ${rel || good.length ? `<div class="two">${releaseCard(rel)}${good.length ? `<section class="card good"><div class="label">${L.todo.good} · ${good.length}</div><div class="meta">${L.todo.goodHint}</div>
+      <ul class="insights">${good.map((i) => `<li><div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a></div>${mini(i)}</li>`).join('')}</ul></section>` : ''}</div>` : ''}`
 
   return `
     ${verdict}
@@ -1233,10 +1404,10 @@ async function overview() {
       ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', vs)}
       ${tile(L.failures, num(n.failures), n.failures ? 'bad' : 'ok', diff(n.failures, b.failures, true), 'failures', vs)}
     </section>
+    ${insights}
     ${kindsCard(o)}
     ${scoreChart(o)}
     ${heatMap(o)}
-    ${insights}
     <section class="card"><div class="head"><div style="flex:1;min-width:240px"><div class="label">${L.forAi}</div><div class="meta">${L.forAiHint}</div></div>
       <div class="field"><button id="copy-report" class="primary">${L.copyReport}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)"
         href="/api/report?${esc(query())}" download="termometro-${esc($('#project').value)}.json">${L.downloadJson}</a></div></div></section>`
@@ -1604,20 +1775,29 @@ async function actions() {
 // Versions -------------------------------------------------------------------------------------------------
 async function versions() {
   const c = await read('/api/compare', { a: state.a, b: state.b }) // the header's version filter does not apply here
-  if (c.versions.length < 2) return empty(L.oneVersion)
+  if (c.versions.length < 2) {
+    // One version in the period: offer to widen it to where the one before still is.
+    const R = L.rel, prev = c.previous, n = prev && widenTo(prev.days)
+    if (!c.b) return empty(L.oneVersion)
+    return `<section class="card"><div class="head"><div style="flex:1;min-width:240px"><div class="label">${esc(R.onlyOne(c.b))}${help('release')}</div>
+      <div class="meta">${prev ? esc(R.prevHint(prev.version, n)) : projectNow()?.mark ? R.sinceMark : R.noPrev}</div></div>
+      ${prev && n > +$('#days').value ? `<a class="button primary widen" ${linkAttrs({ tab: 'versions', params: { days: String(n) } })}>${R.widen(n)}</a>` : ''}</div></section>`
+  }
   const pick = (id, value) => `<select id="${id}" aria-label="${L.version}">${c.versions.map((v) => `<option ${v === value ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`
   const delta = (d) => d === null ? '<span class="meta">—</span>'
     : `<span class="pill ${d >= 10 ? 'bad' : d <= -10 ? 'ok' : d > 0 ? 'warn' : 'ok'}">${d > 0 ? '+' : ''}${d}</span>`
   const pair = (x, y, unit = '') => `${x ?? '—'}${x !== undefined && x !== null ? unit : ''} → <b>${y ?? '—'}${y !== undefined && y !== null ? unit : ''}</b>`
-  const o = c.overall
-  const d = o.b.score - o.a.score
+  const o = c.overall, R = L.rel
+  const v = verdictOf(o.b.score - o.a.score)
   return `
-    <section class="card"><div class="head"><div class="field" style="flex-wrap:wrap">${pick('cmp-b', c.b)}<span class="meta">${L.compareWith}</span>${pick('cmp-a', c.a)}</div></div>
+    <section class="card"><div class="head"><div class="field" style="flex-wrap:wrap">${pick('cmp-b', c.b)}<span class="meta">${L.compareWith}</span>${pick('cmp-a', c.a)}</div>
+      ${markVersionButton(c.b, o.b.first_at, true)}</div>
       <div class="meta" style="margin-top:8px">${L.compareHint}</div></section>
     <section class="numbers">
-      <div class="card"><div class="label">${L.overall}</div><div class="big">${scoreHtml(o.a.score)} → ${scoreHtml(o.b.score)}</div>
-        <span class="pill ${d >= 10 ? 'bad' : d > 0 ? 'warn' : 'ok'}">${d > 0 ? L.worse : d < 0 ? L.better : L.same}</span></div>
-      <div class="card"><div class="label">${L.visits}</div><div class="big">${o.a.visits} → ${o.b.visits}</div></div>
+      <div class="card"><div class="label">${R.scorePer}${help('release')}</div><div class="big">${scoreHtml(o.a.score)} → ${scoreHtml(o.b.score)}</div>
+        <span class="pill ${VERDICT_CLS[v]}">${L[v]}</span> <span class="meta">${esc(R.volume(num(o.a.visits), num(o.b.visits)))}</span></div>
+      <div class="card"><div class="label">${R.failPer}</div><div class="big ${o.b.failures_per_100 > o.a.failures_per_100 ? 'bad' : ''}">${num(o.a.failures_per_100)} → ${num(o.b.failures_per_100)}</div>
+        <span class="meta">${num(o.a.failures)} → ${num(o.b.failures)} ${L.failures.toLowerCase()} · ${L.todo.sessions(o.b.sessions)}</span></div>
       <div class="card"><div class="label">${L.newFailures}</div><div class="big ${c.new_failures.length ? 'bad' : 'ok'}">${c.new_failures.length}</div></div>
     </section>
     <section class="card"><div class="label">${L.screensCompared}${help('compare')}</div>
