@@ -424,6 +424,15 @@ class Server(unittest.TestCase):
         self.assertIn("form_detour", kinds)
         self.assertNotIn("form_away", kinds)  # 3 times is under the minimum of 10
 
+    def test_usage_of_a_screen_carries_its_click_routes_for_the_map(self):
+        clk = lambda t: {"type": "click", "route": "/users", "target": t}
+        for i in range(3):
+            self.send([{"type": "page", "route": "/users"}, clk("button#new"), clk("input#email"), clk("button#save")], session=f"r{i}")
+        self.send([{"type": "page", "route": "/users"}, clk("button#new"), clk("button#new")], session="x")  # a repeat is no route
+        u = self.read("/api/usage?project=shop&days=1&route=/users")
+        self.assertEqual([(p["from"], p["to"], p["n"]) for p in u["paths"]],
+                         [("button#new", "input#email", 3), ("input#email", "button#save", 3)])
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
@@ -611,7 +620,7 @@ class Server(unittest.TestCase):
         screens = self.read("/api/usage?project=shop")["screens"]
         self.assertEqual([(s["route"], s["visits"], s["clicks"], s["users"]) for s in screens], [("/t", 2, 3, 1), ("/c", 1, 0, 1)])
         screen = self.read("/api/usage?project=shop&route=/t")
-        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0})
+        self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "label": ""})
         self.assertEqual(screen["never_clicked"], ["button#delete"])
 
     def test_clicks_and_actions_do_not_weigh(self):

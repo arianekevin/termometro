@@ -555,6 +555,10 @@ def summary(con, f: Filter) -> dict:
             "versions": sorted(frustration_by(con, f, "version") if not f.q.get("version") else [], key=lambda g: g["key"])}
 
 
+STEP_MS = 30_000  # a click this soon after another on the same screen is the next step of a route
+PATHS_MAX = 40
+
+
 def usage(con, f: Filter) -> dict:
     """No route: how much each screen is used. With a route: how much each element is clicked, and what never was."""
     route = f.q.get("route")
@@ -574,7 +578,25 @@ def usage(con, f: Filter) -> dict:
     elements = {t: {"target": t, "clicks": c, "users": u, "rage": r, "dead": d, "errors": e} for t, c, u, r, d, e in rows}
     visits = con.execute(f"SELECT COUNT(*) FROM events WHERE {f.sql} AND type = 'page'", f.args).fetchone()[0]
     seen = [t for (t,) in con.execute("SELECT target FROM elements WHERE project = ? AND route = ?", (f.q.get("project"), route))]
-    return {"route": route, "visits": visits,
+    # Click routes on this screen: one element to the next within the same visit, for the map's arrows.
+    steps: dict = {}
+    session, last = None, None
+    for sid, kind, target, at in con.execute(f"""SELECT session, type, target, at FROM events WHERE {f.sql}
+            AND type IN ('page', 'click') ORDER BY session, at, id""", f.args):
+        if sid != session or kind == "page":
+            session, last = sid, None
+            continue
+        if not target:
+            continue
+        if last and last[0] != target and at - last[1] <= STEP_MS:
+            steps[(last[0], target)] = steps.get((last[0], target), 0) + 1
+        last = (target, at)
+    labels = names(con, f.q.get("project", ""))["controls"]
+    for e in elements.values():
+        e["label"] = labels.get(route + "\t" + e["target"], "")
+    paths = [{"from": a, "to": b, "n": n, "from_label": labels.get(route + "\t" + a, ""), "to_label": labels.get(route + "\t" + b, "")}
+             for (a, b), n in sorted(steps.items(), key=lambda kv: -kv[1])[:PATHS_MAX]]
+    return {"route": route, "visits": visits, "paths": paths,
             "elements": sorted(elements.values(), key=lambda e: -e["clicks"]),
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}
 

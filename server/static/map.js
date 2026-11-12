@@ -2,7 +2,8 @@
 // opened with `?termometro_map=<token>` (the dashboard's "Open heat map" button makes that link) and leaves
 // window.termometroMap = { url, token, route(), onClose() }. Each element of the current screen is painted by
 // how much it is clicked, with a badge for rage clicks, dead clicks and errors after it; what can be clicked
-// and never was is dashed. Esc or "Close" turn it off.
+// and never was is dashed. In "Routes" mode, arrows link each click to the next one on this screen, thicker and
+// hotter the more often that step was taken. Esc or "Close" turn it off.
 ;(() => {
   const cfg = window.termometroMap
   if (!cfg || window.__termometroMapOpen) return
@@ -13,13 +14,17 @@
     ? { title: 'Termometro · mapa de uso', close: 'Fechar', loading: 'Carregando…', visits: 'visitas', clicks: 'cliques',
         inView: (n, total) => `${n} de ${total} elementos com dados estão à vista`, never: 'nunca clicados',
         neverCount: (n) => `${n} elementos nunca clicados`, days: 'dias', expired: 'o link do mapa expirou: abra de novo pelo painel',
-        down: 'o Termometro não respondeu', less: 'pouco → muito clicado',
+        down: 'o Termometro não respondeu', less: 'pouco → muito clicado', heat: 'Calor', routes: 'Rotas',
+        routesInfo: (shown, total) => `${shown} das ${total} rotas mais feitas nesta tela`, routesLess: 'pouco → muito feita',
+        noRoutes: 'nenhuma sequência de cliques nesta tela ainda', top: (n) => `${n} mais feitas`, step: (a, b, n) => `${a} → ${b}\n${n} vezes`,
         tip: (e, n) => `${e.target}\n${e.clicks} cliques de ${e.users} usuários\nrage ${e.rage} · sem resposta ${e.dead} · erros depois ${e.errors}` +
           (n > 1 ? `\n${n} elementos com este seletor; o número é a soma` : '') }
     : { title: 'Termometro · usage map', close: 'Close', loading: 'Loading…', visits: 'visits', clicks: 'clicks',
         inView: (n, total) => `${n} of ${total} elements with data are in view`, never: 'never clicked',
         neverCount: (n) => `${n} elements never clicked`, days: 'days', expired: 'the map link expired: open it again from the dashboard',
-        down: 'Termometro did not answer', less: 'few → many clicks',
+        down: 'Termometro did not answer', less: 'few → many clicks', heat: 'Heat', routes: 'Routes',
+        routesInfo: (shown, total) => `${shown} of the ${total} most taken routes on this screen`, routesLess: 'rarely → often taken',
+        noRoutes: 'no click sequence on this screen yet', top: (n) => `top ${n}`, step: (a, b, n) => `${a} → ${b}\n${n} times`,
         tip: (e, n) => `${e.target}\n${e.clicks} clicks by ${e.users} users\nrage ${e.rage} · dead ${e.dead} · errors after ${e.errors}` +
           (n > 1 ? `\n${n} elements share this selector; the number is their sum` : '') }
 
@@ -38,6 +43,9 @@
 
   let days = 30
   let showNever = true
+  let mode = 'heat'
+  let routesShown = 5
+  const SVG = 'http://www.w3.org/2000/svg'
   let data = null
   let loadedRoute = null
   let frame = 0
@@ -68,10 +76,60 @@
     layer.appendChild(div)
   }
 
+  const center = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r } }
+  const svgEl = (tag, attrs) => { const el = document.createElementNS(SVG, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el }
+
+  // Routes: the most taken steps from one click to the next, as curved arrows between the elements.
+  function drawRoutes() {
+    const paths = data.paths ?? []
+    const shown = []
+    for (const p of paths) {
+      if (shown.length >= routesShown) break
+      const a = find(p.from).find(visible), b = find(p.to).find(visible)
+      if (a && b) shown.push({ ...p, a: center(a), b: center(b) })
+    }
+    const svg = svgEl('svg', { width: innerWidth, height: innerHeight })
+    svg.style.cssText = 'position:fixed;inset:0;overflow:visible'
+    const defs = svgEl('defs', {})
+    svg.appendChild(defs)
+    const max = Math.max(1, ...shown.map((p) => p.n))
+    const outlined = new Set()
+    // Least taken first, so the most taken are drawn on top.
+    shown.slice().reverse().forEach((p, i) => {
+      const f = p.n / max, color = heat(f, 0.95), width = 2 + f * 6, id = `tm-arrow-${i}`
+      const marker = svgEl('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 3, markerHeight: 3, orient: 'auto-start-reverse' })
+      marker.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: color }))
+      defs.appendChild(marker)
+      // A bend to one side, so A→B and B→A do not overlap; the end stops at the target's edge.
+      const dx = p.b.x - p.a.x, dy = p.b.y - p.a.y, len = Math.hypot(dx, dy) || 1
+      const bend = Math.min(80, len * 0.25), cx = (p.a.x + p.b.x) / 2 - (dy / len) * bend, cy = (p.a.y + p.b.y) / 2 + (dx / len) * bend
+      const stop = Math.min(len / 3, Math.max(p.b.r.width, p.b.r.height) / 2 + 4)
+      const ex = p.b.x - ((p.b.x - cx) / Math.hypot(p.b.x - cx, p.b.y - cy)) * stop, ey = p.b.y - ((p.b.y - cy) / Math.hypot(p.b.x - cx, p.b.y - cy)) * stop
+      svg.appendChild(svgEl('path', { d: `M${p.a.x},${p.a.y} Q${cx},${cy} ${ex},${ey}`, fill: 'none', stroke: color, 'stroke-width': width,
+        'stroke-linecap': 'round', 'marker-end': `url(#${id})`, opacity: 0.85 }))
+      const mx = 0.25 * p.a.x + 0.5 * cx + 0.25 * ex, my = 0.25 * p.a.y + 0.5 * cy + 0.25 * ey
+      const badge = document.createElement('div')
+      badge.style.cssText = `position:fixed;left:${mx - 14}px;top:${my - 10}px;pointer-events:auto;cursor:help;background:${heat(f, 1)};color:#fff;` +
+        'font-weight:700;border-radius:999px;padding:1px 7px;font-size:11px;border:2px solid #fff;white-space:nowrap'
+      badge.textContent = String(p.n)
+      badge.title = T.step(p.from_label || p.from, p.to_label || p.to, p.n)
+      for (const [sel, c] of [[p.from, p.a], [p.to, p.b]]) {
+        if (outlined.has(sel)) continue
+        outlined.add(sel)
+        box(c.r, 'outline:2px solid rgba(29,27,34,.55);background:rgba(255,255,255,.12)')
+      }
+      layer.appendChild(badge)
+    })
+    layer.prepend(svg)
+    const counter = panel.querySelector('[data-in-view]')
+    if (counter) counter.textContent = paths.length ? T.routesInfo(shown.length, paths.length) : T.noRoutes
+  }
+
   function draw() {
     frame = 0
     layer.replaceChildren()
     if (!data) return
+    if (mode === 'routes') return drawRoutes()
     const max = Math.max(1, ...data.elements.map((e) => e.clicks))
     let inView = 0
     for (const e of data.elements) {
@@ -117,12 +175,15 @@
         <div style="margin-top:6px">${d.visits} ${T.visits} · ${clicks} ${T.clicks}</div>
         <div data-in-view style="margin-top:2px"></div>
         <div style="margin-top:2px;color:#a1a1aa">${esc(T.neverCount(d.never_clicked.length))}</div>` : `<div style="margin-top:6px">${T.loading}</div>`}
+      <div style="display:flex;gap:4px;margin-top:8px">${['heat', 'routes'].map((m) => `<button data-mode="${m}" style="${button};${mode === m ? 'background:#fff;color:#1d1b22;font-weight:600' : ''}">${esc(T[m])}</button>`).join('')}</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
         <select data-act="days" style="background:#27252d;color:#fff;border:1px solid #555;border-radius:6px;padding:2px 4px">
           ${[7, 30, 90].map((n) => `<option value="${n}" ${n === days ? 'selected' : ''}>${n} ${T.days}</option>`).join('')}
         </select>
-        <label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" data-act="never" ${showNever ? 'checked' : ''}>${esc(T.never)}</label>
-        <span title="${esc(T.less)}" style="margin-left:auto;display:inline-block;width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,${heat(0, 1)},${heat(0.5, 1)},${heat(1, 1)})"></span>
+        ${mode === 'heat' ? `<label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" data-act="never" ${showNever ? 'checked' : ''}>${esc(T.never)}</label>`
+          : `<select data-act="shown" aria-label="${esc(T.routes)}" style="background:#27252d;color:#fff;border:1px solid #555;border-radius:6px;padding:2px 4px">
+              ${[5, 10, 15].map((n) => `<option value="${n}" ${n === routesShown ? 'selected' : ''}>${esc(T.top(n))}</option>`).join('')}</select>`}
+        <span title="${esc(mode === 'heat' ? T.less : T.routesLess)}" style="margin-left:auto;display:inline-block;width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,${heat(0, 1)},${heat(0.5, 1)},${heat(1, 1)})"></span>
       </div>`
   }
 
@@ -159,10 +220,15 @@
 
   function onKey(e) { if (e.key === 'Escape') close() }
 
-  panel.addEventListener('click', (e) => { if (e.target.closest('[data-act="close"]')) close() })
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('[data-act="close"]')) return close()
+    const m = e.target.closest('[data-mode]')
+    if (m) { mode = m.dataset.mode; renderPanel(); schedule() }
+  })
   panel.addEventListener('change', (e) => {
     if (e.target.matches('[data-act="days"]')) { days = Number(e.target.value); load() }
     if (e.target.matches('[data-act="never"]')) { showNever = e.target.checked; schedule() }
+    if (e.target.matches('[data-act="shown"]')) { routesShown = Number(e.target.value); schedule() }
   })
   addEventListener('scroll', schedule, true)
   addEventListener('resize', schedule)
