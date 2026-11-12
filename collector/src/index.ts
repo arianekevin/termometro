@@ -1,9 +1,13 @@
 /**
  * Termometro collector — usage and frustration signals from the browser, never content.
  *
- * No text from the screen, a field or the user leaves the browser. A click target is a selector
- * (`button#save`, `div.toolbar > button.btn`), and every long number, e-mail address or identifier becomes
- * `:id`. Who the user is travels only as the ids you hand to `identity` (account, user, role).
+ * No text a user typed or a record shows leaves the browser. A click target is a selector (`button#save`,
+ * `div.toolbar > button.btn`) plus, for people who do not read selectors, the control's own label ("New user"):
+ * only of buttons, menu items, tabs and links outside tables, lists of records and fields, up to 40 characters,
+ * scrubbed like everything else. A screen's name comes from your `screen` option, `data-termometro-screen` or the
+ * page title, and only on routes without `:id` (a record's page title is the record). `data-termometro-private`
+ * on any element keeps its labels home. Every long number, e-mail address or identifier becomes `:id`. Who the
+ * user is travels only as the ids you hand to `identity` (account, user, role).
  *
  * Signals: rage (3 clicks on the same spot within 1 s), dead (a click on a button or link that changed nothing
  * within 1 s), js_error, http_4xx / http_5xx (401 is left out: an expired session is not frustration), abandon
@@ -34,6 +38,9 @@ export interface Options {
   version?: string
   /** The current route as a pattern (`/orders/:id`). Without it, the URL path with ids replaced by `:id`. */
   route?: () => string
+  /** The current screen's name for people ("Users"), read on every screen change. Without it: the element with
+   *  `data-termometro-screen` (its value or text), else the page title's first part, and never on a route with `:id`. */
+  screen?: () => string | null | undefined
   /** Who is using it, read on every event; null before sign-in. Or call `identify()`. */
   identity?: () => Identity | null
   /** How often a batch is sent. Default: 10 s. */
@@ -76,6 +83,9 @@ interface TrackedEvent {
   clicks?: number
   duration_ms?: number
   targets?: string[]
+  /** For people: a click's control label, a page's screen name, an action's button. `labels` goes with `targets`. */
+  label?: string
+  labels?: string[]
   /** When it happened (the browser's clock); the server lines it up with its own by the batch's `sent`. */
   t?: number
   /** js_error only: where in the code, as `function @ /path/file.js:line:col` lines — never the page's query or data. */
@@ -167,6 +177,43 @@ function selectorPart(el: Element): string {
   return classes.length ? `${tag}.${classes.map((c) => cssEscape(stableId(c))).join('.')}` : tag
 }
 
+const MAX_LABEL = 40
+// Controls whose label is the app's words, not a record's.
+const LABELED = 'button,a[href],[role="button"],[role="menuitem"],[role="tab"],summary,input[type="submit"],input[type="button"]'
+// Where text is the user's or a record's: tables, grids, lists of records, fields, and whatever the app marks private.
+const PRIVATE = 'table,[role="grid"],[role="table"],[role="row"],[role="treegrid"],[role="listbox"],[role="feed"],[role="log"],' +
+  'input:not([type="submit"]):not([type="button"]),textarea,select,[contenteditable=""],[contenteditable="true"],[data-termometro-private]'
+// A list is a menu when it sits in navigation; otherwise its items are usually records (contacts, tickets).
+const MENU = 'nav,header,aside,[role="navigation"],[role="menu"],[role="menubar"],[role="tablist"],[role="toolbar"]'
+
+function clean(text: string | null | undefined): string {
+  const t = scrub((text ?? '').replace(/\s+/g, ' ').trim())
+  return t.length > MAX_LABEL ? '' : t // a long text is content, not a label
+}
+
+/** The words people see on a control ("New user"), or '' where they could be someone's data. */
+export function labelOf(el: Element | null): string {
+  const control = el?.closest(LABELED)
+  if (!control || control.closest(PRIVATE)) return ''
+  const list = control.closest('ul,ol,dl')
+  if (list && !list.closest(MENU) && !control.closest(MENU)) return ''
+  const own = control.closest('[data-termometro-label]')?.getAttribute('data-termometro-label')
+  if (own) return clean(own)
+  const by = control.getAttribute('aria-labelledby')
+  const labelled = by ? by.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' ') : ''
+  const value = control instanceof HTMLInputElement ? control.value : ''
+  return clean(control.getAttribute('aria-label') || labelled || control.getAttribute('title') || value || control.textContent)
+}
+
+/** The screen's name for people, or '' on a record's page (`:id` in the route) and wherever it is not known. */
+export function screenOf(route: string, given?: string | null): string {
+  if (given) return clean(given)
+  if (route.includes(':id')) return ''
+  const marked = document.querySelector('[data-termometro-screen]')
+  if (marked) return clean(marked.getAttribute('data-termometro-screen') || marked.textContent)
+  return clean(document.title.split(/\s+[|\-–—·]\s+/)[0])
+}
+
 /** Short selector: the element and up to two ancestors, stopping at the first one with an id. */
 export function selectorOf(el: Element | null): string {
   const parts: string[] = []
@@ -246,6 +293,8 @@ export function start(options: Options): Termometro {
   let rageInBurst = false
   let filling: string | null = null
   let lastClick: { target: string; t: number } | null = null
+  // The last labelled control clicked: the name an action gets ("Save" for POST /api/tickets).
+  let lastLabel = ''
   // The clicks since the last accepted write: the effort the next one took.
   let actionClicks = 0
   let actionStart = 0
@@ -261,8 +310,11 @@ export function start(options: Options): Termometro {
     return { account: text(id?.account), user: text(id?.user), role: text(id?.role) }
   }
 
-  const record = (event: TrackedEvent) => {
-    if (queue.length < MAX_QUEUE) queue.push({ event: { ...event, t: Date.now() }, who: who() })
+  const record = (event: TrackedEvent): TrackedEvent | undefined => {
+    if (queue.length >= MAX_QUEUE) return undefined
+    const queued = { event: { ...event, t: Date.now() }, who: who() }
+    queue.push(queued)
+    return queued.event // still in the queue: a detail known a moment later can be added to it
   }
   const recentClick = () => (lastClick && Date.now() - lastClick.t < AFTER_CLICK_MS ? lastClick.target : undefined)
 
@@ -324,8 +376,10 @@ export function start(options: Options): Termometro {
       filling = null
       // A write nobody clicked for (a heartbeat, a background save) is not an action.
       if (actionClicks > 0) {
-        record({ type: 'action', route: currentRoute, detail: where, clicks: actionClicks, duration_ms: Date.now() - actionStart })
+        record({ type: 'action', route: currentRoute, detail: where, clicks: actionClicks, duration_ms: Date.now() - actionStart,
+          label: lastLabel || undefined })
         actionClicks = 0
+        lastLabel = ''
       }
     }
     if (status === 401 || ok) return
@@ -346,13 +400,14 @@ export function start(options: Options): Termometro {
     inventoryTimer = setTimeout(() => {
       if (route !== currentRoute || inventoried.has(route)) return
       inventoried.add(route)
-      const seen = new Set<string>()
+      const seen = new Map<string, string>()
       for (const el of Array.from(document.querySelectorAll(CLICKABLE))) {
         if (el.closest(OVERLAY) || !el.getClientRects().length) continue
-        seen.add(selectorOf(el))
+        const selector = selectorOf(el)
+        if (!seen.get(selector)) seen.set(selector, labelOf(el))
         if (seen.size >= MAX_INVENTORY) break
       }
-      if (seen.size) record({ type: 'inventory', route, targets: Array.from(seen) })
+      if (seen.size) record({ type: 'inventory', route, targets: Array.from(seen.keys()), labels: Array.from(seen.values()) })
     }, INVENTORY_DELAY_MS)
   }
 
@@ -361,8 +416,21 @@ export function start(options: Options): Termometro {
     currentRoute = route ?? options.route?.() ?? routeFromPath(location.pathname)
     arrivedAt = Date.now()
     slowSeen.clear()
-    record({ type: 'page', route: currentRoute })
+    pageEvent()
     scheduleInventory()
+  }
+
+  // The title usually changes just after the router does: the name is read a moment later, on the same visit.
+  function pageEvent() {
+    const event = record({ type: 'page', route: currentRoute })
+    const route = currentRoute
+    setTimeout(() => {
+      if (route !== currentRoute) return
+      let given: string | null | undefined
+      try { given = options.screen?.() } catch { /* the app is not ready */ }
+      const name = screenOf(route, given)
+      if (name && event) event.label = name
+    }, 300)
   }
 
   // Clicks: usage, rage, dead, and the effort of the next action.
@@ -372,8 +440,10 @@ export function start(options: Options): Termometro {
     const now = Date.now()
     const clickable = target?.closest(CLICKABLE) ?? null
     const selector = selectorOf(clickable ?? target)
-    record({ type: 'click', route: currentRoute, target: selector })
+    const label = labelOf(clickable) || undefined
+    record({ type: 'click', route: currentRoute, target: selector, label })
     lastClick = { target: selector, t: now }
+    if (label) lastLabel = label
     if (!actionClicks || now - lastClickAt > ACTION_IDLE_MS) {
       actionClicks = 0
       actionStart = now
@@ -386,14 +456,14 @@ export function start(options: Options): Termometro {
     clicks.push({ t: now, x: e.clientX, y: e.clientY })
     if (clicks.length >= RAGE_CLICKS && !rageInBurst) {
       rageInBurst = true
-      record({ type: 'rage', route: currentRoute, target: selectorOf(target) })
+      record({ type: 'rage', route: currentRoute, target: selectorOf(target), label: labelOf(target) || undefined })
     }
 
     if (!clickable) return
     const before = { route: currentRoute, href: location.href, mutations: mutationCount, requests: networkCount }
     setTimeout(() => {
       const reacted = mutationCount !== before.mutations || networkCount !== before.requests || location.href !== before.href
-      if (!reacted && !rageInBurst) record({ type: 'dead', route: before.route, target: selectorOf(clickable) })
+      if (!reacted && !rageInBurst) record({ type: 'dead', route: before.route, target: selectorOf(clickable), label })
     }, DEAD_WAIT_MS)
   })
 
@@ -486,7 +556,7 @@ export function start(options: Options): Termometro {
   }
 
   if (!options.pagesFromRouter) {
-    record({ type: 'page', route: currentRoute })
+    pageEvent()
     scheduleInventory()
   }
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { routeFromPath, scrub, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
+import { labelOf, routeFromPath, scrub, screenOf, selectorOf, stackOf, start as startTermometro, type Termometro, type Identity } from '../src/index'
 
-interface SentEvent { type: string; route: string; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string }
+interface SentEvent { type: string; route: string; label?: string; labels?: string[]; target?: string; detail?: string; clicks?: number; duration_ms?: number; targets?: string[]; t?: number; stack?: string }
 interface SentBatch { key: string; version: string; session: string; account: string; user: string; role: string; device?: string; sent?: number; events: SentEvent[] }
 
 describe('termometro', () => {
@@ -50,6 +50,42 @@ describe('termometro', () => {
     expect(routeFromPath('/contacts/3f2a9c1e-0b7d-4e55-9f00-1a2b3c4d5e6f')).toBe('/contacts/:id')
   })
 
+  it('names a control by its own words, never by a record or a field', () => {
+    document.body.innerHTML = `
+      <nav><ul><li><a href="/u" id="menu">Usuários</a></li></ul></nav>
+      <div class="toolbar"><button id="new"> Novo
+        usuário </button><button id="icon" aria-label="Exportar"><svg></svg></button><button id="bare"><svg></svg></button>
+        <button id="mine" data-termometro-label="Criar conta">+</button><input type="submit" id="send" value="Enviar"></div>
+      <table><tr><td><button id="row">Maria Souza</button></td></tr></table>
+      <ul class="contacts"><li><a href="/c/1" id="contact">João Lima</a></li></ul>
+      <div data-termometro-private><button id="private">Ana</button></div>
+      <button id="long">Este texto é comprido demais para ser o rótulo de um botão qualquer</button>
+      <button id="mail">Enviar para ana@x.com</button>`
+    const label = (id: string) => labelOf(document.getElementById(id))
+    expect(['menu', 'new', 'icon', 'bare', 'mine', 'send'].map(label)).toEqual(['Usuários', 'Novo usuário', 'Exportar', '', 'Criar conta', 'Enviar'])
+    expect(['row', 'contact', 'private', 'long'].map(label)).toEqual(['', '', '', ''])
+    expect(label('mail')).toBe('Enviar para :email')
+  })
+
+  it('names a screen from the app, a marked element or the title, never on a record page', () => {
+    document.title = 'Usuários | ndesk'
+    expect(screenOf('/config/usuarios')).toBe('Usuários')
+    expect(screenOf('/tickets/:id')).toBe('') // the title of a record page is the record
+    expect(screenOf('/tickets/:id', 'Ticket')).toBe('Ticket')
+    document.body.innerHTML = '<h2 data-termometro-screen="Configurações">x</h2>'
+    expect(screenOf('/config')).toBe('Configurações')
+  })
+
+  it('sends the screen name with the visit and the labels with the inventory', async () => {
+    document.title = 'Usuários — ndesk'
+    document.body.innerHTML = '<button id="new">Novo usuário</button><table><tr><td><a href="/u/1" id="u">Maria</a></td></tr></table>'
+    start().page('/config/usuarios')
+    await vi.advanceTimersByTimeAsync(1500)
+    const all = await events()
+    expect(all.find((e) => e.type === 'page')).toMatchObject({ label: 'Usuários' })
+    expect(all.find((e) => e.type === 'inventory')).toMatchObject({ targets: ['button#new', 'a#u'], labels: ['Novo usuário', ''] })
+  })
+
   it('builds a short selector without text', () => {
     document.body.innerHTML = '<div id="toolbar"><span class="grp"><button class="p-button save">Salvar Maria</button></span></div>'
     expect(selectorOf(document.querySelector('button'))).toBe('div#toolbar > span.grp > button.p-button.save')
@@ -76,7 +112,7 @@ describe('termometro', () => {
     for (let i = 0; i < 5; i++) click(button)
     await vi.advanceTimersByTimeAsync(1500)
     const signals = (await events()).filter((e) => e.type !== 'page' && e.type !== 'click' && e.type !== 'inventory')
-    expect(signals).toEqual([{ type: 'rage', route: '/tickets', target: 'button#save' }])
+    expect(signals).toEqual([{ type: 'rage', route: '/tickets', target: 'button#save', label: 'Salvar' }])
   })
 
   it('reports a dead click when nothing changes after it', async () => {
@@ -232,7 +268,7 @@ describe('termometro', () => {
     click(document.querySelector('#a')!, 200, 10)
     await call('/api/save', { method: 'POST' })
     expect((await events()).filter((e) => e.type === 'action')).toEqual([
-      { type: 'action', route: '/x', detail: 'POST /api/save', clicks: 3, duration_ms: 0 }
+      { type: 'action', route: '/x', detail: 'POST /api/save', clicks: 3, duration_ms: 0, label: 'a' }
     ])
   })
 
@@ -393,7 +429,7 @@ describe('termometro', () => {
     await fetch('/api/tickets/4821', { method: 'PUT' }) // refused: not an action, and the failure names the click
     const all = await events()
     expect(all.filter((e) => e.type === 'action')).toEqual([
-      { type: 'action', route: '/tickets/new', detail: 'POST /api/tickets', clicks: 3, duration_ms: 2000 }
+      { type: 'action', route: '/tickets/new', detail: 'POST /api/tickets', clicks: 3, duration_ms: 2000, label: 'a' }
     ])
     expect(all.find((e) => e.type === 'http_5xx')).toMatchObject({ target: 'button#b', detail: 'PUT /api/tickets/:id 500' })
   })

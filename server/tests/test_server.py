@@ -210,6 +210,19 @@ class Server(unittest.TestCase):
         filtered = self.read("/api/overview?project=shop&days=7&version=1.1")["insights"]
         self.assertNotIn("version_worse", [i["kind"] for i in filtered])  # one version picked: nothing to compare
 
+    def test_names_come_from_what_the_collector_saw_and_the_app_name_is_left_out(self):
+        for route in ("/a", "/b", "/c"):
+            self.send([{"type": "page", "route": route, "label": "ndesk"}])
+        self.send([{"type": "page", "route": "/config/usuarios", "label": "Usuários"},
+                   {"type": "inventory", "route": "/config/usuarios", "targets": ["button#new", "a#help"], "labels": ["Novo usuário"]},
+                   {"type": "click", "route": "/config/usuarios", "target": "a#help", "label": "Ajuda"},
+                   {"type": "action", "route": "/config/usuarios", "detail": "POST /api/users", "clicks": 2, "label": "Salvar"}])
+        n = self.read("/api/names?project=shop")
+        self.assertEqual(n["screens"], {"/config/usuarios": "Usuários"})
+        self.assertEqual(n["controls"], {"/config/usuarios\tbutton#new": "Novo usuário", "/config/usuarios\ta#help": "Ajuda"})
+        self.assertEqual(n["actions"], {"POST /api/users": "Salvar"})
+        self.assertEqual(call(self.base, "/api/names?project=shop")[0], 401)
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},

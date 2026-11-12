@@ -36,9 +36,10 @@ bank data or anything under LGPD/GDPR. Termometro keeps only the shape of the in
 
 | Sent | Never sent |
 |---|---|
-| the signal (rage click, dead click, error…) | text on the screen or in fields |
+| the signal (rage click, dead click, error…) | what users typed or what a record shows |
 | the route as a pattern (`/orders/:id`) | the real ids in the URL |
 | a short selector (`button#save`) | names, e-mails |
+| the app's own words on a control ("New user") and the screen's name ("Users"), up to 40 characters | text inside tables, lists of records and fields, a record page's title, anything under `data-termometro-private` |
 | the ids you choose to give (account, user, role) | recordings, screenshots |
 | browser and system family (`Chrome 130 · macOS`), kind of screen (phone, tablet, desktop) | exact versions, screen size, IP |
 | where an error happened in your code (`loadRows @ /assets/index.js:1:4567`) | the page's query string or data |

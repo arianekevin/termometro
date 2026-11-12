@@ -23,6 +23,7 @@ and the API:
   GET  /api/actions    effort (clicks and time) per accepted write  │
   GET  /api/compare    one version against another (default: latest) │
   GET  /api/filters    accounts, roles and versions seen             │
+  GET  /api/names      what people call screens, buttons and actions │
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
   POST /api/mark       start the project afresh from now (?project=), or ?clear=1 to undo ┘
@@ -92,11 +93,12 @@ ALERT_MIN_VISITS = 30   # visits to a screen in each of the two versions before 
 ALERT_RISE = 15         # score points a screen has to get worse by
 ALERT_MIN_NEW = 5       # times a failure the previous version never had must happen
 SIZES = {"version": 40, "session": 40, "account": 64, "user": 64, "role": 32,
-         "route": 200, "target": 200, "detail": 200, "stack": 1200, "device": 10}
+         "route": 200, "target": 200, "detail": 200, "stack": 1200, "device": 10, "label": 60}
 MAX_CLOCK_GAP = 86400 * 1000  # an event older than this inside a batch is put at the batch's arrival
 TRAIL_BEFORE, TRAIL_AFTER, TRAIL_SAMPLES, SESSION_MAX = 15, 3, 5, 500
 # Added after 0.2: old databases get them on start (empty for what was already there).
-NEW_COLUMNS = {"stack": "TEXT NOT NULL DEFAULT ''", "agent": "TEXT NOT NULL DEFAULT ''", "device": "TEXT NOT NULL DEFAULT ''"}
+NEW_COLUMNS = {"stack": "TEXT NOT NULL DEFAULT ''", "agent": "TEXT NOT NULL DEFAULT ''", "device": "TEXT NOT NULL DEFAULT ''",
+               "label": "TEXT NOT NULL DEFAULT ''"}
 
 
 class Config:
@@ -176,13 +178,14 @@ def connect() -> sqlite3.Connection:
             project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, version, key));
     """)
-    have = {row[1] for row in con.execute("PRAGMA table_info(events)")}
-    for column, kind in NEW_COLUMNS.items():
-        if column not in have:
-            try:
-                con.execute(f"ALTER TABLE events ADD COLUMN {column} {kind}")
-            except sqlite3.OperationalError:  # another thread added it first
-                pass
+    for table, columns in (("events", NEW_COLUMNS), ("elements", {"label": "TEXT NOT NULL DEFAULT ''"})):
+        have = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
+        for column, kind in columns.items():
+            if column not in have:
+                try:
+                    con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+                except sqlite3.OperationalError:  # another thread added it first
+                    pass
     con.execute("CREATE INDEX IF NOT EXISTS events_session ON events (project, session, at)")
     MARKS.clear()
     MARKS.update({k[5:]: int(v) for k, v in con.execute("SELECT k, v FROM meta WHERE k LIKE 'mark:%'")})
@@ -285,7 +288,10 @@ def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[t
         route = text(e.get("route"), "route") or "/"
         if e["type"] == "inventory":
             targets = e.get("targets") if isinstance(e.get("targets"), list) else []
-            elements += [(project["name"], route, text(t, "target"), now) for t in targets[:MAX_INVENTORY] if t]
+            labels = e.get("labels") if isinstance(e.get("labels"), list) else []
+            labels = (labels + [""] * len(targets))[:len(targets)]
+            elements += [(project["name"], route, text(t, "target"), now, text(l, "label"))
+                         for t, l in zip(targets[:MAX_INVENTORY], labels) if t]
             continue
         # The browser's clock only says how long before sending it happened; the server's says when that was.
         t = moment(e.get("t"))
@@ -293,12 +299,12 @@ def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[t
         rows.append((project["name"], who[0] or "?", session, who[1], who[2], who[3], e["type"], route,
                      text(e.get("target"), "target"), text(e.get("detail"), "detail"),
                      integer(e.get("clicks")), integer(e.get("duration_ms")), at,
-                     text(e.get("stack"), "stack") if e["type"] == "js_error" else "", agent, device))
+                     text(e.get("stack"), "stack") if e["type"] == "js_error" else "", agent, device, text(e.get("label"), "label")))
     return project["name"], rows, elements
 
 
 INSERT_EVENT = ("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, detail, clicks, "
-                "duration_ms, at, stack, agent, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                "duration_ms, at, stack, agent, device, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
 
 def within_limit(bucket: str, n: int, limit: int) -> bool:
@@ -1023,6 +1029,32 @@ def report_markdown(r: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+SHARED_NAME = 3  # a screen name seen on this many routes is the app's name in the title, not the screen's
+
+
+def names(con, project: str) -> dict:
+    """What people call things, as the collector saw them: screens by route, controls by route and selector, actions
+    by request. The most common label wins; the technical key always stays next to it in the dashboard."""
+    def most_common(rows):
+        best: dict = {}
+        for key, label, n in rows:
+            if label and n > best.get(key, ("", 0))[1]:
+                best[key] = (label, n)
+        return {k: v[0] for k, v in best.items()}
+
+    screens = most_common(con.execute("""SELECT route, label, COUNT(*) FROM events WHERE project = ? AND type = 'page'
+        AND label != '' GROUP BY route, label""", (project,)))
+    shared = {n for n in set(screens.values()) if list(screens.values()).count(n) >= SHARED_NAME}
+    screens = {r: n for r, n in screens.items() if n not in shared}
+    controls = most_common(con.execute("""SELECT route || char(9) || target, label, COUNT(*) FROM events WHERE project = ?
+        AND type IN ('click', 'rage', 'dead') AND label != '' GROUP BY route, target, label""", (project,)))
+    for route, target, label in con.execute("SELECT route, target, label FROM elements WHERE project = ? AND label != ''", (project,)):
+        controls.setdefault(route + "\t" + target, label)
+    actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
+        AND label != '' GROUP BY detail, label""", (project,)))
+    return {"screens": screens, "controls": controls, "actions": actions}
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -1308,8 +1340,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(429, {"error": "rate limit"}, headers)
         with connect() as con:
             con.executemany(INSERT_EVENT, rows)
-            con.executemany("INSERT INTO elements (project, route, target, last_seen) VALUES (?, ?, ?, ?) "
-                            "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen", elements)
+            con.executemany("INSERT INTO elements (project, route, target, last_seen, label) VALUES (?, ?, ?, ?, ?) "
+                            "ON CONFLICT (project, route, target) DO UPDATE SET last_seen = excluded.last_seen, "
+                            "label = CASE WHEN excluded.label != '' THEN excluded.label ELSE elements.label END", elements)
         self.send(204, headers=headers)
 
     def login(self):
@@ -1353,7 +1386,7 @@ class Handler(BaseHTTPRequestHandler):
                                                  "mark": marks.get(p["name"])}
                                                 for k, p in CONFIG.projects.items()]
                                    if who else []})
-        if url.path not in READS and url.path not in ("/api/filters", "/api/status"):
+        if url.path not in READS and url.path not in ("/api/filters", "/api/status", "/api/names"):
             return self.json(404, {"error": "not found"})
         headers = {}
         if not self.signed_in():
@@ -1365,6 +1398,8 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             if url.path == "/api/filters":
                 return self.json(200, filters(con, q.get("project", "")), headers)
+            if url.path == "/api/names":
+                return self.json(200, names(con, q.get("project", "")), headers)
             if url.path == "/api/status":
                 first, last, total = con.execute(
                     "SELECT MIN(at), MAX(at), COUNT(*) FROM events WHERE project = ?", (q.get("project", ""),)).fetchone()
