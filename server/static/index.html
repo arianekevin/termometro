@@ -134,6 +134,8 @@ button.small { height: 28px; font-size: 12px; }
 .insights .text { flex: 1; min-width: 0; }
 .insights a { white-space: nowrap; color: var(--accent); font-weight: 500; text-decoration: none; }
 .insights a:hover { text-decoration: underline; }
+#dict-body { display: grid; gap: 16px; } #account { max-width: 220px; text-overflow: ellipsis; }
+.dict-name { width: 100%; min-width: 180px; } .dict-name.saved { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .nm { display: block; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
 code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); overflow-wrap: anywhere; }
 .steps code.tech { display: inline; margin: 0 0 0 6px; }
@@ -225,7 +227,11 @@ const L = PT ? {
     addStep: 'Adicionar passo…', screensG: 'Telas', actionsG: 'Ações', elementsG: 'Botões', removeStep: 'Tirar passo',
     reached: (n, pct) => `${n} ${n === 1 ? 'sessão' : 'sessões'} · ${pct}%`, lost: (pct) => `perde ${pct}% aqui`, stepKind: { page: 'Tela', action: 'Ação', click: 'Botão' },
   },
-  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões' },
+  tabs: { overview: 'Início', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', people: 'Pessoas', actions: 'Ações', versions: 'Versões', dictionary: 'Dicionário' },
+  dict: { title: 'Dicionário', hint: 'O nome que as pessoas usam para cada tela, botão, ação e conta. Vazio usa o nome que o app mostra. O nome de uma conta fica só neste servidor.',
+    filter: 'Filtrar por nome ou chave…', screens: 'Telas', controls: 'Botões e elementos', actions: 'Ações (gravações)', accounts: 'Contas',
+    key: 'Chave técnica', auto: 'Nome no app', name: 'Nome', used: 'Uso', users: 'Usuários', placeholder: 'dar nome…', accountPlaceholder: 'ex.: Contrato Acme Saúde',
+    saved: 'Salvo', more: (n) => `mais ${n} — filtre para achar`, none: 'Nada com esse filtro.' },
   search: 'Buscar tela, botão, erro, ação, usuário…', noResults: 'Nada com esse nome neste período.',
   kinds: { screen: 'Telas', element: 'Elementos', failure: 'Falhas', action: 'Ações', user: 'Usuários', account: 'Contas' },
   vsBefore: (n) => `contra os ${n} dias anteriores`, vsDay: 'contra as 24 horas anteriores', people: 'Pessoas', failures: 'Falhas',
@@ -317,7 +323,11 @@ const L = PT ? {
     addStep: 'Add a step…', screensG: 'Screens', actionsG: 'Actions', elementsG: 'Buttons', removeStep: 'Remove step',
     reached: (n, pct) => `${n} ${n === 1 ? 'session' : 'sessions'} · ${pct}%`, lost: (pct) => `loses ${pct}% here`, stepKind: { page: 'Screen', action: 'Action', click: 'Button' },
   },
-  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions' },
+  tabs: { overview: 'Overview', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', people: 'People', actions: 'Actions', versions: 'Versions', dictionary: 'Dictionary' },
+  dict: { title: 'Dictionary', hint: 'The name people use for each screen, control, action and account. Empty uses the name the app shows. An account\'s name stays on this server.',
+    filter: 'Filter by name or key…', screens: 'Screens', controls: 'Buttons and elements', actions: 'Actions (writes)', accounts: 'Accounts',
+    key: 'Technical key', auto: 'Name in the app', name: 'Name', used: 'Use', users: 'Users', placeholder: 'give it a name…', accountPlaceholder: 'e.g. Acme Health contract',
+    saved: 'Saved', more: (n) => `${n} more — filter to find them`, none: 'Nothing matches the filter.' },
   search: 'Search screen, button, error, action, user…', noResults: 'Nothing by that name in this period.',
   kinds: { screen: 'Screens', element: 'Elements', failure: 'Failures', action: 'Actions', user: 'Users', account: 'Accounts' },
   vsBefore: (n) => `against the previous ${n} days`, vsDay: 'against the previous 24 hours', people: 'People', failures: 'Failures',
@@ -509,7 +519,11 @@ function shell() {
   wireSearch()
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
+  $('#content').addEventListener('input', (e) => {
+    if (e.target.id === 'dict-filter') { state.dictFilter = e.target.value; $('#dict-body').innerHTML = dictBody() }
+  })
   $('#content').addEventListener('change', (e) => {
+    if (e.target.matches('.dict-name')) saveName(e.target)
     if (e.target.id === 'cmp-a' || e.target.id === 'cmp-b') { state.a = $('#cmp-a').value; state.b = $('#cmp-b').value; render() }
     if (e.target.id === 'flow-screen') { state.route = e.target.value; render() }
     if (e.target.id === 'funnel-add' && e.target.value) { state.funnel = JSON.stringify([...funnelSteps(), e.target.value]); render() }
@@ -540,15 +554,16 @@ async function onMark(action) {
   render()
 }
 
-async function loadFilters() {
+const accountText = (id) => { const n = NM().accounts?.[id]; return n ? (n.includes(id) ? n : `${n} (${id})`) : id }
+async function loadFilters(keepNames = false) {
   const f = await (await fetch('/api/filters?project=' + encodeURIComponent($('#project').value))).json()
   const fill = (id, values, all) => {
     const current = state.hash.has(id) ? state.hash.get(id) : state.hash.toString() ? '' : $('#' + id).value || recall(id) || ''
-    $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option>${esc(v)}</option>`).join('')
+    $('#' + id).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option value="${esc(v)}">${esc(id === 'account' ? accountText(v) : v)}</option>`).join('')
     $('#' + id).value = values.includes(current) ? current : ''
   }
+  if (!keepNames) state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json().catch(() => null)
   fill('version', f.versions, L.allf); fill('account', f.accounts, L.all); fill('role', f.roles, L.all)
-  state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json().catch(() => null)
 }
 
 function query(extra = {}) {
@@ -974,15 +989,15 @@ async function people() {
   const p = await read('/api/people')
   if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
   const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${s.visits}</span>`).join('<br>')
-  const group = (title, hint, list, col) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
+  const group = (title, hint, list, col, name = (k) => esc(k)) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
     ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
-      list.map((g) => `<tr><td><b>${esc(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${g.users}</td><td class="n">${g.visits}</td><td class="n">${g.clicks}</td><td class="n">${scoreHtml(g.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
   return `
-    <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account)}</section>
+    <section class="two">${group(L.byRole, L.roleHint, p.roles, L.role)}${group(L.byAccount, L.accountHint, p.accounts, L.account, (k) => esc(accountText(k)))}</section>
     <section class="card"><div class="label">${L.byUser}</div><div class="meta">${L.userHint}</div>
       ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
         p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
-          <td><code title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(u.account)}</td>
+          <td><code title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(accountText(u.account))}</td>
           <td class="n">${u.visits}</td><td class="n">${u.clicks}</td><td class="n">${scoreHtml(u.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
 }
 
@@ -1054,7 +1069,46 @@ async function hasEvents() {
 }
 
 // Render ---------------------------------------------------------------------------------------------------
-const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions }
+// Dictionary ---------------------------------------------------------------------------------------------------
+const D = () => L.dict
+const DICT_SHOW = 60
+async function dictionary() {
+  const d = await read('/api/dictionary')
+  state.dict = d
+  return `<section class="card"><div class="head"><div><div class="label">${D().title}</div><div class="meta">${D().hint}</div></div>
+      <input id="dict-filter" type="search" placeholder="${D().filter}" aria-label="${D().filter}" value="${esc(state.dictFilter ?? '')}" style="min-width:260px"></div></section>
+    <div id="dict-body">${dictBody()}</div>`
+}
+function dictBody() {
+  const d = state.dict, f = (state.dictFilter ?? '').trim().toLowerCase()
+  const hit = (x, ...extra) => !f || [x.key, x.auto, x.name, ...extra].some((v) => String(v ?? '').toLowerCase().includes(f))
+  const section = (kind, title, list, keyHtml, extraHead = '', extraCell = () => '') => {
+    const shown = list.filter((x) => hit(x, kind === 'control' ? screenText(x.route) : ''))
+    return `<section class="card"><div class="label">${title} · ${list.length}</div>
+      ${shown.length ? table(`<th>${D().key}</th><th>${kind === 'account' ? '' : D().auto}</th><th>${D().name}</th>${extraHead}<th class="n">${D().used}</th>`,
+        shown.slice(0, DICT_SHOW).map((x) => `<tr><td>${keyHtml(x)}</td><td>${esc(x.auto) || '<span class="meta">—</span>'}</td>
+          <td><input class="dict-name" data-kind="${kind}" data-key="${esc(x.key)}" value="${esc(x.name)}" placeholder="${kind === 'account' ? D().accountPlaceholder : esc(x.auto || D().placeholder)}" aria-label="${D().name}"></td>
+          ${extraCell(x)}<td class="n">${num(x.used)}</td></tr>`).join('')) : `<p class="meta">${D().none}</p>`}
+      ${shown.length > DICT_SHOW ? `<p class="meta">${D().more(shown.length - DICT_SHOW)}</p>` : ''}</section>`
+  }
+  return section('screen', D().screens, d.screens, (x) => `<code>${esc(x.key)}</code>`)
+    + section('control', D().controls, d.controls, (x) => `<span class="nm">${esc(screenText(x.route) || x.route)}</span><code class="tech">${esc(x.target)}</code>`)
+    + section('action', D().actions, d.actions, (x) => `<code>${esc(x.key)}</code>`)
+    + section('account', D().accounts, d.accounts, (x) => `<code>${esc(x.key)}</code>`, `<th class="n">${D().users}</th>`, (x) => `<td class="n">${x.users}</td>`)
+}
+async function saveName(input) {
+  const res = await fetch('/api/names?project=' + encodeURIComponent($('#project').value), { method: 'POST',
+    body: JSON.stringify({ kind: input.dataset.kind, key: input.dataset.key, name: input.value }) })
+  if (res.status === 401) return boot()
+  if (!res.ok) return
+  const item = Object.values(state.dict).flat().find((x) => x.key === input.dataset.key)
+  if (item) item.name = input.value.trim()
+  state.names = await (await fetch('/api/names?project=' + encodeURIComponent($('#project').value))).json()
+  await loadFilters(true)
+  input.classList.add('saved'); setTimeout(() => input.classList.remove('saved'), 1200)
+}
+
+const TABS = { overview, frustration, failures, usage, journeys, people, actions, versions, dictionary }
 
 async function render() {
   clearTimeout(waitTimer)

@@ -23,7 +23,9 @@ and the API:
   GET  /api/actions    effort (clicks and time) per accepted write  │
   GET  /api/compare    one version against another (default: latest) │
   GET  /api/filters    accounts, roles and versions seen             │
-  GET  /api/names      what people call screens, buttons and actions │
+  GET  /api/names      what people call screens, buttons, actions and accounts │
+  GET  /api/dictionary everything that can be named, with its automatic name, its given name and its use
+  POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
   GET  /api/status     has this project received anything yet        │
   POST /api/map-token  a one-hour token to open the heat map        │
   POST /api/mark       start the project afresh from now (?project=), or ?clear=1 to undo ┘
@@ -174,6 +176,9 @@ def connect() -> sqlite3.Connection:
             day TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL, route TEXT NOT NULL, type TEXT NOT NULL,
             n INTEGER NOT NULL, PRIMARY KEY (day, project, version, route, type));
         CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS dictionary (
+            project TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL,
+            PRIMARY KEY (project, kind, key));
         CREATE TABLE IF NOT EXISTS alerts (
             project TEXT NOT NULL, version TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, version, key));
@@ -1053,7 +1058,52 @@ def names(con, project: str) -> dict:
         controls.setdefault(route + "\t" + target, label)
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
         AND label != '' GROUP BY detail, label""", (project,)))
-    return {"screens": screens, "controls": controls, "actions": actions}
+    out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {},
+           "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions)}}
+    # What the product team wrote in the dictionary wins over what the collector saw.
+    for kind, key, name in con.execute("SELECT kind, key, name FROM dictionary WHERE project = ?", (project,)):
+        out[DICTIONARY[kind]][key] = name
+    return out
+
+
+def dictionary(con, project: str) -> dict:
+    """Everything that can be named, over everything kept: its key, what the collector calls it, what the dictionary
+    says, and how much it is used, the most used first. Controls include the ones without a label (icons)."""
+    n = names(con, project)
+    custom = {(k, key): name for k, key, name in con.execute("SELECT kind, key, name FROM dictionary WHERE project = ?", (project,))}
+
+    def item(kind, key, auto, used, **extra):
+        return {"key": key, "auto": auto, "name": custom.get((kind, key), ""), "used": used, **extra}
+    screens = [item("screen", r, n["auto"]["screens"].get(r, ""), v) for r, v in con.execute(
+        "SELECT route, SUM(type = 'page') v FROM events WHERE project = ? GROUP BY route ORDER BY v DESC LIMIT 500", (project,))]
+    used = dict(((r + "\t" + t), c) for r, t, c in con.execute("""SELECT route, target, COUNT(*) FROM events WHERE project = ?
+        AND type = 'click' AND target != '' GROUP BY route, target""", (project,)))
+    keys = set(used) | {r + "\t" + t for r, t in con.execute("SELECT route, target FROM elements WHERE project = ?", (project,))}
+    controls = sorted((item("control", k, n["auto"]["controls"].get(k, ""), used.get(k, 0), route=k.split("\t")[0],
+                            target=k.split("\t", 1)[1]) for k in keys), key=lambda x: -x["used"])[:1000]
+    actions = [item("action", d, n["auto"]["actions"].get(d, ""), c) for d, c in con.execute(
+        "SELECT detail, COUNT(*) c FROM events WHERE project = ? AND type = 'action' GROUP BY detail ORDER BY c DESC LIMIT 500", (project,))]
+    accounts = [item("account", a, "", v, users=u) for a, v, u in con.execute("""SELECT account, SUM(type = 'page') v,
+        COUNT(DISTINCT NULLIF(user_id, '')) FROM events WHERE project = ? AND account != '' GROUP BY account ORDER BY v DESC LIMIT 1000""",
+        (project,))]
+    return {"screens": screens, "controls": controls, "actions": actions, "accounts": accounts}
+
+
+DICTIONARY = {"screen": "screens", "control": "controls", "action": "actions", "account": "accounts"}
+MAX_NAME = 80
+
+
+def name_thing(con, project: str, kind: str, key: str, name: str) -> None:
+    """The dictionary: a screen (route), control (route TAB selector), action (request) or account (id) gets the
+    name people use; an empty name gives it back to what the collector saw. An account's name stays on this server."""
+    if kind not in DICTIONARY or not key or len(key) > 400:
+        raise ValueError("kind or key")
+    name = " ".join(str(name).split())[:MAX_NAME]
+    if name:
+        con.execute("INSERT OR REPLACE INTO dictionary (project, kind, key, name, at) VALUES (?, ?, ?, ?, ?)",
+                    (project, kind, key, name, int(time.time() * 1000)))
+    else:
+        con.execute("DELETE FROM dictionary WHERE project = ? AND kind = ? AND key = ?", (project, kind, key))
 
 
 def filters(con, project: str) -> dict:
@@ -1306,6 +1356,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.login()
         if path == "/api/logout":
             return self.json(200, {"ok": True}, {"Set-Cookie": "termometro_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"})
+        if path == "/api/names":
+            who = self.session()
+            if not who or who["email"] == "api":  # API tokens read; only people write
+                return self.json(401, {"error": "sign in"})
+            project = parse_qs(urlparse(self.path).query).get("project", [""])[0]
+            if project not in CONFIG.by_name:
+                return self.json(404, {"error": "project"})
+            try:
+                item = json.loads(self.body())
+                with connect() as con:
+                    name_thing(con, project, str(item.get("kind", "")), str(item.get("key", "")), str(item.get("name", "")))
+            except (ValueError, AttributeError, UnicodeDecodeError) as error:
+                return self.json(400, {"error": str(error)})
+            return self.json(200, {"ok": True})
         if path == "/api/mark":
             if not self.signed_in():
                 return self.json(401, {"error": "sign in"})
@@ -1387,7 +1451,7 @@ class Handler(BaseHTTPRequestHandler):
                                                  "mark": marks.get(p["name"])}
                                                 for k, p in CONFIG.projects.items()]
                                    if who else []})
-        if url.path not in READS and url.path not in ("/api/filters", "/api/status", "/api/names"):
+        if url.path not in READS and url.path not in ("/api/filters", "/api/status", "/api/names", "/api/dictionary"):
             return self.json(404, {"error": "not found"})
         headers = {}
         if not self.signed_in():
@@ -1401,6 +1465,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(200, filters(con, q.get("project", "")), headers)
             if url.path == "/api/names":
                 return self.json(200, names(con, q.get("project", "")), headers)
+            if url.path == "/api/dictionary":
+                return self.json(200, dictionary(con, q.get("project", "")), headers)
             if url.path == "/api/status":
                 first, last, total = con.execute(
                     "SELECT MIN(at), MAX(at), COUNT(*) FROM events WHERE project = ?", (q.get("project", ""),)).fetchone()

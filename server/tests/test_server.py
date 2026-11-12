@@ -226,6 +226,23 @@ class Server(unittest.TestCase):
         self.assertEqual({(r["kind"], r["label"]) for r in found}, {("screen", "/config/usuarios")})
         self.assertIn(("action", "POST /api/users"), {(r["kind"], r["label"]) for r in self.read("/api/search?project=shop&days=1&q=salvar")["results"]})
 
+    def test_the_dictionary_names_screens_controls_actions_and_accounts_and_wins_over_auto(self):
+        self.send([{"type": "page", "route": "/opp", "label": "Opps"},
+                   {"type": "click", "route": "/opp", "target": "button#s", "label": "Salvar"}], account="4821")
+        def name(kind, key, value):
+            return call(self.base, "/api/names?project=shop", {"kind": kind, "key": key, "name": value}, cookie=self.cookie)[0]
+        self.assertEqual(name("screen", "/opp", "  Oportunidades "), 200)
+        self.assertEqual(name("control", "/opp\tbutton#s", "Criar oportunidade"), 200)
+        self.assertEqual(name("account", "4821", "4821 · Contrato Acme Saúde"), 200)
+        n = self.read("/api/names?project=shop")
+        self.assertEqual((n["screens"]["/opp"], n["auto"]["screens"]["/opp"]), ("Oportunidades", "Opps"))
+        self.assertEqual(n["controls"]["/opp\tbutton#s"], "Criar oportunidade")
+        self.assertEqual(n["accounts"], {"4821": "4821 · Contrato Acme Saúde"})
+        self.assertEqual(name("screen", "/opp", ""), 200)  # back to what the collector saw
+        self.assertEqual(self.read("/api/names?project=shop")["screens"]["/opp"], "Opps")
+        self.assertEqual(name("bogus", "/opp", "x"), 400)
+        self.assertEqual(call(self.base, "/api/names?project=shop", {"kind": "screen", "key": "/opp", "name": "x"})[0], 401)
+
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},
                    {"type": "js_error", "route": "/orders", "detail": "TypeError: orders is undefined"},
