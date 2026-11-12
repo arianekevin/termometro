@@ -339,7 +339,7 @@ class Server(unittest.TestCase):
         # (2x3 + 2 + 5 + 1 + 2) / 10 visits x 20 = 32; each kind is its own points over the same visits
         self.assertEqual((cart["score"], cart["categories"]),
                          (32, {"irritation": 12, "no_effect": 4, "failure": 10, "slowness": 2, "giving_up": 4}))
-        self.assertEqual(cart["effort"], {"clicks": 5, "actions": 3})
+        self.assertEqual(cart["effort"], {"clicks": 5, "actions": 3, "here_median": None, "path_median": None})  # older collectors
         k = self.read("/api/overview?project=shop&days=1")["kinds"]
         self.assertEqual((k["now"]["irritation"], k["effort"]["now"]["clicks"], len(k["daily"])), (12, 5, 1))
 
@@ -375,6 +375,16 @@ class Server(unittest.TestCase):
         self.assertEqual((p["near_miss"][0]["target"], p["near_miss"][0]["n"]), ("button#tiny", 6))
         kinds = {i["kind"] for i in self.read("/api/overview?project=shop&days=1")["insights"]}
         self.assertTrue({"focus_candidate", "click_follows", "search_no_enter", "retry_needed", "near_miss"} <= kinds, kinds)
+
+    def test_effort_splits_the_way_to_the_screen_from_the_clicks_on_it(self):
+        act = lambda c, h: {"type": "action", "route": "/users", "detail": "POST /api/users", "clicks": c, "here": h}
+        self.send([{"type": "page", "route": "/users"}, act(5, 2), act(7, 3), act(4, 2)])
+        [a] = self.read("/api/actions?project=shop&days=1")["actions"]
+        self.assertEqual((a["clicks_median"], a["here_median"], a["path_median"]), (5, 2, 3))
+        users = self.read("/api/summary?project=shop&days=1")["routes"][0]
+        self.assertEqual((users["effort"]["here_median"], users["effort"]["path_median"]), (2, 3))
+        e = self.read("/api/overview?project=shop&days=1")["kinds"]["effort"]["now"]
+        self.assertEqual((e["clicks"], e["here_median"], e["path_median"]), (5, 2, 3))
 
     def test_search_finds_screens_elements_failures_actions_and_ids(self):
         self.send([{"type": "page", "route": "/orders"}, {"type": "click", "route": "/orders", "target": "button#export-orders"},

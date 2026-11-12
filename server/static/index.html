@@ -317,7 +317,7 @@ const HELP_PT = {
   flow: ['O que é', 'Para a tela escolhida: de quais telas as pessoas chegam e para quais vão em seguida, em porcentagem das passagens. "Saíram do app" é onde a sessão terminou.', 'Saída alta numa tela do meio de um fluxo indica abandono. Ida e volta frequente entre duas telas sugere que falta informação numa delas.'],
   funnel: ['O que é', 'Uma sequência de telas e ações, e quantas sessões chegam a cada passo, na ordem.', 'O passo com a maior perda é onde o fluxo trava. Veja a frustração e as falhas daquela tela.'],
   byUser: ['O que é', 'Uso e frustração por pessoa, só pelo id. Clique numa pessoa para filtrar o painel por ela.', 'Frustração alta em poucas pessoas costuma ser treinamento; espalhada por todos, é a tela.'],
-  effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
+  effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo. "Até a tela" são os cliques no caminho até a tela da ação; "na tela", os cliques nela.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
   adoption: ['O que é', 'A porcentagem das pessoas ativas no período que usaram a feature ao menos uma vez.', 'Adoção baixa com uso alto quer dizer que poucas pessoas dependem muito dela.'],
@@ -348,7 +348,7 @@ const HELP_EN = {
   flow: ['What it is', 'For the chosen screen: which screens people come from and which they go to next, as a share of the passages. "Left the app" is where the session ended.', 'A high exit in the middle of a flow points to abandonment. Frequent back and forth between two screens suggests one of them lacks information.'],
   funnel: ['What it is', 'A sequence of screens and actions, and how many sessions reach each step, in order.', 'The step with the biggest loss is where the flow gets stuck. See that screen\'s frustration and failures.'],
   byUser: ['What it is', 'Use and frustration per person, by id only. Click a person to narrow the dashboard to them.', 'High frustration in a few people is usually training; spread over everyone, it is the screen.'],
-  effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
+  effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done. "On the way" are the clicks to reach the action\'s screen; "on the screen", the clicks on it.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
   adoption: ['What it is', 'The share of the people active in the period who used the feature at least once.', 'Low adoption with high use means a few people depend on it a lot.'],
@@ -463,7 +463,7 @@ const L = PT ? {
     names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
     effort: 'Esforço', effortUnit: (n) => `${num(n)} ${n === 1 ? 'clique' : 'cliques'} por ação`, effortWhat: 'cliques até concluir uma ação, no caso típico',
-    effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}`, why: 'por quê' },
+    effortSplit: (path, here) => `${num(path)} até a tela + ${num(here)} nela`, effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}`, why: 'por quê' },
   pat: { title: 'Padrões de clique', hint: 'O que as pessoas fazem sempre do mesmo jeito, e que dá para poupar.', focus: 'Campo clicado primeiro ao abrir a tela',
     firstClick: 'Primeiro clique', share: 'Quanto', ofVisits: (n) => `de ${num(n)} visitas`, follows: 'Clique que quase sempre vem depois de outro', after: 'Depois de',
     then: 'Clicam em', field: 'campo', ofClicks: (n) => `de ${num(n)} cliques`, noEnter: 'Digitam e clicam num botão em vez de Enter', typedIn: 'Digitaram em',
@@ -623,7 +623,7 @@ const L = PT ? {
     names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
     effort: 'Effort', effortUnit: (n) => `${num(n)} ${n === 1 ? 'click' : 'clicks'} per action`, effortWhat: 'clicks to get an action done, in the typical case',
-    effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}`, why: 'why' },
+    effortSplit: (path, here) => `${num(path)} on the way + ${num(here)} on the screen`, effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}`, why: 'why' },
   pat: { title: 'Click patterns', hint: 'What people always do the same way, and could be spared.', focus: 'Field clicked first on opening the screen',
     firstClick: 'First click', share: 'How often', ofVisits: (n) => `of ${num(n)} visits`, follows: 'A click that nearly always follows another', after: 'After',
     then: 'They click', field: 'field', ofClicks: (n) => `of ${num(n)} clicks`, noEnter: 'They type and click a button instead of Enter', typedIn: 'Typed in',
@@ -1034,6 +1034,7 @@ function kindsCard(o) {
         <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions && e.now.clicks !== e.before.clicks
           ? `<span class="delta ${e.now.clicks > e.before.clicks ? 'bad' : 'ok'}">${e.now.clicks > e.before.clicks ? '▲' : '▼'}&nbsp;${FT().before(num(e.before.clicks))}</span>` : ''}</span>
         ${spark(e.daily.map((d) => d.clicks), `${C().effort}: ${L.perDay}`, 96, 24)}
+        ${e.now.here_median !== null && e.now.here_median !== undefined ? `<span class="why">${esc(C().effortSplit(e.now.path_median, e.now.here_median))}</span>` : ''}
         <span class="meta">${C().effortWhat} · ${num(e.now.actions)} ${PT ? 'ações' : 'actions'}</span></a>
     </div></section>`
 }
@@ -1201,7 +1202,7 @@ async function frustration() {
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${scr(x.key)}</div></td>
           <td class="n">${cat ? `<b>${x.categories?.[cat] ?? 0}</b><div class="meta">${L.score} ${x.score}</div>` : scoreHtml(x.score)}${kindBar(x.categories, x.score)}</td>
-          <td class="n">${x.visits}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
+          <td class="n">${x.visits}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${x.effort.here_median !== null && x.effort.here_median !== undefined ? esc(C().effortSplit(x.effort.path_median, x.effort.here_median)) : PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
         <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="5">${detail(x)}</td></tr>`).join(''))}
       ${kindLegend()}
     </section>
@@ -1491,9 +1492,10 @@ async function actions() {
   if (!actions.length) return empty(L.noActions)
   const effort = (c) => (c >= 15 ? 'bad' : c >= 8 ? 'warn' : 'ok')
   return `<section class="card"><div class="label">${L.effort}${help('effort')}</div><div class="meta">${L.effortHint}</div>
-    ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
+    ${table(`<th>${L.action}</th><th class="n">${L.times}</th><th class="n">${L.users}</th><th class="n">${L.clicksMed}</th><th class="n">${PT ? 'Até a tela' : 'On the way'}</th><th class="n">${PT ? 'Na tela' : 'On the screen'}</th><th class="n">${L.clicksP90}</th><th class="n">${L.timeMed}</th><th class="n">${L.timeP90}</th>`,
       actions.map((a) => `<tr class="${a.action === state.action ? 'sel' : ''}"><td>${act(a.action)}</td><td class="n">${a.times}</td><td class="n">${a.users}</td>
-        <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td><td class="n">${a.clicks_p90}</td>
+        <td class="n"><span class="pill ${effort(a.clicks_median)}">${a.clicks_median}</span></td>
+        <td class="n">${a.path_median ?? '—'}</td><td class="n">${a.here_median ?? '—'}</td><td class="n">${a.clicks_p90}</td>
         <td class="n">${a.seconds_median} s</td><td class="n">${a.seconds_p90} s</td></tr>`).join(''))}</section>`
 }
 

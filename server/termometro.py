@@ -110,7 +110,7 @@ MAX_CLOCK_GAP = 86400 * 1000  # an event older than this inside a batch is put a
 TRAIL_BEFORE, TRAIL_AFTER, TRAIL_SAMPLES, SESSION_MAX = 15, 3, 5, 500
 # Added after 0.2: old databases get them on start (empty for what was already there).
 NEW_COLUMNS = {"stack": "TEXT NOT NULL DEFAULT ''", "agent": "TEXT NOT NULL DEFAULT ''", "device": "TEXT NOT NULL DEFAULT ''",
-               "label": "TEXT NOT NULL DEFAULT ''"}
+               "label": "TEXT NOT NULL DEFAULT ''", "here": "INTEGER"}
 
 
 class Config:
@@ -382,12 +382,13 @@ def parse_batch(batch, origin: str | None, agent: str = "") -> tuple[str, list[t
         rows.append((project["name"], who[0] or "?", session, who[1], who[2], who[3], e["type"], route,
                      text(e.get("target"), "target"), text(e.get("detail"), "detail"),
                      integer(e.get("clicks")), integer(e.get("duration_ms")), at,
-                     text(e.get("stack"), "stack") if e["type"] == "js_error" else "", agent, device, text(e.get("label"), "label")))
+                     text(e.get("stack"), "stack") if e["type"] == "js_error" else "", agent, device, text(e.get("label"), "label"),
+                     integer(e.get("here")) if e["type"] == "action" else None))
     return project["name"], rows, elements
 
 
 INSERT_EVENT = ("INSERT INTO events (project, version, session, account, user_id, role, type, route, target, detail, clicks, "
-                "duration_ms, at, stack, agent, device, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                "duration_ms, at, stack, agent, device, label, here) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
 
 def within_limit(bucket: str, n: int, limit: int) -> bool:
@@ -480,9 +481,9 @@ def frustration_by(con, f: Filter, key: str) -> list[dict]:
 def effort_by_route(con, f: Filter) -> dict:
     """Effort, apart from frustration: the clicks a typical accepted write took (median), per screen where it happened."""
     per: dict[str, list] = {}
-    for route, clicks in con.execute(f"SELECT route, clicks FROM events WHERE {f.sql} AND type = 'action' AND clicks IS NOT NULL", f.args):
-        per.setdefault(route, []).append(clicks)
-    return {r: {"clicks": median(c), "actions": len(c)} for r, c in per.items()}
+    for route, clicks, here in con.execute(f"SELECT route, clicks, here FROM events WHERE {f.sql} AND type = 'action' AND clicks IS NOT NULL", f.args):
+        per.setdefault(route, []).append((clicks, here))
+    return {r: {"clicks": median([c for c, _ in p]), "actions": len(p), **split(p)} for r, p in per.items()}
 
 
 def kinds(con, f: Filter) -> dict:
@@ -495,8 +496,8 @@ def kinds(con, f: Filter) -> dict:
         return g[0]["categories"] if g else {c: 0 for c in CATEGORIES}
 
     def effort(fl):
-        clicks = [c for (c,) in con.execute(f"SELECT clicks FROM events WHERE {fl.sql} AND type = 'action' AND clicks IS NOT NULL", fl.args)]
-        return {"clicks": median(clicks), "actions": len(clicks)}
+        pairs = con.execute(f"SELECT clicks, here FROM events WHERE {fl.sql} AND type = 'action' AND clicks IS NOT NULL", fl.args).fetchall()
+        return {"clicks": median([c for c, _ in pairs]), "actions": len(pairs), **split(pairs)}
     days = sorted(frustration_by(con, f, "date(at / 1000, 'unixepoch')"), key=lambda g: g["key"])
     per_day_clicks: dict[str, list] = {}
     for d, c in con.execute(f"""SELECT date(at / 1000, 'unixepoch'), clicks FROM events WHERE {f.sql} AND type = 'action'
@@ -602,18 +603,28 @@ def people(con, f: Filter) -> dict:
     return {"roles": by("role"), "accounts": by("account"), "users": users[:200]}
 
 
+def split(pairs: list) -> dict:
+    """(clicks, here) per action -> medians of the clicks on the action's screen and of the way there. Only actions
+    whose collector says how many were on the screen (0.2.4 on); None when none does."""
+    known = [(c, h) for c, h in pairs if h is not None]
+    if not known:
+        return {"here_median": None, "path_median": None}
+    return {"here_median": statistics.median(h for _, h in known), "path_median": statistics.median(c - h for c, h in known)}
+
+
 def actions(con, f: Filter) -> dict:
     rows = con.execute(f"""
-        SELECT detail, clicks, duration_ms, user_id FROM events
+        SELECT detail, clicks, duration_ms, user_id, here FROM events
         WHERE {f.sql} AND type = 'action' AND clicks IS NOT NULL""", f.args).fetchall()
     groups: dict[str, dict] = {}
-    for detail, clicks, ms, user in rows:
-        g = groups.setdefault(detail, {"clicks": [], "ms": [], "users": set()})
+    for detail, clicks, ms, user, here in rows:
+        g = groups.setdefault(detail, {"clicks": [], "ms": [], "users": set(), "pairs": []})
         g["clicks"].append(clicks)
         g["ms"].append(ms or 0)
+        g["pairs"].append((clicks, here))
         if user:
             g["users"].add(user)
-    out = [{"action": a, "times": len(g["clicks"]), "users": len(g["users"]),
+    out = [{"action": a, "times": len(g["clicks"]), "users": len(g["users"]), **split(g["pairs"]),
             "clicks_median": statistics.median(g["clicks"]), "clicks_p90": p90(g["clicks"]),
             "seconds_median": round(statistics.median(g["ms"]) / 1000, 1), "seconds_p90": round(p90(g["ms"]) / 1000, 1)}
            for a, g in groups.items()]

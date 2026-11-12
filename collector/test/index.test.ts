@@ -268,7 +268,7 @@ describe('termometro', () => {
     click(document.querySelector('#a')!, 200, 10)
     await call('/api/save', { method: 'POST' })
     expect((await events()).filter((e) => e.type === 'action')).toEqual([
-      { type: 'action', route: '/x', detail: 'POST /api/save', clicks: 3, duration_ms: 0, label: 'a' }
+      { type: 'action', route: '/x', detail: 'POST /api/save', clicks: 3, here: 3, duration_ms: 0, label: 'a' }
     ])
   })
 
@@ -429,9 +429,21 @@ describe('termometro', () => {
     await fetch('/api/tickets/4821', { method: 'PUT' }) // refused: not an action, and the failure names the click
     const all = await events()
     expect(all.filter((e) => e.type === 'action')).toEqual([
-      { type: 'action', route: '/tickets/new', detail: 'POST /api/tickets', clicks: 3, duration_ms: 2000, label: 'a' }
+      { type: 'action', route: '/tickets/new', detail: 'POST /api/tickets', clicks: 3, here: 3, duration_ms: 2000, label: 'a' }
     ])
     expect(all.find((e) => e.type === 'http_5xx')).toMatchObject({ target: 'button#b', detail: 'PUT /api/tickets/:id 500' })
+  })
+
+  it('splits an action\'s clicks into the way to the screen and the clicks on it', async () => {
+    scripted(() => 201)
+    termometro = startTermometro({ url: 'http://t.test/', key: 'tk_1', countScriptedClicks: true, pagesFromRouter: true, flushIntervalMs: 1000 })
+    termometro.page('/home')
+    document.body.innerHTML = '<a id="menu" href="#">Usuários</a><button id="new">Novo</button><button id="save">Salvar</button>'
+    click(document.querySelector('#menu')!, 10, 10) // the way there
+    termometro.page('/users')
+    click(document.querySelector('#new')!, 100, 10); click(document.querySelector('#save')!, 200, 10)
+    await call('/api/users', { method: 'POST' })
+    expect((await events()).find((e) => e.type === 'action')).toMatchObject({ clicks: 3, here: 2 })
   })
 
   it('starts counting an action again after two idle minutes', async () => {

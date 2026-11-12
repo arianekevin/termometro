@@ -98,6 +98,8 @@ interface TrackedEvent {
   clicks?: number
   duration_ms?: number
   targets?: string[]
+  /** action only: of `clicks`, the ones on the screen where it happened; the rest was the way there. */
+  here?: number
   /** For people: a click's control label, a page's screen name, an action's button. `labels` goes with `targets`. */
   label?: string
   labels?: string[]
@@ -336,6 +338,8 @@ export function start(options: Options): Termometro {
   let lastLabel = ''
   // The clicks since the last accepted write: the effort the next one took.
   let actionClicks = 0
+  // ...and how many of them were on the screen where the write happened: the rest was the way there.
+  let hereClicks = 0
   let actionStart = 0
   let lastClickAt = 0
   let inventoryTimer: ReturnType<typeof setTimeout> | undefined
@@ -418,9 +422,11 @@ export function start(options: Options): Termometro {
       filling = null
       // A write nobody clicked for (a heartbeat, a background save) is not an action.
       if (actionClicks > 0) {
-        record({ type: 'action', route: currentRoute, detail: where, clicks: actionClicks, duration_ms: Date.now() - actionStart,
+        record({ type: 'action', route: currentRoute, detail: where, clicks: actionClicks, here: Math.min(hereClicks, actionClicks),
+          duration_ms: Date.now() - actionStart,
           label: lastLabel || undefined })
         actionClicks = 0
+        hereClicks = 0
         lastLabel = ''
       }
     }
@@ -473,6 +479,7 @@ export function start(options: Options): Termometro {
     arrivedAt = Date.now()
     slowSeen.clear()
     typedHere.clear()
+    hereClicks = 0
     pageEvent()
     scheduleInventory()
   }
@@ -535,9 +542,11 @@ export function start(options: Options): Termometro {
     if (label) lastLabel = label
     if (!actionClicks || now - lastClickAt > ACTION_IDLE_MS) {
       actionClicks = 0
+      hereClicks = 0
       actionStart = now
     }
     actionClicks++
+    hereClicks++
     lastClickAt = now
 
     clicks = clicks.filter((c) => now - c.t < RAGE_WINDOW_MS && Math.hypot(c.x - e.clientX, c.y - e.clientY) < RAGE_RADIUS_PX)
