@@ -20,10 +20,10 @@ collects what users type or see, and it runs on your own server.
   or merge them), where people come from and go to on each screen, and funnels you build from screens, actions and buttons.
 - **Usage:** most and least used screens, and the elements nobody clicks.
 - **People:** usage by role, account and user — ids only.
-- **Screen map:** each screen drawn in the dashboard from where its buttons, links and regions sit (no content),
-  with three lenses: Problems (what irritates, as a share of its clicks), Use (clicks) and Routes (where people go
-  next, with back-and-forth pairs marked). Click an element for its numbers and steps. The same heat and routes open
-  over your own app too.
+- **Heat map:** each screen looking like your app (colours, blocks and lines of text, without the words) with three
+  lenses: Heat (where people click most, blue to red), Problems (where it irritates most, with why for each element
+  and what to do) and Routes (where people go next, with back-and-forth pairs marked). The same map opens over your
+  own app too.
 - **By version:** did the last deploy make things better or worse? Screen by screen, action by action, and the
   failures only the new version has — and a Slack or Google Chat message when it got worse.
 - **Each failure dated:** in which version it started and when it was last seen, so you know whether the fix worked.
@@ -172,6 +172,49 @@ claude mcp add termometro -e TERMOMETRO_URL=https://termometro.example.com -e TE
 Tools: `report` (start there), `overview`, `search`, `frustration`, `failures`, `failure`, `session`, `journeys`,
 `funnel`, `usage`, `effort`, `people`, `compare_versions` and `list_projects`. The token reads every project of the
 instance; keep it like a password.
+
+## The dashboard, tab by tab
+
+At the top: the period (1, 7, 30 or 90 days), the account, **Filters** (version, role, feature)
+with each filter in use as a chip, **Marks** and, under ⋯, the appearance (theme, text size, palette, colour-blind
+mode). Everything you pick lives in the address. The tabs come in groups:
+
+**Summary**
+- **Overview:** the period's verdict, the numbers against the previous period, the **To do** list ranked by impact
+  (how many people and sessions each item reaches), the latest version's card and what you are following.
+
+**Problems**
+- **Frustration:** each screen's level, by kind of signal, and where it irritates inside it.
+- **Failures:** errors grouped by message, with the stack, browser, the version where it started, who was hit and the
+  steps up to it; copied as Markdown for an issue.
+- **Actions:** what each save costs (clicks and time, median and p90).
+- **Versions:** one version against another, screen by screen, and the failures only the new one has.
+
+**Usage**
+- **Usage:** the most and least used screens and elements, and what nobody clicks.
+- **Journeys:** distance to each button and action against its use, actions that go together, where people come from
+  and go to, and funnels.
+- **Map:** the heat map of the chosen screen, on desktop and phone.
+  - **Heat:** each element's spot goes from blue to red with its clicks; only the five hottest carry the number.
+  - **Problems:** the same heat for the share of clicks that irritate (half or more is the deepest red). Beside it,
+    why each element irritates, with counts: clicked again while it was loading (with the slow request and how long
+    it took), nothing changed on screen, an error (which one), not clickable, nearly hit. And what to do.
+  - **Routes:** the most common next step after each element, as arrows; click an element for everything before and
+    after it.
+  - What a click opens (a dialog, a menu) is part of the drawing. **Open with the heat** and **Open with the routes**
+    take the same map over the real app, which stays clickable.
+- **Product:** use by area of the app, what is little used and what is new.
+- **Features:** the features you watch (screens, buttons and actions you group under a name, in Settings): use,
+  frustration and who uses them. Picking a feature in Filters cuts the whole dashboard to it.
+
+**People**
+- **People:** use by role and by user (ids, and the name if you send it).
+- **Accounts:** each account with people per day, feature use, frustration and failures, and a warning when an
+  account's use drops (60% or more, out of its normal). "Worst first" sorts by what needs attention most.
+
+**Settings**
+- **Dictionary:** the name people use for each screen, button, action, account and area. The whole dashboard then
+  speaks that name, with the technical one below.
 
 ## How frustration is measured
 

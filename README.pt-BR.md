@@ -20,10 +20,10 @@ não coleta o que o usuário digita ou vê e roda no seu próprio servidor.
   cada tela, e funis montados com telas, ações e botões.
 - **Uso:** telas mais e menos usadas, e os elementos que ninguém clica.
 - **Pessoas:** uso por papel, conta e usuário — só ids.
-- **Mapa da tela:** cada tela desenhada no painel pelas posições dos botões, links e regiões (sem conteúdo), com três
-  lentes: Problemas (o que irrita, pela parte dos cliques), Uso (cliques) e Rotas (para onde as pessoas vão depois,
-  com o vai e volta marcado). Clique num elemento para ver os números e os passos dele. O mesmo calor e as rotas
-  também abrem sobre o seu próprio app.
+- **Mapa de calor:** cada tela com a cara do seu app (cores, blocos e linhas de texto, sem as palavras) e três
+  lentes: Calor (onde mais clicam, do azul ao vermelho), Problemas (onde mais irrita, com o porquê de cada elemento
+  e o que fazer) e Rotas (para onde as pessoas vão depois, com o vai e volta marcado). O mesmo mapa abre por cima do
+  seu próprio app.
 - **Por versão:** o último deploy melhorou ou piorou? Tela a tela, ação a ação, e as falhas que só a versão nova
   tem — com mensagem no Slack ou no Google Chat quando piorou.
 - **Cada falha datada:** em que versão começou e quando apareceu pela última vez, para saber se a correção funcionou.
@@ -150,6 +150,50 @@ Sem bundler:
 ```html
 <script src="https://termometro.exemplo.com/termometro.js" data-key="tk_TROCAR" async></script>
 ```
+
+## O painel, aba por aba
+
+No topo ficam o período (1, 7, 30 ou 90 dias), a conta, os **Filtros** (versão, papel, feature) com
+cada filtro em uso como etiqueta, os **Marcos** e, em ⋯, a aparência (tema, tamanho do texto, paleta, modo para
+daltônicos). Tudo o que se escolhe fica no endereço. As abas vêm em grupos:
+
+**Resumo**
+- **Início:** o veredito do período, os números contra o período anterior, a lista **Para fazer** ordenada por
+  impacto (quantas pessoas e sessões cada item atinge), o cartão da última versão e o que você está acompanhando.
+
+**Problemas**
+- **Frustração:** o nível de cada tela, por tipo de sinal, e onde irrita dentro dela.
+- **Falhas:** erros agrupados por mensagem, com o stack, o navegador, a versão em que começou, quem foi atingido e os
+  passos até a falha; copia em Markdown para uma issue.
+- **Ações:** o esforço de cada gravação (cliques e tempo, mediana e p90).
+- **Versões:** uma versão contra a outra, tela a tela, e as falhas que só a nova tem.
+
+**Uso**
+- **Uso:** telas e elementos mais e menos usados, e o que ninguém clica.
+- **Jornadas:** distância até cada botão e ação contra o uso, ações que andam juntas, de onde vêm e para onde vão,
+  e funis.
+- **Mapa:** o mapa de calor da tela escolhida, no desktop e no celular.
+  - **Calor:** a mancha de cada elemento vai do azul ao vermelho conforme os cliques; só os cinco mais quentes têm
+    o número.
+  - **Problemas:** o mesmo calor pela parte dos cliques que irrita (metade ou mais é o vermelho mais forte). Ao lado,
+    o porquê de cada elemento com a contagem: clicou de novo enquanto carregava (com a requisição lenta e quanto levou),
+    nada mudou na tela, deu erro (qual), não é clicável, quase acertou. E o que fazer.
+  - **Rotas:** o próximo passo mais comum depois de cada elemento, em setas; clique num elemento para ver tudo o
+    que vem antes e depois dele.
+  - O que um clique abre (uma janela, um menu) entra no desenho. **Abrir com o calor** e **Abrir com as rotas**
+    levam o mesmo mapa para cima do app de verdade, que continua clicável.
+- **Produto:** uso por área do app, o que é pouco usado e as novidades.
+- **Features:** as funcionalidades que você vigia (telas, botões e ações que você junta com um nome, em Ajustes):
+  uso, frustração e quem usa. Escolher uma feature nos Filtros recorta o painel inteiro por ela.
+
+**Gente**
+- **Pessoas:** uso por papel e por usuário (ids, e o nome se você mandar).
+- **Contas:** cada conta com pessoas por dia, uso das features, frustração e falhas, e um aviso quando o uso de uma
+  conta cai (60% ou mais, fora do normal dela). "Pior primeiro" ordena pelo que mais precisa de atenção.
+
+**Ajustes**
+- **Dicionário:** o nome que as pessoas usam para cada tela, botão, ação, conta e área. O painel inteiro passa a
+  falar esse nome, com o técnico embaixo.
 
 ## Como a frustração é medida
 
