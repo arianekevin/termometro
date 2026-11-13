@@ -968,7 +968,7 @@ const L = PT ? {
   screensCompared: 'Telas, da que mais piorou para a que mais melhorou', actionsCompared: 'Ações: cliques e tempo (medianas)',
   newFailures: 'Falhas que só a versão nova tem', noNewFailures: 'Nenhuma falha nova.', onlyIn: (v) => `só na ${v}`, worse: 'piorou', better: 'melhorou', same: 'igual',
   rel: { title: (b, a) => `Versão ${b} vs ${a}`, scorePer: 'Frustração por visita', failPer: 'Falhas por 100 sessões', volume: (a, b) => `Volume: ${a} → ${b} visitas (só contexto: cada versão ficou no ar um tempo)`,
-    worst: 'Telas que mais pioraram', noWorse: 'Nenhuma tela piorou.', open: 'Ver em Versões', widened: (n) => `Comparadas em ${n} dias: a versão anterior saiu do período escolhido.`,
+    worst: 'Telas que mais pioraram', worstVs: (a) => `contra a versão ${a}`, noWorse: 'Nenhuma tela piorou.', open: 'Ver em Versões', widened: (n) => `Comparadas em ${n} dias: a versão anterior saiu do período escolhido.`,
     onlyOne: (b) => `Só a versão ${b} neste período.`, prevHint: (a, n) => `A anterior, ${a}, aparece ampliando o período para ${n} dias.`,
     widen: (n) => `Comparar com a versão anterior (amplia para ${n} dias)`, noPrev: 'Não há versão anterior nos dados guardados.', sinceMark: 'Não há versão anterior desde o marco em uso. Escolha "Todo o período" em Marcos para ver as outras.',
     markIt: 'Criar marco nesta versão', markTip: (v) => `Salva o início da ${v} nos Marcos, para contar a partir dela quando quiser. O período em uso não muda.`, marked: 'Marco salvo', markName: (v) => `Versão ${v}` },
@@ -1222,7 +1222,7 @@ const L = PT ? {
   screensCompared: 'Screens, most worsened first', actionsCompared: 'Actions: clicks and time (medians)',
   newFailures: 'Failures only the new version has', noNewFailures: 'No new failures.', onlyIn: (v) => `only in ${v}`, worse: 'worse', better: 'better', same: 'same',
   rel: { title: (b, a) => `Version ${b} vs ${a}`, scorePer: 'Frustration per visit', failPer: 'Failures per 100 sessions', volume: (a, b) => `Volume: ${a} → ${b} visits (context only: each version was live for its own time)`,
-    worst: 'Screens that got worse the most', noWorse: 'No screen got worse.', open: 'See in Versions', widened: (n) => `Compared over ${n} days: the previous version is out of the chosen period.`,
+    worst: 'Screens that got worse the most', worstVs: (a) => `against version ${a}`, noWorse: 'No screen got worse.', open: 'See in Versions', widened: (n) => `Compared over ${n} days: the previous version is out of the chosen period.`,
     onlyOne: (b) => `Only version ${b} in this period.`, prevHint: (a, n) => `The previous one, ${a}, shows up widening the period to ${n} days.`,
     widen: (n) => `Compare with the previous version (widens to ${n} days)`, noPrev: 'There is no previous version in the kept data.', sinceMark: 'There is no previous version since the mark in use. Pick "Whole period" in Marks to see the others.',
     markIt: 'Create a mark at this version', markTip: (v) => `Saves the start of ${v} in Marks, to count from it whenever you want. The period in use does not change.`, marked: 'Mark saved', markName: (v) => `Version ${v}` },
@@ -1959,11 +1959,11 @@ function releaseCard(rel) {
     <div class="rel-nums"><div><div class="meta">${R.scorePer}</div><div class="big">${scoreHtml(a.score)} → ${scoreHtml(b.score)}</div></div>
       <div><div class="meta">${R.failPer}</div><div class="big">${num(a.failures_per_100)} → ${num(b.failures_per_100)}</div></div></div>
     <div class="meta">${R.volume(num(a.visits), num(b.visits))}</div>
-    <div class="psec"><div class="meta">${R.worst}</div>${worst.length ? `<ul class="counts">${worst.map((r) => `<li>
+    <div class="psec"><div class="meta">${R.worst} <span class="vs">${R.worstVs(c.a)}</span></div>${worst.length ? `<ul class="counts">${worst.map((r) => `<li>
         <a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(screenText(r.route) || r.route)}</a>
         <span>${scoreHtml(r.a.score)} → ${scoreHtml(r.b.score)} <span class="pill bad">+${r.delta}</span></span></li>`).join('')}</ul>` : `<p class="meta">${R.noWorse}</p>`}</div>
     <div class="actions-row rel-acts">${markVersionButton(c.b, b.first_at)}
-      <a class="button primary" ${linkAttrs({ tab: 'versions', params: { a: c.a, b: c.b, ...(widened ? { days: String(widened) } : {}) } })}>${R.open} →</a></div></section>`
+      <a class="button primary" ${linkAttrs({ tab: 'versions', params: { a: c.a, b: c.b } })}>${R.open} →</a></div></section>`
 }
 
 async function overview() {
