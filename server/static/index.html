@@ -972,7 +972,7 @@ const L = PT ? {
     since: (st, d, v) => `${{ better: 'melhorou', same: 'igual', worse: 'piorou', waiting: 'acompanhando' }[st]} desde ${d}${v ? ` (versão ${v})` : ''}`,
     waitingHint: 'nada medido depois disso', stop: 'Parar de acompanhar', confirmStop: (x) => `Parar de acompanhar "${x}"? A linha de base se perde.`,
     all: (n) => `Ver todos (${n})`, fewer: 'Ver só os 5 primeiros' },
-  dnew: 'novo', dwas: (b) => `antes ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% contra o período anterior`,
+  dnew: 'novo', dwas: (b) => `antes ${b}`, dtip: (p) => `${p > 0 ? '+' : '−'}${Math.abs(p)}% contra o período anterior`,
   setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
   originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
@@ -1225,7 +1225,7 @@ const L = PT ? {
     since: (st, d, v) => `${{ better: 'improved', same: 'same', worse: 'worse', waiting: 'following' }[st]} since ${d}${v ? ` (version ${v})` : ''}`,
     waitingHint: 'nothing measured since', stop: 'Stop following', confirmStop: (x) => `Stop following "${x}"? Its baseline is lost.`,
     all: (n) => `See all (${n})`, fewer: 'See only the top 5' },
-  dnew: 'new', dwas: (b) => `before ${b}`, dtip: (p) => `${p > 0 ? '+' : ''}${p}% against the period before`,
+  dnew: 'new', dwas: (b) => `was ${b}`, dtip: (p) => `${p > 0 ? '+' : '−'}${Math.abs(p)}% against the period before`,
   setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
   originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
@@ -1700,16 +1700,23 @@ const dayText = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T12:00:00Z
 const every = (n, fit) => [1, 2, 7, 14, 28].find((k) => Math.ceil(n / k) <= fit) ?? 28
 const dayAxis = (days, cls = '') => { const n = days.length, w = every(n, 16), m = every(n, 6)
   return `<div class="xl ${cls}" aria-hidden="true">${days.map((d, i) => `<span class="${(n - 1 - i) % w ? '' : 'w'} ${(n - 1 - i) % m ? '' : 'm'}">${esc(dayText(d))}</span>`).join('')}</div>` }
-// Frustration now against before, in points: going up is worse (▲ +42), down is better (▼ −12); the number before in the tooltip.
-const scoreDelta = (now, before) => before === null || before === undefined ? '' : now === before ? `<span class="delta meta" title="${esc(FT().before(before))}">=</span>`
-  : `<span class="delta ${now > before ? 'bad' : 'ok'}" title="${esc(FT().before(before))}">${now > before ? '▲ +' : '▼ −'}${Math.abs(now - before)}</span>`
-// A count now against before, in %: neither good nor bad by itself (visits), so no colour; the number before in the tooltip.
-// A small base makes a giant percent, as on Início: below 20 before, the value before; beyond ±500%, how many times.
-const countDelta = (now, before) => { if (before === null || before === undefined || !before) return ''
-  const pct = Math.round((now - before) / before * 100)
-  if (!pct) return `<span class="delta meta" title="${esc(FT().before(num(before)))}">=</span>`
+// The one "change against the period before" chip. kind 'pct' (default) or 'pts' (frustration, in points).
+// Real minus sign always. Base under 20 → "antes N"; before 0 → "novo"; beyond ±500% → "×N"; same → "=".
+// Coloured only when the server says it moved beyond chance (significant) or the caller says which way is worse (worseUp);
+// otherwise neutral. Without a before there is nothing to compare: no chip. The number before stays in the tooltip.
+const deltaChip = (now, before, { worseUp, kind = 'pct', significant } = {}) => {
+  if (before === null || before === undefined) return ''
+  const bTip = esc(FT().before(num(before)))
+  if (!before && kind === 'pct') return now ? `<span class="delta ${worseUp ? 'bad' : 'meta'}" title="${bTip}">${L.dnew}</span>` : ''
+  const diff = now - before
+  if (!diff || (kind === 'pct' && !Math.round(diff / before * 100))) return `<span class="delta meta" title="${bTip}">=</span>`
+  const colour = significant || worseUp !== undefined, cls = !colour ? 'meta' : (diff > 0) === !!worseUp ? 'bad' : 'ok', arrow = diff > 0 ? '▲' : '▼'
+  if (kind === 'pts') return `<span class="delta ${cls}" title="${bTip}">${arrow} ${diff > 0 ? '+' : '−'}${Math.abs(diff)}</span>`
+  const pct = Math.round(diff / before * 100)
   const text = before < 20 ? L.dwas(num(before)) : Math.abs(pct) > 500 ? `×${num(Math.round(now / before))}` : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}%`
-  return `<span class="delta meta" title="${esc(FT().before(num(before)))} · ${esc(L.dtip(pct))}">${pct > 0 ? '▲' : '▼'} ${text}</span>` }
+  return `<span class="delta ${cls}" title="${bTip} · ${esc(L.dtip(pct))}">${arrow} ${text}</span>` }
+const scoreDelta = (now, before) => deltaChip(now, before, { kind: 'pts', worseUp: true })
+const countDelta = (now, before, worseUp) => deltaChip(now, before, { worseUp })
 
 // A 2px line of the values, oldest to newest, with a dot on the latest. Each point has a hover target as wide as its
 // slot, its value (and its day, when given) in the tooltip; the whole names the range.
@@ -1935,16 +1942,7 @@ async function overview() {
   if (!n.visits && !b.visits) return empty(L.noVisits)
   // Compare only when the period before has data on at least half as many days: otherwise +3000% says nothing.
   const comparable = o.before_daily.length >= Math.max(1, Math.ceil(o.daily.length / 2))
-  // A small base makes a giant percent (10 → 200 is +1900%): below 20 before, the value before; beyond ±500%, how many times.
-  const diff = (now, before, worseUp) => {
-    if (!comparable) return ''
-    if (!before) return now ? `<span class="delta ${worseUp ? 'bad' : 'meta'}">${L.dnew}</span>` : ''
-    const pct = Math.round((now - before) / before * 100)
-    if (!pct) return `<span class="delta meta">=</span>`
-    const cls = worseUp === undefined ? 'meta' : (pct > 0) === worseUp ? 'bad' : 'ok'
-    const text = before < 20 ? L.dwas(num(before)) : Math.abs(pct) > 500 ? `×${num(Math.round(now / before))}` : `${pct > 0 ? '+' : ''}${pct}%`
-    return `<span class="delta ${cls}" title="${esc(L.dtip(pct))}">${pct > 0 ? '▲' : '▼'} ${text}</span>`
-  }
+  const diff = (now, before, worseUp) => comparable ? deltaChip(now, before, { worseUp }) : ''
   const points = n.score - b.score
   const vs = !comparable ? L.noCompare : o.days === 1 ? L.vsDay : L.vsBefore(o.days)
   const series = (k) => o.daily.map((d) => d[k])
@@ -1989,7 +1987,7 @@ async function overview() {
   return `
     ${verdict}
     <section class="numbers">
-      ${tile(L.overall, n.score, band(n.score), comparable && b.visits ? `<span class="delta ${points > 0 ? 'bad' : points < 0 ? 'ok' : 'meta'}">${points > 0 ? '▲ +' : points < 0 ? '▼ ' : ''}${points || '='}</span>` : '', 'score',
+      ${tile(L.overall, n.score, band(n.score), comparable && b.visits ? deltaChip(n.score, b.score, { kind: 'pts', worseUp: true }) : '', 'score',
         `<span class="pill ${band(n.score)}">${say(n.score)}</span> ${L.allScreens}`)}
       ${tile(L.visits, num(n.visits), '', diff(n.visits, b.visits), 'visits', L.sessions(n.sessions))}
       ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', vs)}
@@ -2251,7 +2249,9 @@ function addCsvButtons() {
     if (!t || card.querySelector(':scope > .csv')) return
     const b = Object.assign(document.createElement('button'), { className: 'small csv', textContent: L.csv, title: L.csvTip })
     b.addEventListener('click', () => {
-      const cell = (c) => `"${c.textContent.replace(/\s+/g, ' ').trim().replace(/"/g, '""')}"`
+      const q = (x) => `"${x.replace(/\s+/g, ' ').trim().replace(/"/g, '""')}"`
+      // The number cell exports the number only: the delta chip is dropped from the text.
+      const cell = (c) => { const k = c.cloneNode(true); k.querySelectorAll('.delta').forEach((d) => d.remove()); return q(k.textContent) }
       // Action columns (copy, watch…) are not data: a header or cell marked data-nocsv stays out, the whole column with it.
       const skip = new Set([...(t.tHead?.rows[0]?.cells ?? [])].flatMap((c, j) => c.hasAttribute('data-nocsv') ? [j] : []))
       const rows = [...t.querySelectorAll('tr')].filter((r) => !r.hidden && !r.classList.contains('detail'))
@@ -2599,7 +2599,7 @@ async function product() {
           return `<tr class="row" data-open="a${i}" tabindex="0"><td><span class="nm">${esc(a.area)}</span><span class="meta">${PR().nScreens(a.screens.length)}</span></td>
           <td class="n">${num(a.visits)}${countDelta(a.visits, b?.visits)}<div class="meta">${pctOf(a.share)} ${PR().share}</div></td>
           <td class="n">${pctOf(a.session_share)}<div class="bar"><i style="width:${a.session_share * 100}%;background:var(--fill)"></i></div><div class="meta">${PR().nPeople(a.users)}</div></td>
-          <td class="n">${scoreHtml(a.score)}${scoreDelta(a.score, b?.score)}</td><td class="n">${num(a.failures)}${countDelta(a.failures, failsBefore)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`, 120, 28, a.daily.map((d) => d.day))}</td></tr>
+          <td class="n">${scoreHtml(a.score)}${scoreDelta(a.score, b?.score)}</td><td class="n">${num(a.failures)}${countDelta(a.failures, failsBefore, true)}</td><td>${spark(a.daily.map((d) => d.n), `${a.area}: ${PR().trend}`, 120, 28, a.daily.map((d) => d.day))}</td></tr>
           <tr class="detail" data-of="a${i}" hidden><td colspan="6"><ul class="counts">${a.screens.map((r) => `<li><a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })}>${esc(screenText(r.route) || r.route)}</a>
             <span class="meta">${num(r.visits)} · ${L.score.toLowerCase()} ${r.score} · ${num(r.failures)} ${PR().failures.toLowerCase()}</span></li>`).join('')}</ul></td></tr>` }).join(''))}
     </section>
@@ -2625,8 +2625,7 @@ function barsChart(title, days, value, tip) {
       <i class="acc" style="height:${Math.max(1.5, value(d) / top * 100)}%"></i></div>`).join('')}</div></div>${dayAxis(days.map((d) => d.day), 'sm')}</section>`
 }
 // Now against before, where down is the bad direction (engagement): ▼ red, ▲ green.
-const change = (now, before) => before === null || before === undefined ? '' : now === before ? '<span class="delta meta">=</span>'
-  : `<span class="delta ${now < before ? 'bad' : 'ok'}">${now < before ? '▼' : '▲'}&nbsp;${FT().before(num(before))}</span>`
+const change = (now, before) => deltaChip(now, before, { worseUp: false })
 const ruleText = (r) => {
   if (r.kind === 'screen') return screenText(r.key) || r.key
   if (r.kind === 'control') { const [route, target] = r.key.split('\t'); return controlText(route, target) || `${screenText(route) || route} › ${target}` }
@@ -2652,7 +2651,7 @@ async function features() {
         ${spark(ft.daily.map((d) => d.n), `${ft.name}: ${FT().usesByDay}`, 120, 28, ft.daily.map((d) => d.day))}</div>
       <div class="adopt"><div class="meta">${FT().inSessions}${help('adoption')} ${Math.round(ft.session_share * 100)}% ${FT().sessionsOf()}</div>
         <div class="bar"><i style="width:${ft.session_share * 100}%;background:var(--fill)"></i></div></div>
-      <div class="meta">${FT().peopleOf(ft.users, r.active_users)}${countDelta(ft.users, ft.before_detail?.users)} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures)}</div>
+      <div class="meta">${FT().peopleOf(ft.users, r.active_users)}${countDelta(ft.users, ft.before_detail?.users)} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()} · ${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures, true)}</div>
       <div class="actions-row"><button class="primary small" data-feat="open" data-id="${esc(ft.id)}">${FT().analyse}</button>
         <button class="small" data-feat="edit" data-id="${esc(ft.id)}">${FT().edit}</button></div>
     </section>`).join('')}</div>`
@@ -2670,7 +2669,7 @@ async function featureDetail(ft, r) {
       <div class="card"><div class="label">${FT().uses}</div><div class="big">${num(ft.uses)}${change(ft.uses, ft.before)}</div></div>
       <div class="card"><div class="label">${FT().inSessions}${help('adoption')}</div><div class="big">${Math.round(ft.session_share * 100)}%</div><div class="meta">${FT().sessionsOf()}</div></div>
       <div class="card"><div class="label">${FT().people}</div><div class="big">${num(ft.users)}${countDelta(ft.users, ft.before_detail?.users)}</div><div class="meta">${FT().peopleOf(ft.users, r.active_users)} · ${num(ft.accounts)} ${FT().accounts.toLowerCase()}</div></div>
-      <div class="card"><div class="label">${FT().score}${help('featureScore')}</div><div class="big ${band(ft.score)}">${ft.score}${scoreDelta(ft.score, ft.before_detail?.score)}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures)}</div></div>
+      <div class="card"><div class="label">${FT().score}${help('featureScore')}</div><div class="big ${band(ft.score)}">${ft.score}${scoreDelta(ft.score, ft.before_detail?.score)}</div><div class="meta">${num(ft.failures)} ${FT().failures.toLowerCase()}${countDelta(ft.failures, ft.before_detail?.failures, true)}</div></div>
     </section>
     ${barsChart(FT().usesByDay, ft.daily, (d) => d.n, (d) => FT().dayTip(d.day, d.n))}
     <section class="card"><div class="label">${FT().byAccount}${help('byAccount')}</div><div class="meta">${FT().byAccountHint}</div>
@@ -2757,11 +2756,9 @@ async function onFeatureClick(e) {
 // An account's trend, as a chip that says it in words (the colour only repeats it).
 const TREND = { down: ['bad', '▼'], flat: ['flat', '='], up: ['ok', '▲'] }
 const trendChip = (t) => t ? `<span class="pill trend ${TREND[t][0]}">${TREND[t][1]} ${AC().trend[t]}</span>` : '<span class="meta">—</span>'
-// A number now against before, as a %: coloured only when it moved beyond chance (the server's move), the number before in the tooltip.
 const pctText = (now, before) => !before ? (now ? AC().fromZero : '=') : Math.round((now - before) / before * 100) || '='
-const accDelta = (now, before, mv) => { if (before === null || before === undefined) return ''
-  const p = pctText(now, before), cls = mv === 'down' ? 'bad' : mv === 'up' ? 'ok' : 'meta'
-  return `<span class="delta ${cls}" title="${esc(FT().before(num(before)))}">${typeof p === 'number' ? `${p > 0 ? '▲ +' : '▼ −'}${Math.abs(p)}%` : p === '=' ? '=' : '▲ ' + p}</span>` }
+// A number now against before: coloured only when it moved beyond chance (the server's move).
+const accDelta = (now, before, mv) => deltaChip(now, before, { significant: mv === 'up' || mv === 'down', worseUp: false })
 // What customer success pastes in a ticket or a chat: who, the trend, how much it suffers, the numbers before → now, the features that fell.
 function accountSummary(a, e) {
   const line = (label, now, before) => `${label}: ${before === null || before === undefined ? num(now) : `${num(before)} → ${num(now)}`}${before ? (typeof pctText(now, before) === 'number' ? ` (${pctText(now, before) > 0 ? '+' : '−'}${Math.abs(pctText(now, before))}%)` : '') : ''}`
@@ -2804,7 +2801,7 @@ async function accounts() {
         <td>${accCell(a.account)}</td>
         <td>${trendChip(a.trend)}</td>
         <td class="n">${scoreHtml(a.now.score)}${scoreDelta(a.now.score, a.before?.score)}</td>
-        <td class="n">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures)}</td>
+        <td class="n">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures, true)}</td>
         <td class="n">${num(a.now.users_day)}${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</td>
         <td class="n">${num(a.now.sessions_day)}${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</td>
         <td class="n">${num(a.now.users)}</td>
@@ -2838,7 +2835,7 @@ async function accountDetail(e, id) {
   if (!a) return head + empty(L.noVisits)
   return head + `<section class="numbers">
       <div class="card"><div class="label">${AC().score}${help('overall')}</div><div class="big ${band(a.now.score)}">${a.now.score}${scoreDelta(a.now.score, a.before?.score)}</div><div class="meta">${say(a.now.score)}</div></div>
-      <div class="card"><div class="label">${AC().failures}</div><div class="big">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures)}</div></div>
+      <div class="card"><div class="label">${AC().failures}</div><div class="big">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures, true)}</div></div>
       <div class="card"><div class="label">${AC().usersDay}${help('usersDay')}</div><div class="big">${num(a.now.users_day)} ${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().sessionsDay}</div><div class="big">${num(a.now.sessions_day)} ${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</div></div>
       <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
