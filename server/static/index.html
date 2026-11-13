@@ -484,7 +484,11 @@ header.busy .progress { opacity: 1; transition-delay: .12s; }
 .fbar { position: sticky; top: var(--hh, 0px); z-index: 4; display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin: -16px -16px 12px; padding: 8px 16px;
   background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
 .fbar-title { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.fbar-act { display: flex; gap: 8px; flex-wrap: wrap; }
+.fbar-act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* The note after a copy, with its Acompanhar também button. */
+.toast { position: fixed; z-index: 60; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px; border-radius: 10px; background: var(--fg); color: var(--surface); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.toast button { background: var(--surface); color: var(--fg); border-color: var(--surface); }
 code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty))) .t { display: none; }
 .xl { display: flex; margin: 4px 28px 0 0; font-size: 11px; line-height: 14px; color: var(--faint); }
 .xl.sm { margin-right: 0; }
@@ -992,7 +996,7 @@ const L = PT ? {
   setupTitle: (p) => `Ligue o ${p} ao Termometro`, setupIntro: 'Ainda não chegou nenhum evento deste projeto. Escolha um dos jeitos abaixo, abra o seu app e clique em qualquer coisa: esta tela muda sozinha.',
   withBundler: 'Com bundler (Vite, webpack, Next…)', withoutBundler: 'Sem bundler: uma tag no HTML', routerHint: 'Com router, passe pagesFromRouter: true e chame termometro.page(rota) a cada troca de tela — veja o README.',
   originsHint: (o) => `Esta chave só aceita envios de: ${o}.`, anyOrigin: 'Esta chave aceita envios de qualquer origem. Para restringir, preencha "origins" no projeto.',
-  waiting: 'Esperando o primeiro evento…', copy: 'Copiar', copied: 'Copiado',
+  waiting: 'Esperando o primeiro evento…', copy: 'Copiar', copied: 'Copiado', alsoFollow: 'Acompanhar também',
   nodata: { title: (d) => d === 1 ? 'Sem dados neste dia' : `Sem dados nestes ${d} dias`, last: (w, a) => `O último evento chegou em ${w} (${a}).`,
     lastCut: (w, a) => `O último evento com estes filtros chegou em ${w} (${a}).`, lastAny: (a) => `Sem os filtros, o último chegou ${a}.`,
     noneCut: 'Nenhum evento com estes filtros em todo o histórico guardado.', tooOld: (n) => `É mais antigo que os ${n} dias que o painel mostra.`,
@@ -1245,7 +1249,7 @@ const L = PT ? {
   setupTitle: (p) => `Connect ${p} to Termometro`, setupIntro: 'No event from this project yet. Pick one of the ways below, open your app and click anything: this screen changes by itself.',
   withBundler: 'With a bundler (Vite, webpack, Next…)', withoutBundler: 'Without a bundler: one tag in your HTML', routerHint: 'With a router, pass pagesFromRouter: true and call termometro.page(route) on every screen change — see the README.',
   originsHint: (o) => `This key only accepts events from: ${o}.`, anyOrigin: 'This key accepts events from any origin. To restrict it, fill the project\'s "origins".',
-  waiting: 'Waiting for the first event…', copy: 'Copy', copied: 'Copied',
+  waiting: 'Waiting for the first event…', copy: 'Copy', copied: 'Copied', alsoFollow: 'Follow too',
   nodata: { title: (d) => d === 1 ? 'No data on this day' : `No data in these ${d} days`, last: (w, a) => `The last event arrived on ${w} (${a}).`,
     lastCut: (w, a) => `The last event matching these filters arrived on ${w} (${a}).`, lastAny: (a) => `Without the filters, the last one arrived ${a}.`,
     noneCut: 'No event matches these filters in all the kept history.', tooOld: (n) => `That is older than the ${n} days the dashboard shows.`,
@@ -1875,6 +1879,17 @@ function followCard(follows) {
       ${follows.length > TODO_TOP ? `<button class="small" id="fw-all" aria-expanded="false" data-n="${follows.length}">${W.all(follows.length)}</button>` : ''}`
       : `<p class="meta fw-empty">${W.empty}</p>`}</section>`
 }
+// A small note at the bottom after a copy; with `follow` ({ kind, key, label }) it also offers Acompanhar, which the
+// [data-follow] handler below takes like any other follow button.
+function toast(text, follow) {
+  document.querySelector('.toast')?.remove()
+  const t = Object.assign(document.createElement('div'), { className: 'toast', role: 'status' })
+  t.innerHTML = `<span>${esc(text)}</span>${follow ? `<button class="small" data-follow="${esc(follow.kind)}" data-key="${esc(follow.key)}" data-label="${esc(follow.label)}">${L.alsoFollow}</button>` : ''}`
+  document.body.append(t)
+  setTimeout(() => t.remove(), follow ? 7000 : 2000)
+}
+// What a copy button says about its subject when it can be followed (data-fk, data-fkey, data-flabel).
+const followOfButton = (b) => b.dataset.fk ? { kind: b.dataset.fk, key: b.dataset.fkey, label: b.dataset.flabel } : null
 document.addEventListener('click', async (e) => {
   const more = e.target.closest?.('[data-todo-more]')
   if (more) {
@@ -1895,6 +1910,7 @@ document.addEventListener('click', async (e) => {
   if (!fb && !stop) return
   if (stop && !confirm(L.fw.confirmStop(stop.dataset.label))) return
   ;(fb ?? stop).disabled = true
+  fb?.closest('.toast')?.remove()
   const res = fb ? await fetch(`/api/follow?${query()}`, { method: 'POST', body: JSON.stringify({ kind: fb.dataset.follow, key: fb.dataset.key, label: fb.dataset.label }) })
     : await fetch(`/api/follow?${new URLSearchParams({ project: $('#project').value, id: stop.dataset.unfollow })}`, { method: 'DELETE' })
   if (res.status === 401) return boot()
@@ -2110,10 +2126,10 @@ async function frustration() {
 const F = () => L.failureTab
 // The failure detail's and the screen detail's own words (kept apart from L, which several hands change).
 const FD_PT = { perDay: 'Por dia', byDay: 'Vezes por dia', peak: (n, d) => `pico de ${n}× em ${d}`, firstSeen: 'Primeira vez', lastSeen: 'Última vez', inVersion: (v) => `na versão ${v}`,
-  started: 'apareceu', accounts: 'Contas atingidas', people: 'Pessoas atingidas', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copiar demanda',
+  started: 'apareceu', accounts: 'Contas atingidas', people: 'Pessoas atingidas', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copiar como demanda',
   unnamed: { icon: 'Ícone sem nome', button: 'Botão sem nome', link: 'Link sem nome', field: 'Campo sem nome', form: 'Formulário sem nome', other: 'Elemento sem nome' }, accountsMd: 'Contas' }
 const FD_EN = { perDay: 'Per day', byDay: 'Times per day', peak: (n, d) => `peak of ${n}× on ${d}`, firstSeen: 'First seen', lastSeen: 'Last seen', inVersion: (v) => `in version ${v}`,
-  started: 'appeared', accounts: 'Accounts hit', people: 'People hit', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copy request',
+  started: 'appeared', accounts: 'Accounts hit', people: 'People hit', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copy as a request',
   unnamed: { icon: 'Unnamed icon', button: 'Unnamed button', link: 'Unnamed link', field: 'Unnamed field', form: 'Unnamed form', other: 'Unnamed element' }, accountsMd: 'Accounts' }
 const FD = () => (PT ? FD_PT : FD_EN)
 const when = (at) => (at ? new Date(at).toLocaleString(PT ? 'pt-BR' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—')
@@ -2182,8 +2198,16 @@ function failureChart(d) {
 const hitList = (title, list, name, link) => `<div><div class="label">${title}</div>${list?.length
   ? `<ul class="counts">${list.map((x) => `<li><a ${linkAttrs(link(x.key))} title="${esc(x.key)}">${esc(name(x.key))}</a><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 
+// A failure is followed by its type and detail; the copy buttons carry what the toast needs unless it already is.
+const failFollowButton = (d, follows) => follows.some((x) => x.kind === 'failure' && x.key === failKey(d.type, d.detail))
+  ? `<span class="pill same fw-on" title="${esc(L.fw.followTip)}">✓ ${L.fw.following}</span>`
+  : `<button class="small" data-follow="failure" data-key="${esc(failKey(d.type, d.detail))}" data-label="${esc(`${L.names[d.type] ?? d.type}: ${d.detail}`)}" title="${esc(L.fw.followTip)}">${L.fw.follow}</button>`
+const failKey = (type, detail) => `${type}\t${detail}`
+const failFollowAttrs = (type, detail, follows) => follows.some((x) => x.kind === 'failure' && x.key === failKey(type, detail)) ? ''
+  : followAttrs({ kind: 'failure', key: failKey(type, detail) })
 async function failures() {
-  const { failures: list, days } = await read('/api/failures')
+  const [{ failures: list, days }, fw] = await Promise.all([read('/api/failures'), read('/api/follow').catch(() => ({ items: [] }))])
+  const follows = fw.items ?? []
   if (!list.length) return empty(F().none)
   const d = state.signal ? await read('/api/failure', { signal: state.signal, detail: state.detail }) : null
   // Back from a failure: the one just seen stays marked, and the list comes back where it was on the screen.
@@ -2199,7 +2223,7 @@ async function failures() {
   const detail = d?.n ? `<section class="card failure">
       <div class="fbar"><button class="small" data-fail-back>← ${F().back}</button>
         <span class="fbar-title" title="${esc(d.detail)}">${esc(L.names[d.type] ?? d.type)}: ${esc(d.detail)}</span>
-        <span class="fbar-act"><button class="small" data-copy="${esc(issueMarkdown(d))}">${F().copyIssue}</button><button class="small" data-copy="${esc(link)}">${F().copyLink}</button></span></div>
+        <span class="fbar-act"><button class="small" data-copy="${esc(issueMarkdown(d))}"${failFollowAttrs(d.type, d.detail, follows)}>${F().copyIssue}</button>${failFollowButton(d, follows)}<button class="small" data-copy="${esc(link)}">${F().copyLink}</button></span></div>
       <div class="fhead">${d.new ? `<span class="pill bad">${F().isNew}</span> ` : ''}<span class="meta">${esc(F().occurrences(d))}</span>
         ${d.detail.length > 60 ? `<div class="title"><code>${esc(d.detail)}</code></div>` : ''}</div>
       <div class="fspan">
@@ -2227,7 +2251,7 @@ async function failures() {
         <td>${spark(f.daily, `${FD().byDay}: ${num(Math.min(...f.daily))}–${num(Math.max(...f.daily))}`, 96, 24, days)}</td>
         <td class="n">${num(f.sessions)}</td><td class="n" data-lo>${num(f.users)}</td><td class="n" data-lo>${num(f.n)}</td>
         <td data-lo><code>${esc(f.first_version)}</code></td><td class="meta" data-lo>${ago(f.last_at)}</td>
-        <td data-lo><button class="small" data-copy-failure title="${esc(F().copyIssue)}">${FD().copyRow}</button></td></tr>
+        <td data-lo><button class="small" data-copy-failure title="${esc(F().copyIssue)}"${failFollowAttrs(f.type, f.detail, follows)}>${FD().copyRow}</button></td></tr>
         ${subRow([[L.users, num(f.users)], [L.times, num(f.n)], [F().since, `<code>${esc(f.first_version)}</code>`], [F().last, ago(f.last_at)]], `data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}"`, isSel(f) ? 'sel' : '')}`).join(''))}</section>`
 }
 
@@ -2324,7 +2348,7 @@ document.addEventListener('click', (e) => {
   const text = read('/api/failure', params).then((d) => issueMarkdown(d, link))
   const item = typeof ClipboardItem !== 'undefined' ? new ClipboardItem({ 'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })) }) : null
   ;(item ? navigator.clipboard.write([item]) : text.then((t) => navigator.clipboard.writeText(t)))
-    .then(() => { b.textContent = L.copied; setTimeout(() => { b.textContent = was }, 1500) }, () => {})
+    .then(() => { b.textContent = L.copied; setTimeout(() => { b.textContent = was }, 1500); const f = followOfButton(b); if (f) toast(L.copied, f) }, () => {})
 }, true)
 
 async function showSession(button) {
@@ -3332,7 +3356,8 @@ function onContentClick(e) {
   const copy = e.target.closest('[data-copy]')
   if (copy) {
     const was = copy.textContent
-    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = was }, 1500) })
+    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = was }, 1500)
+      const f = followOfButton(copy); if (f) toast(L.copied, f) })
     return
   }
   const flow = e.target.closest('[data-flow]')
