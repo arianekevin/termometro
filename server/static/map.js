@@ -37,7 +37,7 @@
     back: '← Todas as rotas', times: (n) => `${fmt(n)} ${n === 1 ? 'vez' : 'vezes'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'clique' : 'cliques'}`,
     irritates: (p) => `${p} irrita`, backForth: 'vai e volta', after: (n) => `Depois: ${n}`, before: (n) => `Antes: ${n}`,
     arrivals: (n, total) => `${fmt(n)} das ${fmt(total)} chegadas`,
-    noSteps: 'Ainda não há sequências de cliques nesta tela.', noStrong: 'Nenhum passo chega a 15% do que vem depois: as pessoas se espalham.',
+    noSteps: 'Ainda não há sequências de cliques nesta tela: cada visita teve um clique só, ou nenhum.', fewSteps: (n, k) => `Há ${fmt(n)} sequências de cliques, mas nenhuma se repetiu ${k} vezes ainda: com mais uso, as setas aparecem.`, noStrong: 'Nenhum passo chega a 15% do que vem depois: as pessoas se espalham.',
     noProblems: 'Nada nesta tela irrita quem usa neste período.', noClicks: 'Nenhum clique nesta tela neste período.',
     kinds: { rage: 'cliques repetidos de irritação', dead: 'clicou e nada aconteceu', errors: 'erro logo depois',
       retry: 'precisou clicar de novo', near_miss: 'clicou do lado, quase acertou' },
@@ -54,6 +54,9 @@
     pickedNone: (a) => `Não há clique seguinte registrado depois de ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irrita ${p} das vezes que é clicado: ${why}. ${advice}`,
     copyNote: 'Copiar a frase', copiedNote: 'Copiado',
+    howTo: { usage: (n, c) => `Como ler: quanto mais vermelho, mais clicam. Aqui, ${n} é o mais clicado (${c}).`,
+      problems: (n, p) => `Como ler: a cor é a parte dos cliques que vira irritação. Aqui, ${n}: ${p} dos cliques irritam.`,
+      routes: (a, p, b) => `Como ler: a seta vai de um elemento para o que clicam logo depois; o % é quem segue por ali. Aqui, depois de ${a}, ${p} clicam em ${b}.` },
     causesTitle: 'Por que irrita', whyNote: (n, p, list, fix) => `${n}: ${p} dos cliques irritam. Por quê: ${list}. O que fazer: ${fix}`,
     noCauses: 'Nada irrita neste elemento no período.',
     cause: { rage_waiting: (c) => `clicou de novo enquanto carregava: o botão seguiu clicável${c.slow ? ` (${c.slow} levou ${secs(c.slow_ms)} na mediana)` : ''}`,
@@ -89,7 +92,7 @@
     back: '← All routes', times: (n) => `${fmt(n)} ${n === 1 ? 'time' : 'times'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'click' : 'clicks'}`,
     irritates: (p) => `${p} irritate`, backForth: 'back and forth', after: (n) => `Next: ${n}`, before: (n) => `Before: ${n}`,
     arrivals: (n, total) => `${fmt(n)} of ${fmt(total)} arrivals`,
-    noSteps: 'No click sequences on this screen yet.', noStrong: 'No step reaches 15% of what comes next: people scatter.',
+    noSteps: 'No click sequences on this screen yet: each visit had one click, or none.', fewSteps: (n, k) => `There are ${fmt(n)} click sequences, but none repeated ${k} times yet: with more use, the arrows show up.`, noStrong: 'No step reaches 15% of what comes next: people scatter.',
     noProblems: 'Nothing on this screen irritates people in this period.', noClicks: 'No clicks on this screen in this period.',
     kinds: { rage: 'angry repeated clicks', dead: 'clicked and nothing happened', errors: 'error right after',
       retry: 'had to click again', near_miss: 'clicked beside it, nearly hit' },
@@ -106,6 +109,9 @@
     pickedNone: (a) => `No next click recorded after ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irritates ${p} of the times it is clicked: ${why}. ${advice}`,
     copyNote: 'Copy the sentence', copiedNote: 'Copied',
+    howTo: { usage: (n, c) => `How to read it: the redder, the more clicks. Here, ${n} is the most clicked (${c}).`,
+      problems: (n, p) => `How to read it: the colour is the share of clicks that turn into irritation. Here, ${n}: ${p} of the clicks irritate.`,
+      routes: (a, p, b) => `How to read it: the arrow goes from an element to what people click right after; the % is who goes that way. Here, after ${a}, ${p} click ${b}.` },
     causesTitle: 'Why it irritates', whyNote: (n, p, list, fix) => `${n}: ${p} of the clicks irritate. Why: ${list}. What to do: ${fix}`,
     noCauses: 'Nothing about this element irritates in this period.',
     cause: { rage_waiting: (c) => `clicked again while it was loading: the button stayed clickable${c.slow ? ` (${c.slow} took ${secs(c.slow_ms)}, median)` : ''}`,
@@ -267,8 +273,9 @@
   }
   // A step's share: of everything that came right after `from`, how much went to `to`.
   const share = (p) => p.n / (outTotal.get(p.from) || 1)
-  const MIN_N = 5 // a step taken fewer times than this is an accident, not a route
-  const paths = () => (data?.paths || []).filter((p) => p.n >= MIN_N)
+  // A step taken fewer times than this is an accident, not a route; a screen with little use needs fewer.
+  const minN = () => { const v = data?.visits || 0; return v < 100 ? 2 : v < 300 ? 3 : 5 }
+  const paths = () => (data?.paths || []).filter((p) => p.n >= minN())
   const step = (a, b) => paths().find((p) => p.from === a && p.to === b)
   const backAndForth = (p) => { const r = step(p.to, p.from); return share(p) >= MIN && !!r && share(r) >= MIN }
   function bestSteps() { // each element's single most common next step, when it is a real share
@@ -490,6 +497,14 @@
   }
   const redraw = () => { measure(); draw(true) }
 
+  // How to read the lens, with this screen's strongest case as the example; the plain help when there is none.
+  function howTo() {
+    if (lens === 'usage') { const e = used()[0]; return e ? T.howTo.usage(nameOf(e.target), T.clicksN(e.clicks)) : T.help.usage }
+    if (lens === 'problems') { const e = problems()[0]; return e ? T.howTo.problems(nameOf(e.target), pc(e.pain)) : T.help.problems }
+    const p = bestSteps()[0]
+    return p ? T.howTo.routes(nameOf(p.from), pc(share(p)), nameOf(p.to)) : T.help.routes
+  }
+
   // ---------- panel ----------
   const btn = `font:inherit;font-size:12px;background:${C.surface};border:1px solid ${C.line};color:${C.fg};border-radius:8px;padding:3px 10px;cursor:pointer`
   const chip = (text, color) => `<span style="display:inline-block;font-size:11px;font-weight:600;padding:0 8px;border-radius:999px;color:${color};background:${color}22">${esc(text)}</span>`
@@ -540,7 +555,7 @@
       return {
         title: T.look, lead: esc(T.lookLead),
         items: best.map((p) => item(p.from, `${nameOf(p.from)} → ${nameOf(p.to)}`, pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''))).join(''),
-        empty: !paths().length ? T.noSteps : !best.length ? T.noStrong : '', note: notes.join(' ')
+        empty: !(data?.paths || []).length ? T.noSteps : !paths().length ? T.fewSteps((data.paths || []).length, minN()) : !best.length ? T.noStrong : '', note: notes.join(' ')
       }
     }
     if (lens === 'problems') {
@@ -587,7 +602,7 @@
     else {
       const r = reading()
       body = `
-        <div style="color:${C.faint};font-size:12px;margin-top:6px">${esc(picked ? T.help.picked(nameOf(picked)) : T.help[lens])}</div>
+        <div style="color:${C.faint};font-size:12px;margin-top:6px">${esc(picked ? T.help.picked(nameOf(picked)) : howTo())}</div>
         ${picked ? `<button data-act="unpick" style="${btn};margin-top:10px">${esc(T.back)}</button>` : ''}
         <h2 style="margin:10px 0 0;font-size:15px;line-height:20px">${esc(r.title)}</h2>
         <p style="margin:4px 0 8px;color:${C.fg2}">${r.lead}</p>

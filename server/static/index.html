@@ -838,6 +838,11 @@ const L = PT ? {
   mapTab: { title: 'Mapa da tela', hint: 'A tela desenhada pelas posições dos botões e links: onde está o problema, o que é usado e para onde as pessoas vão depois.',
     lenses: { usage: 'Calor', problems: 'Problemas', routes: 'Rotas' }, lensLabel: 'O que mostrar', views: { desktop: 'Desktop', mobile: 'Celular' }, viewLabel: 'Tamanho da tela',
     lensHint: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Quanto mais quente, mais irrita.', usage: 'Quanto mais quente, mais clicam.' }, scale: { usage: ['menos cliques', 'mais cliques'], problems: ['irrita pouco', 'irrita muito'] }, onlyOf: (x) => `Só as rotas de ${x}.`,
+    howTo: { usage: (n, c, p) => `Como ler: quanto mais vermelho, mais clicam. Aqui, ${n} é o mais clicado: ${c} cliques, ${p}% da tela.`,
+      problems: (n, p, why) => `Como ler: a cor é a parte dos cliques que vira irritação (clicar de novo, não acontecer nada, dar erro). Aqui, ${n}: ${p}% dos cliques irritam${why ? ` — ${why}` : ''}.`,
+      routes: (a, p, b) => `Como ler: cada seta sai de um elemento e vai para o que as pessoas clicam logo depois; o % é a parte de quem segue por ali. Aqui, depois de ${a}, ${p}% clicam em ${b}.`,
+      none: { usage: 'Como ler: quanto mais vermelho, mais clicam.', problems: 'Como ler: a cor é a parte dos cliques que vira irritação; sem cor, nada irrita.',
+        routes: 'Como ler: cada seta sai de um elemento e vai para o que as pessoas clicam logo depois; o % é a parte de quem segue por ali.' } },
     irritates: (p) => `${p}% irrita`, clicks: (n) => n === 1 ? '1 clique' : `${num(n)} cliques`, times: (n) => n === 1 ? '1 vez' : `${num(n)} vezes`, backForth: 'vai e volta',
     arrivals: (n, all) => `${num(n)} das ${num(all)} chegadas`, afterX: (x) => `Depois: ${x}`, beforeX: (x) => `Antes: ${x}`, allRoutes: '← Todas as rotas',
     legend: { best: 'próximo passo mais comum', thick: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais', from: 'de onde chegam',
@@ -867,7 +872,7 @@ const L = PT ? {
     spread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
     noNext: (a) => `Ninguém clica em outro elemento desta tela logo depois de ${a}: costuma ser o fim da tarefa ou a saída da tela.`,
     fixFirst: (a, p, fix) => `${a} irrita ${p}% das vezes que é clicado. ${fix}`, neverN: (n) => `${n} elemento(s) desenhado(s) nunca clicado(s) no período: escondidos, mal nomeados ou sobrando.`,
-    noProblems: 'Nada irrita nos elementos desta tela no período.', noSteps: 'Nenhum passo comum (15% ou mais do que vem depois) entre os elementos desenhados.',
+    noProblems: 'Nada irrita nos elementos desta tela no período.', noSteps: 'Nenhum passo se repete o bastante (15% ou mais do que vem depois) entre os elementos desenhados: as pessoas se espalham, ou ainda há pouco uso.', noSeq: 'Ainda não há sequências de cliques nesta tela: cada visita teve um clique só, ou nenhum.',
     drawn: (when, w) => `Desenho de ${when}, numa janela de ${w} px.`, offMap: (n) => `${n} elemento(s) clicado(s) no período sem posição no desenho (campos de texto, ou telas vistas antes da atualização): estão na lista abaixo.`,
     noLayout: 'Ainda não há desenho desta tela. A prévia aparece quando o app atualizar o pacote termometro para a versão que envia as posições dos elementos (a seguinte à 0.2.5) e alguém abrir esta tela. Até lá, use a lista abaixo ou abra no app.',
     openApp: 'Abrir no app:',
@@ -1092,6 +1097,11 @@ const L = PT ? {
   mapTab: { title: 'Screen map', hint: 'The screen drawn from where its buttons and links sit: where the trouble is, what is used and where people go next.',
     lenses: { usage: 'Heat', problems: 'Problems', routes: 'Routes' }, lensLabel: 'What to show', views: { desktop: 'Desktop', mobile: 'Phone' }, viewLabel: 'Screen size',
     lensHint: { routes: 'The most common way on after each element.', problems: 'The hotter, the more it irritates.', usage: 'The hotter, the more clicks.' }, scale: { usage: ['fewer clicks', 'more clicks'], problems: ['irritates a little', 'irritates a lot'] }, onlyOf: (x) => `Only the routes of ${x}.`,
+    howTo: { usage: (n, c, p) => `How to read it: the redder, the more clicks. Here, ${n} is the most clicked: ${c} clicks, ${p}% of the screen.`,
+      problems: (n, p, why) => `How to read it: the colour is the share of clicks that turn into irritation (clicking again, nothing happening, an error). Here, ${n}: ${p}% of the clicks irritate${why ? ` — ${why}` : ''}.`,
+      routes: (a, p, b) => `How to read it: each arrow goes from an element to what people click right after; the % is the share who go that way. Here, after ${a}, ${p}% click ${b}.`,
+      none: { usage: 'How to read it: the redder, the more clicks.', problems: 'How to read it: the colour is the share of clicks that turn into irritation; no colour, nothing irritates.',
+        routes: 'How to read it: each arrow goes from an element to what people click right after; the % is the share who go that way.' } },
     irritates: (p) => `${p}% irritate`, clicks: (n) => n === 1 ? '1 click' : `${num(n)} clicks`, times: (n) => n === 1 ? 'once' : `${num(n)} times`, backForth: 'back and forth',
     arrivals: (n, all) => `${num(n)} of ${num(all)} arrivals`, afterX: (x) => `Then: ${x}`, beforeX: (x) => `Before: ${x}`, allRoutes: '← All routes',
     legend: { best: 'most common next step', thick: 'thicker arrow = bigger share', min: 'only steps of 15% or more', from: 'where they come from',
@@ -1121,7 +1131,7 @@ const L = PT ? {
     spread: (a) => `After ${a} people spread out: no next step dominates. If there is an expected way, the screen does not make it clear.`,
     noNext: (a) => `Nobody clicks another element of this screen right after ${a}: usually the end of the task or leaving the screen.`,
     fixFirst: (a, p, fix) => `${a} irritates ${p}% of the times it is clicked. ${fix}`, neverN: (n) => `${n} drawn element(s) never clicked in the period: hidden, badly named or not needed.`,
-    noProblems: 'Nothing on this screen\'s elements irritates in the period.', noSteps: 'No common step (15% or more of what follows) between the drawn elements.',
+    noProblems: 'Nothing on this screen\'s elements irritates in the period.', noSteps: 'No step repeats enough (15% or more of what follows) between the drawn elements: people scatter, or there is little use yet.', noSeq: 'No click sequences on this screen yet: each visit had one click, or none.',
     drawn: (when, w) => `Drawn ${when}, in a ${w} px window.`, offMap: (n) => `${n} element(s) clicked in the period with no place in the drawing (text fields, or screens seen before the update): they are in the list below.`,
     noLayout: 'There is no drawing of this screen yet. The preview appears once the app updates the termometro package to the version that sends where elements sit (the one after 0.2.5) and someone opens this screen. Until then, use the list below or open it in the app.',
     openApp: 'Open in the app:',
@@ -2961,7 +2971,8 @@ const mapCauseText = (c) => MP().cause[c.kind](c)
 const mapWhyNote = (x, name) => { const list = mapCauses(x).slice(0, 3)
   return MP().whyNote(name, `${mapPct(x.rate)}%`, list.map((c) => `${mapCauseText(c)} (${MP().times(c.n)})`).join('; '), MP().fix[list[0].kind](list[0])) }
 const STEP_SHARE = 0.15 // a step shown on the map: at least this share of what follows an element...
-const STEP_MIN = 5      // ...and seen at least this many times (2 of 3 is chance, not a route)
+// ...and seen at least this many times (2 of 3 is chance, not a route) — fewer on a screen with little use.
+const stepMin = () => { const v = state.mapData?.visits || 0; return v < 100 ? 2 : v < 300 ? 3 : 5 }
 async function map() {
   const { screens } = await read('/api/usage')
   if (!screens.length) return empty(L.noVisits)
@@ -3021,7 +3032,7 @@ function mapModel() {
 function mapSteps(m, sel) {
   const boxes = m.lay.boxes
   if (sel) return (m.byT[sel]?.out ?? []).filter((p) => boxes[p.to] && boxes[p.from])
-  return m.all.map((x) => x.out[0]).filter((p) => p && p.n >= STEP_MIN && p.share >= STEP_SHARE && boxes[p.from] && boxes[p.to]).sort((a, b) => b.share - a.share)
+  return m.all.map((x) => x.out[0]).filter((p) => p && p.n >= stepMin() && p.share >= STEP_SHARE && boxes[p.from] && boxes[p.to]).sort((a, b) => b.share - a.share)
 }
 
 const mapPct = (r) => Math.round(r * 100)
@@ -3064,16 +3075,39 @@ function mapWhy(x) {
 function mapBody() {
   const m = mapModel(), lay = m.lay, lens = state.mapLens || 'usage', sel = m.byT[state.mapSel] ? state.mapSel : ''
   const unnamed = (t) => m.nameOf(t) || unnamedText(t)
-  const els = m.all.filter((x) => lay.boxes[x.target])
+  // What clicks open (dialogs, menus) are separate layers: only the one holding what is in play is drawn — the picked
+  // element and its steps, the strongest steps, or the five hottest — never all of them one over the other.
+  const layers = lay.layers ?? [], layerOf = {}
+  layers.forEach((l, i) => l.targets.forEach((t) => { layerOf[t] = i }))
+  const allSteps = lens === 'routes' ? mapSteps(m, sel) : []
+  const play = sel ? [sel, ...allSteps.flatMap((p) => [p.from, p.to])]
+    : lens === 'routes' ? allSteps.flatMap((p) => [p.from, p.to])
+    : m.all.filter((x) => lay.boxes[x.target] && (lens === 'problems' ? x.bad : x.clicks))
+      .sort((a, b) => lens === 'problems' ? b.rate - a.rate : b.clicks - a.clicks).slice(0, 5).map((x) => x.target)
+  const votes = layers.map((l, i) => play.filter((t) => layerOf[t] === i).length)
+  const best = Math.max(0, ...votes), shownLayer = best ? votes.lastIndexOf(best) : -1
+  const shown = (t) => layerOf[t] === undefined || layerOf[t] === shownLayer
+  const els = m.all.filter((x) => lay.boxes[x.target] && shown(x.target))
   const off = m.all.filter((x) => !lay.boxes[x.target] && x.clicks).length
   const maxClicks = Math.max(1, ...els.map((x) => x.clicks))
-  const steps = lens === 'routes' ? mapSteps(m, sel) : []
+  const steps = allSteps.filter((p) => shown(p.from) && shown(p.to))
+  const layer = layers[shownLayer]
+  m.lay = { ...lay, boxes: Object.fromEntries(Object.entries(lay.boxes).filter(([t]) => shown(t))),
+    landmarks: [...(lay.landmarks ?? []), ...(layer?.landmarks ?? [])], over: layer ?? { blocks: [], texts: [] } }
   const G = MP().legend
   const legend = lens === 'routes'
     ? `<span><i class="ln go"></i>${G.best}</span><span><i class="ln back"></i>${MP().backForth}</span><span>${G.thick}</span><span>${G.min}</span>${sel ? `<span><i class="ln from"></i>${G.from}</span>` : ''}`
     : `<span class="heatscale">${esc(MP().scale[lens][0])}<i style="background:${heatCss(lens)}"></i>${esc(MP().scale[lens][1])}</span>`
   const when = new Date(lay.at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: 'short' })
-  const hint = sel && lens === 'routes' ? MP().onlyOf(unnamed(sel)) : MP().lensHint[lens]
+  // How to read the lens, with this screen's own strongest case as the example.
+  const H = MP().howTo, total = els.reduce((a, x) => a + x.clicks, 0) || 1
+  const hot = [...els].filter((x) => x.clicks).sort((a, b) => b.clicks - a.clicks)[0]
+  const sore = [...els].filter((x) => x.bad).sort((a, b) => b.rate - a.rate)[0]
+  const strong = [...steps].sort((a, b) => b.share - a.share)[0]
+  const hint = sel && lens === 'routes' ? MP().onlyOf(unnamed(sel))
+    : lens === 'usage' ? (hot ? H.usage(unnamed(hot.target), num(hot.clicks), mapPct(hot.clicks / total)) : H.none.usage)
+    : lens === 'problems' ? (sore ? H.problems(unnamed(sore.target), mapPct(sore.rate), mapWhy(sore)) : H.none.problems)
+    : strong ? H.routes(unnamed(strong.from), mapPct(strong.share), unnamed(strong.to)) : H.none.routes
   return `<p class="meta" id="map-hint" style="margin:8px 0 0">${esc(hint)}</p>
     <div class="mapwrap"><figure class="mapfig"><div id="map-svg">${mapSvg(m, els, steps, lens, sel, maxClicks, unnamed)}</div>
       <figcaption class="maplegend">${legend}</figcaption>
@@ -3098,7 +3132,7 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(b.r, h / 2, w / 2)}" fill="${b.bg ?? 'none'}"${b.bd && !b.sides ? ` stroke="${b.bd}" class="hair"` : ''}${lift ? ' filter="url(#mk-lift)"' : ''}/>` +
       (b.bd && b.sides ? side(b, b.sides) : '') }
   const bar = ([x, y, w, h, c]) => `<rect x="${x}" y="${y + h * 0.28}" width="${w}" height="${h * 0.44}" rx="${h * 0.22}" fill="${c}" fill-opacity=".28"/>`
-  const over = look?.over ?? { blocks: [], texts: [] }
+  const over = lay.over ?? { blocks: [], texts: [] }
   const biggest = over.blocks.reduce((a, b) => (!a || b.box[2] * b.box[3] > a.box[2] * a.box[3] ? b : a), null)
   const scene = !look ? '' : `<rect x="${X0}" y="${Y0}" width="${W}" height="${H}" fill="${look.page ?? '#ffffff'}"/>` +
     look.blocks.map((b) => block(b)).join('') + look.texts.map(bar).join('') +
@@ -3121,7 +3155,8 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     const dim = lens === 'routes' && sel && !touched.has(x.target)
     // A field is named above its box; a button inside it, smaller or on two lines when it must; an icon gets a glyph and its name
     // beside it when there is room.
-    const name = unnamed(x.target), field = mapIsField(x.target), icon = !field && bw <= 48 && bh <= 48
+    // With the app's look, an element with no name gets no made-up label ("Botão sem nome"): it is drawn as it is.
+    const name = look && !m.nameOf(x.target) ? '' : unnamed(x.target), field = mapIsField(x.target), icon = !field && bw <= 48 && bh <= 48
     const st = look?.styles?.[x.target], ink = st?.[1] ? ` style="fill:${st[1]}"` : '', fs = st?.[4] ? Math.min(16, Math.max(9, st[4])) : 13
     const sizes = [fs, fs - 1, fs - 2, fs - 3].filter((v) => v >= 9)
     let text = ''
@@ -3245,7 +3280,7 @@ function mapTop(m, els, steps, lens, unnamed) {
     items = steps.map((p) => mapItem(p.from, `${unnamed(p.from)} → ${unnamed(p.to)}`, `${mapPct(p.share)}%`,
       esc(MP().times(p.n)) + (m.loop(p.from, p.to) ? ' · ' + mapChip('warn', MP().backForth) : '')))
     const strong = steps.find((p) => p.share >= 0.6), loop = steps.find((p) => m.loop(p.from, p.to))
-    note = !steps.length ? MP().noSteps : [strong && MP().readStrong(mapPct(strong.share), unnamed(strong.from), unnamed(strong.to)),
+    note = !steps.length ? (state.mapData.paths.length ? MP().noSteps : MP().noSeq) : [strong && MP().readStrong(mapPct(strong.share), unnamed(strong.from), unnamed(strong.to)),
       loop && MP().readLoop(unnamed(loop.from), unnamed(loop.to)), !strong && !loop && MP().readSpread].filter(Boolean).join(' ')
   } else if (lens === 'problems') {
     title = MP().irritTitle; lead = MP().irritLead

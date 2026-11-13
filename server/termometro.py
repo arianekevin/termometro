@@ -841,9 +841,23 @@ def usage(con, f: Filter) -> dict:
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}
 
 
+MAX_LAYERS = 12
+
+
+def layers_of(extra: dict) -> list:
+    """The layers kept beside a screen's picture. Before 0.2.8 they were one merged addition: it reads as one layer."""
+    if "layers" in extra:
+        return extra["layers"]
+    if extra.get("boxes"):
+        return [{"boxes": extra["boxes"], "landmarks": extra.get("landmarks", []), "styles": extra.get("styles", {}),
+                 "blocks": extra.get("blocks", []), "texts": extra.get("texts", []), "at": 0}]
+    return []
+
+
 def save_layouts(con, layouts: list) -> None:
     """The screen as the last person saw it, per kind of window: one coherent picture, replaced whole. What clicks opened
-    on it (dialogs, menus) is kept apart in `extra` and survives the next whole picture, which is taken with them closed."""
+    on it (a dialog, a menu) is kept apart in `extra` as its own layer and survives the next whole picture, which is taken
+    with them closed. Layers are never merged: two menus opened at the same spot would draw one over the other."""
     for project, route, viewport, vw, vh, dw, dh, boxes, landmarks, look, partial, at in layouts:
         if not partial:
             con.execute("""INSERT INTO layouts (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at, look) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -852,19 +866,13 @@ def save_layouts(con, layouts: list) -> None:
                         (project, route, viewport, vw, vh, dw, dh, boxes, landmarks, at, look))
             continue
         row = con.execute("SELECT extra FROM layouts WHERE project = ? AND route = ? AND viewport = ?", (project, route, viewport)).fetchone()
-        extra = json.loads(row[0]) if row else {}
-        added = {**extra.get("boxes", {}), **json.loads(boxes)}
-        marks = extra.get("landmarks", [])
-        marks += [x for x in json.loads(landmarks) if x not in marks]
+        layers = layers_of(json.loads(row[0]) if row else {})
         new_look = json.loads(look)
-        styles = {**extra.get("styles", {}), **new_look["styles"]}
-        blocks = extra.get("blocks", [])
-        blocks += [b for b in new_look["blocks"] if b not in blocks]
-        texts = extra.get("texts", [])
-        texts += [x for x in new_look["texts"] if x not in texts]
-        extra = json.dumps({"boxes": dict(list(added.items())[-MAX_BOXES:]), "landmarks": marks[-MAX_LANDMARKS:],
-                            "styles": dict(list(styles.items())[-MAX_BOXES:]), "blocks": blocks[-MAX_BLOCKS:], "texts": texts[-MAX_TEXTS:]},
-                           separators=(",", ":"))
+        layer = {"boxes": json.loads(boxes), "landmarks": json.loads(landmarks), "styles": new_look["styles"],
+                 "blocks": new_look["blocks"], "texts": new_look["texts"], "at": at}
+        # Each thing a click opens is its own layer; the same one opened again replaces it, the newest are kept.
+        layers = [x for x in layers if set(x["boxes"]) != set(layer["boxes"])] + [layer]
+        extra = json.dumps({"layers": layers[-MAX_LAYERS:]}, separators=(",", ":"))
         if row:
             con.execute("UPDATE layouts SET extra = ? WHERE project = ? AND route = ? AND viewport = ?", (extra, project, route, viewport))
         else:  # the addition came before the whole screen: it waits for it with an empty drawing
@@ -883,14 +891,18 @@ def layout_read(con, project: str, route: str, viewport: str | None, labels: dic
         return {"layouts": [], "layout": None}
     _, vw, vh, dw, dh, boxes, landmarks, at, extra, look = rows[pick]
     extra, look = json.loads(extra or "{}"), json.loads(look or "{}")
-    # How it looks: the whole picture's, then what clicks opened, drawn on top (a dialog over the page).
-    look = {"page": look.get("page"), "styles": {**extra.get("styles", {}), **look.get("styles", {})},
-            "blocks": look.get("blocks", []), "texts": look.get("texts", []),
-            "over": {"blocks": extra.get("blocks", []), "texts": extra.get("texts", [])}} if look else None
-    boxes = {**extra.get("boxes", {}), **json.loads(boxes)}  # what the whole picture has wins over an older addition
-    landmarks = json.loads(landmarks) + [x for x in extra.get("landmarks", []) if x not in json.loads(landmarks)]
+    base = json.loads(boxes)
+    layers = layers_of(extra)
+    # Every element, for the lists and the arrows; each layer says which elements are only on it, so the drawing shows
+    # a layer only when what it holds is in play.
+    boxes = {**{t: b for x in layers for t, b in x["boxes"].items()}, **base}
+    landmarks = json.loads(landmarks)
+    styles = {**{t: v for x in layers for t, v in x.get("styles", {}).items()}, **look.get("styles", {})}
+    look = {"page": look.get("page"), "styles": styles, "blocks": look.get("blocks", []), "texts": look.get("texts", [])} if look else None
+    layers = [{"targets": [t for t in x["boxes"] if t not in base], "blocks": x.get("blocks", []), "texts": x.get("texts", []),
+               "landmarks": x.get("landmarks", [])} for x in layers]
     return {"layouts": kinds, "layout": {"viewport": pick, "vw": vw, "vh": vh, "dw": dw, "dh": dh, "at": at, "boxes": boxes,
-                                         "landmarks": landmarks, "look": look,
+                                         "landmarks": landmarks, "look": look, "layers": [x for x in layers if x["targets"]],
                                          "labels": {t: labels.get(route + "\t" + t, "") for t in boxes}}}
 
 

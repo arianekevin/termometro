@@ -648,7 +648,16 @@ class Server(unittest.TestCase):
         self.send([inv(1440, [[10, 20, 80, 32], [100, 10, 60, 20], None])], session="closed")
         lay = self.read("/api/usage?project=shop&route=/users")["layout"]
         self.assertEqual(lay["boxes"], {"input#email": [500, 300, 200, 30], "button#new": [10, 20, 80, 32], "a#help": [100, 10, 60, 20]})
-        self.assertEqual(lay["landmarks"], [{"kind": "dialog", "box": [450, 250, 400, 200]}])
+        self.assertEqual(lay["landmarks"], [])  # the dialog's frame is its layer's, not the page's
+        self.assertEqual(lay["layers"], [{"targets": ["input#email"], "blocks": [], "texts": [],
+                                          "landmarks": [{"kind": "dialog", "box": [450, 250, 400, 200]}]}])
+        # a menu opened at the same spot is its own layer; the same dialog opened again replaces its own
+        menu = {"type": "inventory", "route": "/users", "targets": ["button#m1"], "labels": ["Um"],
+                "layout": {"vw": 1440, "vh": 800, "dw": 1440, "dh": 1600, "boxes": [[500, 300, 200, 30]], "partial": True}}
+        self.send([menu], session="menu")
+        self.send([menu], session="menu2")
+        self.assertEqual([x["targets"] for x in self.read("/api/usage?project=shop&route=/users")["layout"]["layers"]],
+                         [["input#email"], ["button#m1"]])
         with t.connect() as con:
             t.apply_retention(con, now=time.time() + 400 * 86400)
             self.assertEqual(con.execute("SELECT COUNT(*) FROM layouts").fetchone()[0], 0)
@@ -663,13 +672,15 @@ class Server(unittest.TestCase):
         lay = self.read("/api/usage?project=shop&route=/c")["layout"]
         self.assertEqual(lay["look"], {"page": "#f3f1ec", "styles": {"a#go": ["#3b3747", "#ffffff", None, 8, 14], "button#x": [None, None, "#000000", 0, 13]},
                                        "blocks": [{"box": [0, 0, 200, 800], "r": 0, "bg": "#2a2733"}, {"box": [240, 20, 600, 300], "r": 12, "bd": "#e0dcd2", "sides": "b"}],
-                                       "texts": [[260, 40, 150, 18, "#555555"]], "over": {"blocks": [], "texts": []}})
+                                       "texts": [[260, 40, 150, 18, "#555555"]]})
         # what a dialog adds is drawn over the page
         self.send([{"type": "inventory", "route": "/c", "targets": ["input#e"], "layout": {
             "vw": 1280, "vh": 800, "dw": 1280, "dh": 900, "boxes": [[500, 300, 200, 30]], "partial": True, "styles": [["#ffffff", "#111111", "#cccccc", 4, 14]],
             "look": {"page": "#f3f1ec", "blocks": [{"box": [450, 250, 400, 200], "bg": "#ffffff", "r": 12}], "texts": []}}}], session="d")
         look = self.read("/api/usage?project=shop&route=/c")["layout"]["look"]
-        self.assertEqual((look["over"]["blocks"], look["styles"]["input#e"]), ([{"box": [450, 250, 400, 200], "r": 12, "bg": "#ffffff"}], ["#ffffff", "#111111", "#cccccc", 4, 14]))
+        lay = self.read("/api/usage?project=shop&route=/c")["layout"]
+        self.assertEqual((lay["layers"][0]["targets"], lay["layers"][0]["blocks"], look["styles"]["input#e"]),
+                         (["input#e"], [{"box": [450, 250, 400, 200], "r": 12, "bg": "#ffffff"}], ["#ffffff", "#111111", "#cccccc", 4, 14]))
 
     def test_usage_of_a_screen_says_why_each_element_irritated(self):
         self.send([{"type": "page", "route": "/u"}, {"type": "click", "route": "/u", "target": "button#s"},
