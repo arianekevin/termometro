@@ -343,8 +343,9 @@
     const ctx = cv.getContext('2d')
     // Each rect's share of its element (a control repeated in a list splits its clicks) on a log scale: the small ones show too.
     // Problems: how much of its clicks irritate, half or more is the hottest. Clicks: in proportion to the most clicked (a square
-    // root, so the second tier still shows), each rect a share of its element — a control repeated in a list splits its clicks.
-    const per = (e) => heatValue(e) / Math.max(1, (geo.get(e.target) || []).length)
+    // root, so the second tier still shows). A control repeated in a list (an icon on each row) is one element: which row got the
+    // click is not known, so every copy shows the element's whole heat.
+    const per = (e) => heatValue(e)
     const top = Math.max(1, ...list.map(per))
     for (const e of list) {
       const w = lens === 'problems' ? Math.min(1, e.pain / 0.5) : Math.sqrt(per(e) / top)
