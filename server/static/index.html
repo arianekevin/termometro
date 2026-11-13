@@ -496,7 +496,7 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .xl span.w { visibility: visible; }
 .heat .xl.hx { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; margin: 2px 0 0; }
 .chart .rule { border-top-style: dashed; }
-.chart .rule em { position: absolute; left: 0; top: -15px; padding-right: 4px; font: normal 11px/14px system-ui, sans-serif; color: var(--faint); pointer-events: none;
+.chart .rule em { position: absolute; z-index: 2; left: 0; top: -15px; padding-right: 4px; font: normal 11px/14px system-ui, sans-serif; color: var(--faint); pointer-events: none;
   background: color-mix(in srgb, var(--surface) 80%, transparent); }
 .spark .pt rect { fill: transparent; } .spark .pt circle { fill: var(--fg2); stroke: none; opacity: 0; } .spark .pt:hover circle { opacity: 1; }
 .pill.flat { background: var(--sunken); color: var(--fg2); }
@@ -543,7 +543,10 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .fw-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .fw-row:first-child { border-top-color: transparent; } .fw-row[hidden] { display: none; } .fw-row > .pill { justify-self: start; }
 .fw-main { min-width: 0; } .fw-main .fw-say { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } .fw-main .meta { font-size: 12px; line-height: 16px; }
-#fw-all { margin-top: 8px; } .fw-empty { margin: 8px 0 0; max-width: 72ch; }
+#fw-all { margin-top: 8px; } .fw-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding-block: 10px; } .fw-line .fw-empty { margin: 0; cursor: help; }
+/* Ver por dia: the two day-by-day cards under one fold. */
+details.byday > summary { cursor: pointer; font-weight: 600; padding: 8px 0; list-style-position: inside; } details.byday[open] > summary { margin-bottom: 8px; }
+details.byday > .card + .card { margin-top: 16px; }
 @media (max-width: 640px) { .fw-row { grid-template-columns: minmax(0, 1fr); } .fw-row .todo-acts { justify-content: flex-start; flex-wrap: wrap; } }
 /* Routing, empty states, links (ux2/a) */
 :root { --link: var(--accent); --link-hover: var(--accent-hover); }
@@ -799,7 +802,7 @@ const L = PT ? {
     nScreens: (n) => plural(n, 'tela', 'telas'), since: 'Desde', used: 'Usaram', noNews: 'Nada novo apareceu neste período.', areaPh: 'área…',
     inSessions: 'Nas sessões', nPeople: (n) => plural(n, 'pessoa', 'pessoas'), watch: 'Vigiar', watchTip: 'Criar uma feature vigiada com este botão' },
   cat: { title: 'Frustração por tipo', hint: 'O que está pesando: cada tipo é uma parte da frustração. O esforço fica à parte.', all: 'Todos os tipos',
-    names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Falha', slowness: 'Lentidão', giving_up: 'Desistência' },
+    names: { irritation: 'Irritação', no_effect: 'Clique sem efeito', failure: 'Erros', slowness: 'Lentidão', giving_up: 'Desistência' },
     what: { irritation: 'rage clicks', no_effect: 'cliques que não fizeram nada', failure: 'erros de tela e do servidor, pedidos recusados', slowness: 'respostas de 3 s ou mais', giving_up: 'formulários abandonados, voltas na hora' },
     effort: 'Esforço', effortUnit: (n) => `${num(n)} ${n === 1 ? 'clique' : 'cliques'} por ação`, effortWhat: 'cliques até concluir uma ação, no caso típico',
     effortSplit: (path, here) => `${num(path)} até a tela + ${num(here)} nela`, effortCol: 'Esforço', share: (p) => `${p}% do total`, by: (c) => `ordenado por ${c}`, why: 'por quê' },
@@ -921,7 +924,7 @@ const L = PT ? {
   groups: { bugs: 'Bugs', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestões', better: 'Melhorou' },
   prev: 'Anterior', next: 'Próxima', range: (a, b, n) => `${a}–${b} de ${n}`, record: 'detalhe', unnamed: 'um elemento sem nome', noCompare: 'sem período anterior para comparar', perDay: 'por dia no período', allScreens: 'em todas as telas',
   bands: { ok: 'baixa (até 19)', warn: 'moderada (20–49)', bad: 'alta (50+)' }, deployTip: (v, d) => `versão ${v} começou em ${d}`,
-  heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, mais frustração naquele dia. Clique na tela para ver os detalhes.',
+  byDay: 'Ver por dia', heat: 'Telas dia a dia', heatHint: 'As telas que mais pesam no período. Quanto mais escura a célula, mais frustração naquele dia. Clique na tela para ver os detalhes.',
   heatTip: (r, d, x) => x ? `${r} · ${dayText(d)}: frustração ${x.score} em ${plural(x.visits, 'visita', 'visitas')}` : `${r} · ${dayText(d)}: sem visitas`, heatScale: 'Frustração do dia',
   forAi: 'Para uma IA analisar', forAiHint: 'O período inteiro num documento, com as definições para ler os números: cole numa IA e peça os problemas e as melhorias. Para a IA consultar sozinha, use o servidor MCP (veja o README).', copyReport: 'Copiar análise (Markdown)', downloadJson: 'Baixar JSON', copying: 'Gerando…', copiedReport: 'Copiado', see: 'Ver',
   insight: {
@@ -986,7 +989,7 @@ const L = PT ? {
     more: (n, k) => `+${n} ${{ screen: 'nesta tela', failure: 'nesta falha', account: 'nesta conta', action: 'nesta ação' }[k] ?? 'aqui'}`, less: 'Esconder',
     alsoHere: 'Também aqui', follow: 'Acompanhar', followTip: 'Guarda o valor de hoje como linha de base; o cartão Acompanhando mostra, nas próximas semanas, se melhorou.',
     following: 'Acompanhando', title: 'Acompanhando', hint: 'O que você decidiu corrigir, contra o valor do dia em que passou a acompanhar.',
-    empty: 'Nada acompanhado ainda. Em "Para fazer", clique em Acompanhar numa linha: o valor de hoje vira a linha de base, e aqui você vê se a correção melhorou, desde o dia em que começou.',
+    emptyShort: 'Nada acompanhado ainda', empty: 'Nada acompanhado ainda. Em "Para fazer", clique em Acompanhar numa linha: o valor de hoje vira a linha de base, e aqui você vê se a correção melhorou, desde o dia em que começou.',
     metric: { score: 'frustração', irritation: 'cliques de raiva por 100 visitas', failure: 'ocorrências por 100 sessões', clicks: 'cliques por vez', people: 'pessoas por dia' },
     state: { better: 'Melhorou', same: 'Igual', worse: 'Piorou', waiting: 'Sem dados ainda' },
     since: (st, d, v) => `${{ better: 'melhorou', same: 'igual', worse: 'piorou', waiting: 'acompanhando' }[st]} desde ${d}${v ? ` (versão ${v})` : ''}`,
@@ -1053,7 +1056,7 @@ const L = PT ? {
     nScreens: (n) => plural(n, 'screen', 'screens'), since: 'Since', used: 'Used', noNews: 'Nothing new showed up in this period.', areaPh: 'area…',
     inSessions: 'In sessions', nPeople: (n) => plural(n, 'person', 'people'), watch: 'Watch', watchTip: 'Create a watched feature with this button' },
   cat: { title: 'Frustration by kind', hint: 'What is weighing: each kind is a part of the frustration. Effort stays apart.', all: 'All kinds',
-    names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Failure', slowness: 'Slowness', giving_up: 'Giving up' },
+    names: { irritation: 'Irritation', no_effect: 'Clicks with no effect', failure: 'Errors', slowness: 'Slowness', giving_up: 'Giving up' },
     what: { irritation: 'rage clicks', no_effect: 'clicks that did nothing', failure: 'screen and server errors, refused requests', slowness: 'answers of 3 s or more', giving_up: 'abandoned forms, quick backs' },
     effort: 'Effort', effortUnit: (n) => `${num(n)} ${n === 1 ? 'click' : 'clicks'} per action`, effortWhat: 'clicks to get an action done, in the typical case',
     effortSplit: (path, here) => `${num(path)} on the way + ${num(here)} on the screen`, effortCol: 'Effort', share: (p) => `${p}% of the total`, by: (c) => `sorted by ${c}`, why: 'why' },
@@ -1175,7 +1178,7 @@ const L = PT ? {
   groups: { bugs: 'Bugs', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestions', better: 'Improved' },
   prev: 'Previous', next: 'Next', range: (a, b, n) => `${a}–${b} of ${n}`, record: 'detail', unnamed: 'an unnamed element', noCompare: 'no previous period to compare with', perDay: 'per day in the period', allScreens: 'on every screen',
   bands: { ok: 'low (up to 19)', warn: 'medium (20–49)', bad: 'high (50+)' }, deployTip: (v, d) => `version ${v} started on ${d}`,
-  heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the more frustration that day. Click a screen for the details.',
+  byDay: 'See by day', heat: 'Screens day by day', heatHint: 'The screens that weigh the most in the period. The darker the cell, the more frustration that day. Click a screen for the details.',
   heatTip: (r, d, x) => x ? `${r} · ${dayText(d)}: frustration ${x.score} over ${plural(x.visits, 'visit', 'visits')}` : `${r} · ${dayText(d)}: no visits`, heatScale: 'Frustration of the day',
   forAi: 'For an AI to analyse', forAiHint: 'The whole period in one document, with the definitions to read the numbers: paste it into an AI and ask for the problems and improvements. For the AI to look things up by itself, use the MCP server (see the README).', copyReport: 'Copy analysis (Markdown)', downloadJson: 'Download JSON', copying: 'Generating…', copiedReport: 'Copied', see: 'See',
   insight: {
@@ -1239,7 +1242,7 @@ const L = PT ? {
     more: (n, k) => `+${n} ${{ screen: 'on this screen', failure: 'in this failure', account: 'in this account', action: 'in this action' }[k] ?? 'here'}`, less: 'Hide',
     alsoHere: 'Also here', follow: 'Follow', followTip: 'Keeps today\'s value as the baseline; the Following card shows over the next weeks whether it got better.',
     following: 'Following', title: 'Following', hint: 'What you decided to fix, against its value on the day you started following it.',
-    empty: 'Nothing followed yet. In "To do", click Follow on a row: today\'s value becomes the baseline, and here you see whether the fix made it better, since the day it started.',
+    emptyShort: 'Nothing followed yet', empty: 'Nothing followed yet. In "To do", click Follow on a row: today\'s value becomes the baseline, and here you see whether the fix made it better, since the day it started.',
     metric: { score: 'frustration', irritation: 'rage clicks per 100 visits', failure: 'occurrences per 100 sessions', clicks: 'clicks per use', people: 'people a day' },
     state: { better: 'Improved', same: 'Same', worse: 'Worse', waiting: 'No data yet' },
     since: (st, d, v) => `${{ better: 'improved', same: 'same', worse: 'worse', waiting: 'following' }[st]} since ${d}${v ? ` (version ${v})` : ''}`,
@@ -1874,10 +1877,10 @@ function followCard(follows) {
       <div class="todo-acts"><button class="small" data-unfollow="${esc(x.id)}" data-label="${esc(name)}">${W.stop}</button>
         <a class="button small primary" ${linkAttrs(x.link)}>${L.todo.evidence}</a></div></li>`
   }
-  return `<section class="card follow"><div class="label">${W.title}${follows.length ? ` · ${follows.length}` : ''}${help('follow')}</div><div class="meta">${W.hint}</div>
+  return `<section class="card follow${follows.length ? '' : ' fw-line'}"><div class="label">${W.title}${follows.length ? ` · ${follows.length}` : ''}${help('follow')}</div>${follows.length ? `<div class="meta">${W.hint}</div>` : ''}
     ${follows.length ? `<ul class="fw-list">${follows.map(row).join('')}</ul>
       ${follows.length > TODO_TOP ? `<button class="small" id="fw-all" aria-expanded="false" data-n="${follows.length}">${W.all(follows.length)}</button>` : ''}`
-      : `<p class="meta fw-empty">${W.empty}</p>`}</section>`
+      : `<span class="meta fw-empty" title="${esc(W.empty)}">${W.emptyShort}</span>`}</section>`
 }
 // A small note at the bottom after a copy; with `follow` ({ kind, key, label }) it also offers Acompanhar, which the
 // [data-follow] handler below takes like any other follow button.
@@ -1982,6 +1985,17 @@ function releaseCard(rel) {
       <a class="button primary" ${linkAttrs({ tab: 'versions', params: { a: c.a, b: c.b } })}>${R.open} →</a></div></section>`
 }
 
+// The cards that read day by day under one fold: open on a wide screen, closed on a phone (until chosen otherwise).
+function byDay(o) {
+  const inner = scoreChart(o) + heatMap(o)
+  if (!inner) return ''
+  const saved = recall('byDay'), open = saved ? saved === '1' : matchMedia('(min-width: 900px)').matches
+  return `<details class="byday" id="byday" ${open ? 'open' : ''}><summary>${L.byDay}</summary>${inner}</details>`
+}
+document.addEventListener('click', (e) => {
+  const sum = e.target.closest?.('details.byday > summary')
+  if (sum) keep('byDay', sum.parentElement.open ? '0' : '1')
+})
 async function overview() {
   const [o, rel, fw] = await Promise.all([read('/api/overview'), lastRelease().catch(() => null), read('/api/follow').catch(() => ({ items: [] }))])
   const n = o.now, b = o.before
@@ -2042,8 +2056,7 @@ async function overview() {
     </section>
     ${insights}
     ${kindsCard(o)}
-    ${scoreChart(o)}
-    ${heatMap(o)}
+    ${byDay(o)}
     <section class="card"><div class="head"><div style="flex:1;min-width:240px"><div class="label">${L.forAi}</div><div class="meta">${L.forAiHint}</div></div>
       <div class="field"><button id="copy-report" class="primary">${L.copyReport}</button><a class="button" style="height:36px;padding:0 12px;border:1px solid var(--line-strong)"
         href="/api/report?${esc(query())}" download="termometro-${esc($('#project').value)}.json">${L.downloadJson}</a></div></div></section>`
