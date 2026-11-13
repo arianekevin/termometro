@@ -713,12 +713,15 @@ addEventListener('scroll', () => helpOpen && placeHelp(), { passive: true, captu
 addEventListener('resize', () => helpOpen && placeHelp())
 addEventListener('hashchange', () => closeHelp())
 const MARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/></svg>'
-const PT = /^pt\b/i.test(navigator.language)
+// The language: the browser's, unless the viewer picked one in ⋯ (kept in this browser; the page reloads to switch).
+const LANG_PICK = (() => { try { return localStorage.getItem('termometro.lang') || 'auto' } catch { return 'auto' } })()
+const PT = LANG_PICK === 'pt' ? true : LANG_PICK === 'en' ? false : /^pt\b/i.test(navigator.language)
 document.documentElement.lang = PT ? 'pt-BR' : 'en'
 // The colours: Nectar by default, or the viewer's pick, kept in this browser.
 // Appearance, per viewer and kept in this browser: colours (warm tones are Nectar's, the default), light or dark,
 // text size, colour-blind mode and less motion. Each one is an attribute on <html> the CSS reads.
 const PREFS = {
+  lang: { label: PT ? 'Idioma' : 'Language', values: PT ? { auto: 'Do navegador', pt: 'Português', en: 'English' } : { auto: 'Browser', pt: 'Português', en: 'English' }, attr: null, off: 'auto' },
   palette: { label: PT ? 'Cores' : 'Colours', values: PT ? { warm: 'Tons quentes', cold: 'Tons frios', contrast: 'Alto contraste' } : { warm: 'Warm tones', cold: 'Cool tones', contrast: 'High contrast' }, attr: 'palette', off: 'warm' },
   theme: { label: PT ? 'Tema' : 'Theme', values: PT ? { system: 'Do sistema', light: 'Claro', dark: 'Escuro' } : { system: 'System', light: 'Light', dark: 'Dark' }, attr: 'theme', off: 'system' },
   text: { label: PT ? 'Tamanho do texto' : 'Text size', values: PT ? { normal: 'Normal', large: 'Grande', larger: 'Maior' } : { normal: 'Normal', large: 'Large', larger: 'Larger' }, attr: 'text', off: 'normal' },
@@ -727,7 +730,7 @@ const PREFS = {
   motion: { label: PT ? 'Reduzir movimento' : 'Reduce motion', values: PT ? { system: 'Do sistema', reduce: 'Sempre' } : { system: 'System', reduce: 'Always' }, attr: 'motion', off: 'system' },
 }
 const pref = (k) => { try { const v = localStorage.getItem('termometro.' + k); return v in PREFS[k].values ? v : PREFS[k].off } catch { return PREFS[k].off } }
-const applyPref = (k) => { const v = pref(k); if (v === PREFS[k].off) delete document.documentElement.dataset[PREFS[k].attr]; else document.documentElement.dataset[PREFS[k].attr] = v }
+const applyPref = (k) => { const v = pref(k); if (!PREFS[k].attr) return; if (v === PREFS[k].off) delete document.documentElement.dataset[PREFS[k].attr]; else document.documentElement.dataset[PREFS[k].attr] = v }
 Object.keys(PREFS).forEach(applyPref)
 const prefsPanel = () => `<div class="prefs" id="prefs" role="dialog" aria-label="${PT ? 'Aparência' : 'Appearance'}">${Object.entries(PREFS).map(([k, p]) =>
   `<div class="pref"><div class="meta">${p.label}${p.hint ? ` <span class="faint">· ${p.hint}</span>` : ''}</div><div class="seg" role="group" aria-label="${p.label}">${Object.entries(p.values).map(([v, t]) =>
@@ -746,6 +749,7 @@ document.addEventListener('click', (e) => {
   }
   if (b) {
     try { localStorage.setItem('termometro.' + b.dataset.pref, b.dataset.value) } catch {}
+    if (b.dataset.pref === 'lang') return location.reload() // every text is picked once, at load
     applyPref(b.dataset.pref)
     b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
     return
@@ -2501,6 +2505,7 @@ async function openMap(route = '', mode = 'heat') {
   const target = new URL(route && !route.includes(':') ? route.replace(/^\//, '') : '', url.endsWith('/') ? url : url + '/')
   target.searchParams.set('termometro_map', token)
   if (mode === 'routes') target.searchParams.set('termometro_mode', 'routes')
+  if (LANG_PICK !== 'auto') target.searchParams.set('termometro_lang', LANG_PICK)
   window.open(target.href, '_blank', 'noopener')
 }
 

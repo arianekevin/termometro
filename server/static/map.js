@@ -15,7 +15,13 @@
   if (!cfg || window.__termometroMapOpen) return
   window.__termometroMapOpen = true
 
-  const pt = /^pt\b/i.test(navigator.language)
+  // The language picked in the panel comes in the link (`termometro_lang`) and is kept for this tab; else the browser's.
+  const langPick = (() => { try {
+    const v = new URLSearchParams(location.search).get('termometro_lang')
+    if (v) sessionStorage.setItem('termometro.lang', v)
+    return sessionStorage.getItem('termometro.lang')
+  } catch { return null } })()
+  const pt = langPick === 'pt' ? true : langPick === 'en' ? false : /^pt\b/i.test(navigator.language)
   const fmt = (n) => Number(n || 0).toLocaleString(pt ? 'pt-BR' : 'en-US')
   const secs = (ms) => `${(ms / 1000).toLocaleString(pt ? 'pt-BR' : 'en-US', { maximumFractionDigits: 1 })} s`
   const pc = (f) => `${Math.round(Math.min(1, f) * 100)}%`
@@ -141,8 +147,8 @@
   // An older collector (before 0.2.5) leaves `termometro_mode` in the address and never passes it on: read it here.
   const params = new URLSearchParams(location.search)
   const urlMode = params.get('termometro_mode')
-  if (urlMode) {
-    params.delete('termometro_mode')
+  if (urlMode || params.has('termometro_lang')) {
+    params.delete('termometro_mode'); params.delete('termometro_lang')
     const rest = params.toString()
     try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash) } catch {}
   }
