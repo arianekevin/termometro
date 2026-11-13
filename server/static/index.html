@@ -295,7 +295,8 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mapsvg .me:hover rect.box, .mapsvg .me:focus-visible rect.box { stroke: var(--accent); stroke-width: 2px; }
 .mapsvg .me.sel rect.box { stroke: var(--accent); stroke-width: 3px; }
 /* Arrows and words on the drawing never take a click or a hover from the elements under them. */
-.mapsvg .arr, .mapsvg .pills { pointer-events: none; }
+.mapsvg .arr, .mapsvg .pills, .mapsvg .heat { pointer-events: none; }
+.heatscale { display: inline-flex; align-items: center; gap: 6px; } .heatscale i { display: inline-block; width: 110px; height: 10px; border-radius: 999px; }
 .mapsvg .arr path { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; opacity: .9; }
 .mapsvg .arr path.go { stroke: var(--accent); } .mapsvg .arr path.back { stroke: var(--warn); }
 .mapsvg .arr path.from { stroke: var(--faint); stroke-width: 1.5px; stroke-dasharray: 4 5; opacity: .8; }
@@ -791,8 +792,8 @@ const L = PT ? {
     then: 'Clicam em', field: 'campo', ofClicks: (n) => `de ${num(n)} cliques`, noEnter: 'Digitam e clicam num botão em vez de Enter', typedIn: 'Digitaram em',
     thenClicked: 'E clicaram em', retry: 'Precisou de um segundo clique', near: 'Cliques que quase acertaram', times: 'Vezes', none: 'Nenhum padrão forte neste período.' },
   mapTab: { title: 'Mapa da tela', hint: 'A tela desenhada pelas posições dos botões e links: onde está o problema, o que é usado e para onde as pessoas vão depois.',
-    lenses: { routes: 'Rotas', problems: 'Problemas', usage: 'Uso' }, lensLabel: 'O que mostrar', views: { desktop: 'Desktop', mobile: 'Celular' }, viewLabel: 'Tamanho da tela',
-    lensHint: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Só acende o que irrita.', usage: 'Quanto cada elemento é clicado.' }, onlyOf: (x) => `Só as rotas de ${x}.`,
+    lenses: { usage: 'Calor', problems: 'Problemas', routes: 'Rotas' }, lensLabel: 'O que mostrar', views: { desktop: 'Desktop', mobile: 'Celular' }, viewLabel: 'Tamanho da tela',
+    lensHint: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Quanto mais quente, mais irrita.', usage: 'Quanto mais quente, mais clicam.' }, scale: { usage: ['menos cliques', 'mais cliques'], problems: ['irrita pouco', 'irrita muito'] }, onlyOf: (x) => `Só as rotas de ${x}.`,
     irritates: (p) => `${p}% irrita`, clicks: (n) => n === 1 ? '1 clique' : `${num(n)} cliques`, times: (n) => n === 1 ? '1 vez' : `${num(n)} vezes`, backForth: 'vai e volta',
     arrivals: (n, all) => `${num(n)} das ${num(all)} chegadas`, afterX: (x) => `Depois: ${x}`, beforeX: (x) => `Antes: ${x}`, allRoutes: '← Todas as rotas',
     legend: { best: 'próximo passo mais comum', thick: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais', from: 'de onde chegam',
@@ -821,7 +822,7 @@ const L = PT ? {
     oneNext: (a, b) => `Quase todo mundo vai de ${a} para ${b}: vale abrir ${b} já com o foco, ou juntar os dois passos.`,
     spread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
     noNext: (a) => `Ninguém clica em outro elemento desta tela logo depois de ${a}: costuma ser o fim da tarefa ou a saída da tela.`,
-    fixFirst: (a, p, fix) => `${a} irrita ${p}% das vezes que é clicado. ${fix}`, neverN: (n) => `${n} elemento(s) desenhado(s) nunca clicado(s) no período (tracejados): escondidos, mal nomeados ou sobrando.`,
+    fixFirst: (a, p, fix) => `${a} irrita ${p}% das vezes que é clicado. ${fix}`, neverN: (n) => `${n} elemento(s) desenhado(s) nunca clicado(s) no período: escondidos, mal nomeados ou sobrando.`,
     noProblems: 'Nada irrita nos elementos desta tela no período.', noSteps: 'Nenhum passo comum (15% ou mais do que vem depois) entre os elementos desenhados.',
     drawn: (when, w) => `Desenho de ${when}, numa janela de ${w} px.`, offMap: (n) => `${n} elemento(s) clicado(s) no período sem posição no desenho (campos de texto, ou telas vistas antes da atualização): estão na lista abaixo.`,
     noLayout: 'Ainda não há desenho desta tela. A prévia aparece quando o app atualizar o pacote termometro para a versão que envia as posições dos elementos (a seguinte à 0.2.5) e alguém abrir esta tela. Até lá, use a lista abaixo ou abra no app.',
@@ -1045,8 +1046,8 @@ const L = PT ? {
     then: 'They click', field: 'field', ofClicks: (n) => `of ${num(n)} clicks`, noEnter: 'They type and click a button instead of Enter', typedIn: 'Typed in',
     thenClicked: 'Then clicked', retry: 'Needed a second click', near: 'Clicks that nearly hit', times: 'Times', none: 'No strong pattern in this period.' },
   mapTab: { title: 'Screen map', hint: 'The screen drawn from where its buttons and links sit: where the trouble is, what is used and where people go next.',
-    lenses: { routes: 'Routes', problems: 'Problems', usage: 'Use' }, lensLabel: 'What to show', views: { desktop: 'Desktop', mobile: 'Phone' }, viewLabel: 'Screen size',
-    lensHint: { routes: 'The most common way on after each element.', problems: 'Lights up only what irritates.', usage: 'How much each element is clicked.' }, onlyOf: (x) => `Only the routes of ${x}.`,
+    lenses: { usage: 'Heat', problems: 'Problems', routes: 'Routes' }, lensLabel: 'What to show', views: { desktop: 'Desktop', mobile: 'Phone' }, viewLabel: 'Screen size',
+    lensHint: { routes: 'The most common way on after each element.', problems: 'The hotter, the more it irritates.', usage: 'The hotter, the more clicks.' }, scale: { usage: ['fewer clicks', 'more clicks'], problems: ['irritates a little', 'irritates a lot'] }, onlyOf: (x) => `Only the routes of ${x}.`,
     irritates: (p) => `${p}% irritate`, clicks: (n) => n === 1 ? '1 click' : `${num(n)} clicks`, times: (n) => n === 1 ? 'once' : `${num(n)} times`, backForth: 'back and forth',
     arrivals: (n, all) => `${num(n)} of ${num(all)} arrivals`, afterX: (x) => `Then: ${x}`, beforeX: (x) => `Before: ${x}`, allRoutes: '← All routes',
     legend: { best: 'most common next step', thick: 'thicker arrow = bigger share', min: 'only steps of 15% or more', from: 'where they come from',
@@ -1075,7 +1076,7 @@ const L = PT ? {
     oneNext: (a, b) => `Nearly everyone goes from ${a} to ${b}: open ${b} already focused, or merge the two steps.`,
     spread: (a) => `After ${a} people spread out: no next step dominates. If there is an expected way, the screen does not make it clear.`,
     noNext: (a) => `Nobody clicks another element of this screen right after ${a}: usually the end of the task or leaving the screen.`,
-    fixFirst: (a, p, fix) => `${a} irritates ${p}% of the times it is clicked. ${fix}`, neverN: (n) => `${n} drawn element(s) never clicked in the period (dashed): hidden, badly named or not needed.`,
+    fixFirst: (a, p, fix) => `${a} irritates ${p}% of the times it is clicked. ${fix}`, neverN: (n) => `${n} drawn element(s) never clicked in the period: hidden, badly named or not needed.`,
     noProblems: 'Nothing on this screen\'s elements irritates in the period.', noSteps: 'No common step (15% or more of what follows) between the drawn elements.',
     drawn: (when, w) => `Drawn ${when}, in a ${w} px window.`, offMap: (n) => `${n} element(s) clicked in the period with no place in the drawing (text fields, or screens seen before the update): they are in the list below.`,
     noLayout: 'There is no drawing of this screen yet. The preview appears once the app updates the termometro package to the version that sends where elements sit (the one after 0.2.5) and someone opens this screen. Until then, use the list below or open it in the app.',
@@ -2871,7 +2872,7 @@ async function map() {
   const project = state.me.projects.find((p) => p.name === $('#project').value)
   const max = Math.max(1, ...d.paths.map((p) => p.n))
   const nameOf = (t, label) => `${screenText(d.route) || d.route} › ${label || L.unnamed}`
-  const lens = state.mapLens || 'routes'
+  const lens = state.mapLens || 'usage'
   const open = project?.url
     ? `<div class="open"><span class="meta">${MP().openApp}</span><button data-open-map="heat">${MP().openHeat}</button><button data-open-map="routes">${MP().openRoutes}</button></div>`
     : `<span class="meta">${L.mapNoUrl}</span>`
@@ -2923,6 +2924,26 @@ function mapSteps(m, sel) {
 }
 
 const mapPct = (r) => Math.round(r * 100)
+// The heat: cool to hot, as on the map over the app. Clicks: a square root of the share of the most clicked; problems: how
+// much of its clicks irritate, half or more is the hottest.
+const MAP_HEAT = { usage: [[0, [59, 130, 246]], [0.3, [34, 197, 94]], [0.55, [250, 204, 21]], [0.78, [249, 115, 22]], [1, [220, 38, 38]]],
+  problems: [[0, [253, 224, 71]], [0.45, [249, 115, 22]], [0.75, [220, 38, 38]], [1, [127, 29, 29]]] }
+const heatCss = (kind) => `linear-gradient(90deg,${MAP_HEAT[kind].map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(',')})`
+function heatAt(kind, t) {
+  const st = MAP_HEAT[kind]; let k = 0; while (k < st.length - 2 && t > st[k + 1][0]) k++
+  const [t0, c0] = st[k], [t1, c1] = st[k + 1], f = Math.min(1, Math.max(0, (t - t0) / (t1 - t0 || 1)))
+  return `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * f)).join(',')})`
+}
+function mapHeat(lay, els, lens) {
+  const list = els.filter((x) => lens === 'problems' ? x.bad : x.clicks)
+  const top = Math.max(1, ...list.map((x) => x.clicks))
+  return `<g class="heat" filter="url(#mk-heat)" aria-hidden="true">${list.map((x) => {
+    const w = lens === 'problems' ? Math.min(1, x.rate / 0.5) : Math.sqrt(x.clicks / top)
+    if (w < 0.04) return ''
+    const [bx, by, bw, bh] = lay.boxes[x.target]
+    return `<ellipse cx="${bx + bw / 2}" cy="${by + bh / 2}" rx="${bw / 2 + 22}" ry="${bh / 2 + 22}" fill="${heatAt(lens, w)}" fill-opacity="${(0.3 + 0.45 * w).toFixed(2)}"/>`
+  }).join('')}</g>`
+}
 // Why an element irritates, in words: the reason the collector saw most, else what kind of trouble it was.
 function mapWhy(x) {
   const c = mapCauses(x)[0]
@@ -2932,19 +2953,16 @@ function mapWhy(x) {
 }
 
 function mapBody() {
-  const m = mapModel(), lay = m.lay, lens = state.mapLens || 'routes', sel = m.byT[state.mapSel] ? state.mapSel : ''
+  const m = mapModel(), lay = m.lay, lens = state.mapLens || 'usage', sel = m.byT[state.mapSel] ? state.mapSel : ''
   const unnamed = (t) => m.nameOf(t) || unnamedText(t)
   const els = m.all.filter((x) => lay.boxes[x.target])
   const off = m.all.filter((x) => !lay.boxes[x.target] && x.clicks).length
   const maxClicks = Math.max(1, ...els.map((x) => x.clicks))
   const steps = lens === 'routes' ? mapSteps(m, sel) : []
-  const ranges = [1, 2, 3, 4].map((i) => [Math.floor(maxClicks * (i - 1) / 4) + 1, Math.ceil(maxClicks * i / 4)])
   const G = MP().legend
   const legend = lens === 'routes'
     ? `<span><i class="ln go"></i>${G.best}</span><span><i class="ln back"></i>${MP().backForth}</span><span>${G.thick}</span><span>${G.min}</span>${sel ? `<span><i class="ln from"></i>${G.from}</span>` : ''}`
-    : lens === 'problems'
-      ? `<span>${G.problems}</span>${G.sev.map((t, i) => `<span><i class="sw" style="background:var(--ms${i + 1})"></i>${t}</span>`).join('')}<span>${G.calm}</span>`
-      : `<span>${G.usage}</span>${ranges.map(([a, b], i) => `<span><i class="sw" style="background:var(--mu${i + 1})"></i>${num(Math.min(a, b))}–${num(b)}</span>`).join('')}<span><i class="sw never"></i>${G.never}</span>`
+    : `<span class="heatscale">${esc(MP().scale[lens][0])}<i style="background:${heatCss(lens)}"></i>${esc(MP().scale[lens][1])}</span>`
   const when = new Date(lay.at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: 'short' })
   const hint = sel && lens === 'routes' ? MP().onlyOf(unnamed(sel)) : MP().lensHint[lens]
   return `<p class="meta" id="map-hint" style="margin:8px 0 0">${esc(hint)}</p>
@@ -2982,14 +3000,15 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     const card = l.kind === 'form' || l.kind === 'dialog' || (l.kind === 'aside' && x > 0)
     return `<rect class="lm ${card ? 'card' : l.kind}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${(card ? 12 : 4) * k}"/>` }).join('')
   const touched = new Set(sel ? [sel, ...steps.map((p) => p.to), ...m.byT[sel].in.filter((p) => p.share >= STEP_SHARE).map((p) => p.from)] : [])
-  const step = (x) => !x.clicks ? 0 : Math.min(4, Math.ceil(x.clicks / maxClicks * 4))
   const pills = [], taken = [...Object.values(lay.boxes), ...(lay.landmarks ?? []).filter((l) => l.kind === 'title' && title).map((l) => l.box)].map((b) => [...b])
   const tipOf = (x) => [unnamed(x.target) + (m.nameOf(x.target) ? '' : ` (${x.target})`), MP().clicks(x.clicks),
     x.bad ? `${MP().irritates(mapPct(x.rate))}${mapWhy(x) ? ` (${mapWhy(x)})` : ''}` : '',
     x.out[0] ? MP().afterX(`${unnamed(x.out[0].to)} ${mapPct(x.out[0].share)}%`) : ''].filter(Boolean).join(' · ')
+  // The number only on the five hottest: the colour says the rest.
+  const hot = new Set(els.filter((x) => x.clicks).sort((a, b) => b.clicks - a.clicks).slice(0, 5).map((x) => x.target))
   const boxes = els.map((x) => {
     const [bx, by, bw, bh] = lay.boxes[x.target]
-    const cls = lens === 'problems' ? (x.sev ? 's' + x.sev : '') : lens === 'usage' ? (step(x) ? 'u' + step(x) : 'never') : ''
+    const cls = '' // the heat layer colours Calor and Problemas
     const dim = lens === 'routes' && sel && !touched.has(x.target)
     // A field is named above its box; a button inside it, smaller or on two lines when it must; an icon gets a glyph and its name
     // beside it when there is room.
@@ -3016,7 +3035,7 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
     }
     // The number in words above the element: how much it irritates, or how much it is clicked.
     if (lens === 'problems' && x.sev) pills.push(mapPill(lay.boxes[x.target], MP().irritates(mapPct(x.rate)), k, B, 'bad', taken))
-    if (lens === 'usage' && x.clicks) pills.push(mapPill(lay.boxes[x.target], MP().clicks(x.clicks), k, B, 'ink', taken))
+    if (lens === 'usage' && x.clicks && hot.has(x.target)) pills.push(mapPill(lay.boxes[x.target], MP().clicks(x.clicks), k, B, 'ink', taken))
     const hit = Math.max(0, 8 * k - Math.min(bw, bh) / 2)
     return `<g class="me ${cls}${sel === x.target ? ' sel' : ''}${dim ? ' dim' : ''}" data-map-el="${esc(x.target)}" tabindex="0" role="button" data-tip="${esc(tipOf(x))}" aria-label="${esc(tipOf(x))}">
       <rect class="hit" x="${bx - hit}" y="${by - hit}" width="${bw + 2 * hit}" height="${bh + 2 * hit}"/>
@@ -3046,7 +3065,7 @@ function mapSvg(m, els, steps, lens, sel, maxClicks, unnamed) {
   }).join('')
   const mk = (id, cls) => `<marker id="${id}" class="${cls}" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="${12 * k}" markerHeight="${12 * k}" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>`
   return `<svg class="mapsvg${look ? ' looks' : ''}" viewBox="${X0} ${Y0} ${W} ${H}" style="max-width:${W}px" data-k="${k}" role="group" aria-label="${esc(MP().title)}">
-    <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}<filter id="mk-lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="${6 * k}" stdDeviation="${10 * k}" flood-color="#000" flood-opacity=".22"/></filter></defs>${scene}${lm}${boxes}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
+    <defs>${mk('mk-go', 'go')}${mk('mk-back', 'back')}<filter id="mk-heat" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter><filter id="mk-lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="${6 * k}" stdDeviation="${10 * k}" flood-color="#000" flood-opacity=".22"/></filter></defs>${scene}${lm}${boxes}${lens === 'routes' ? '' : mapHeat(lay, els, lens)}<g class="arr" aria-hidden="true">${incoming}${arrows}</g>
     <g class="pills" aria-hidden="true">${pills.join('')}</g></svg>`
 }
 
@@ -3164,7 +3183,7 @@ function onMapClick(el) {
 }
 function redrawMap(focus = null) {
   const body = $('#map-body'); if (!body || !state.mapData?.layout) return
-  document.querySelectorAll('[data-map-lens]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mapLens === (state.mapLens || 'routes'))))
+  document.querySelectorAll('[data-map-lens]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mapLens === (state.mapLens || 'usage'))))
   tip.hidden = true
   body.innerHTML = mapBody()
   fitMap()

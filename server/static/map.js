@@ -22,8 +22,8 @@
   const T = pt ? {
     title: 'Termometro · mapa', close: 'Fechar', collapse: 'Recolher', expand: 'Abrir', loading: 'Carregando…',
     days: 'dias', expired: 'O link do mapa expirou: abra de novo pelo painel.', down: 'O Termometro não respondeu.',
-    lenses: { routes: 'Rotas', problems: 'Problemas', usage: 'Uso' },
-    help: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Só acende o que irrita.', usage: 'Quanto cada elemento é clicado.',
+    lenses: { usage: 'Calor', problems: 'Problemas', routes: 'Rotas' },
+    help: { routes: 'O caminho mais comum depois de cada elemento.', problems: 'Quanto mais quente, mais irrita.', usage: 'Quanto mais quente, mais clicam.',
       picked: (n) => `Só as rotas de ${n}.` },
     look: 'O que olhar nesta tela', lookLead: 'Os passos que mais dizem algo, primeiro o mais forte.',
     irritTitle: 'O que irrita nesta tela', irritLead: 'Parte dos cliques que viraram irritação, clique sem resposta ou erro.',
@@ -63,6 +63,7 @@
       near_miss: () => 'aumente a área de clique ou afaste o que está em volta.', failed: (c) => `corrija ${c.detail} e mostre uma mensagem quando falhar.`,
       slow: (c) => `mostre que está carregando e acelere ${c.slow}.` },
     noteUsage: (n, share) => `${n} leva ${share} dos cliques desta tela.`,
+    scale: { usage: ['menos cliques', 'mais cliques'], problems: ['irrita pouco', 'irrita muito'] },
     legend: { next: 'próximo passo mais comum', back: 'vai e volta', wider: 'seta mais grossa = parte maior', min: 'só passos com 15% ou mais',
       in: 'de onde chegam', bad: 'cor mais forte = mais cliques que irritam', none: 'sem cor = nenhum problema',
       usage: 'amarelo mais forte = mais cliques', never: 'tracejado = pode ser clicado e ninguém clicou' },
@@ -72,8 +73,8 @@
   } : {
     title: 'Termometro · map', close: 'Close', collapse: 'Collapse', expand: 'Open', loading: 'Loading…',
     days: 'days', expired: 'The map link expired: open it again from the dashboard.', down: 'Termometro did not answer.',
-    lenses: { routes: 'Routes', problems: 'Problems', usage: 'Usage' },
-    help: { routes: 'The most common path after each element.', problems: 'Lights up only what irritates.', usage: 'How much each element is clicked.',
+    lenses: { usage: 'Heat', problems: 'Problems', routes: 'Routes' },
+    help: { routes: 'The most common path after each element.', problems: 'The hotter, the more it irritates.', usage: 'The hotter, the more clicks.',
       picked: (n) => `Only the routes of ${n}.` },
     look: 'What to look at on this screen', lookLead: 'The steps that say the most, strongest first.',
     irritTitle: 'What irritates on this screen', irritLead: 'Share of the clicks that turned into rage, no response or an error.',
@@ -113,6 +114,7 @@
       near_miss: () => 'make the click area bigger or move what is around it.', failed: (c) => `fix ${c.detail} and show a message when it fails.`,
       slow: (c) => `show it is loading and speed up ${c.slow}.` },
     noteUsage: (n, share) => `${n} takes ${share} of this screen's clicks.`,
+    scale: { usage: ['fewer clicks', 'more clicks'], problems: ['irritates a little', 'irritates a lot'] },
     legend: { next: 'most common next step', back: 'back and forth', wider: 'thicker arrow = bigger share', min: 'only steps of 15% or more',
       in: 'where they come from', bad: 'stronger colour = more irritating clicks', none: 'no colour = no problem',
       usage: 'stronger yellow = more clicks', never: 'dashed = clickable and nobody clicked' },
@@ -145,8 +147,9 @@
     try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash) } catch {}
   }
   const kept = (ss('termometro.mapLens') || '').split('|')
-  let lens = urlMode ? (urlMode === 'routes' ? 'routes' : 'problems')
-    : kept[0] === cfg.token && T.lenses[kept[1]] ? kept[1] : cfg.mode === 'routes' ? 'routes' : 'problems'
+  // A heat map first: where people click. "Open with the routes" asks for the routes.
+  let lens = urlMode ? (urlMode === 'routes' ? 'routes' : 'usage')
+    : kept[0] === cfg.token && T.lenses[kept[1]] ? kept[1] : cfg.mode === 'routes' ? 'routes' : 'usage'
   const keepLens = () => ss('termometro.mapLens', cfg.token + '|' + lens)
   keepLens()
 
@@ -164,7 +167,7 @@
   document.body.appendChild(root)
 
   let days = 30
-  let showNever = true
+  let showNever = false // the dashed never-clicked marks crowd the heat: a box in the panel turns them on
   let collapsed = false
   let data = null, loadedRoute = null, message = null
   let hovered = null, picked = null // element targets (selectors)
@@ -311,28 +314,71 @@
   const focusOn = () => hovered || picked
   const dimOf = (t) => !!focusOn() && focusOn() !== t
 
+  // Heat: a soft spot on each element, as strong as its clicks (or its irritation), adding up where they sit close, then
+  // coloured from cool to hot. Drawn at half resolution: the blur hides it and scrolling stays smooth.
+  const RAMP = {
+    usage: [[0, [59, 130, 246]], [0.3, [34, 197, 94]], [0.55, [250, 204, 21]], [0.78, [249, 115, 22]], [1, [220, 38, 38]]],
+    problems: [[0, [253, 224, 71]], [0.45, [249, 115, 22]], [0.75, [220, 38, 38]], [1, [127, 29, 29]]]
+  }
+  const paletteOf = (stops) => {
+    const out = new Uint8ClampedArray(256 * 4)
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255
+      let k = 0; while (k < stops.length - 2 && t > stops[k + 1][0]) k++
+      const [t0, c0] = stops[k], [t1, c1] = stops[k + 1], f = Math.min(1, Math.max(0, (t - t0) / (t1 - t0 || 1)))
+      for (let c = 0; c < 3; c++) out[i * 4 + c] = c0[c] + (c1[c] - c0[c]) * f
+      out[i * 4 + 3] = Math.min(165, 40 + t * 190) // see-through even at the hottest: the screen stays readable
+    }
+    return out
+  }
+  const PALETTE = { usage: paletteOf(RAMP.usage), problems: paletteOf(RAMP.problems) }
+  const rampCss = (kind) => `linear-gradient(90deg,${RAMP[kind].map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(',')})`
+  const heatValue = (e) => lens === 'problems' ? e.irr : e.clicks
   function drawHeat() {
     const list = lens === 'problems' ? problems() : used()
-    const max = Math.max(1, ...used().map((e) => e.clicks))
+    const S = 0.5, W = Math.ceil(innerWidth * S), H = Math.ceil(innerHeight * S)
+    const cv = document.createElement('canvas')
+    cv.width = W; cv.height = H
+    cv.style.cssText = `position:fixed;left:0;top:0;width:${innerWidth}px;height:${innerHeight}px;pointer-events:none`
+    const ctx = cv.getContext('2d')
+    // Each rect's share of its element (a control repeated in a list splits its clicks) on a log scale: the small ones show too.
+    // Problems: how much of its clicks irritate, half or more is the hottest. Clicks: in proportion to the most clicked (a square
+    // root, so the second tier still shows), each rect a share of its element — a control repeated in a list splits its clicks.
+    const per = (e) => heatValue(e) / Math.max(1, (geo.get(e.target) || []).length)
+    const top = Math.max(1, ...list.map(per))
     for (const e of list) {
-      const rects = geo.get(e.target)
-      if (!rects) continue
-      const dim = dimOf(e.target), big = e.target === focusOn()
-      if (lens === 'problems') {
-        rects.forEach((r) => mark(r, C.bad, { width: big ? 4 : 2 + Math.round(e.pain * 2), fill: `rgba(168,28,63,${(0.06 + e.pain * 0.3).toFixed(2)})`, dim }))
-      } else {
-        const f = e.clicks / max
-        rects.forEach((r) => mark(r, big ? C.fg : C.accent, { width: big ? 4 : 1 + Math.round(f * 2), fill: `rgba(254,193,13,${(0.08 + f * 0.32).toFixed(2)})`, dim }))
+      const w = lens === 'problems' ? Math.min(1, e.pain / 0.5) : Math.sqrt(per(e) / top)
+      if (w < 0.04) continue
+      for (const r of geo.get(e.target) || []) {
+        const cx = (r.left + r.width / 2) * S, cy = (r.top + r.height / 2) * S
+        const rx = (r.width / 2 + 26) * S, ry = (r.height / 2 + 26) * S, R = Math.max(rx, ry)
+        ctx.save(); ctx.translate(cx, cy); ctx.scale(rx / R, ry / R)
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R)
+        const a = 0.1 + 0.9 * w
+        g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.5, `rgba(0,0,0,${a * 0.8})`); g.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.restore()
       }
     }
-    if (showNever) for (const t of data.never_clicked || []) for (const r of geo.get(t) || []) mark(r, C.never, { dashed: true, dim: !!focusOn() })
-    // Pills: the focused one first, then by rank, each where it covers no other.
-    const order = list.filter((e) => geo.has(e.target) && !dimOf(e.target))
-    order.sort((a, b) => (b.target === focusOn()) - (a.target === focusOn()))
+    const img = ctx.getImageData(0, 0, W, H), px = img.data, pal = PALETTE[lens === 'problems' ? 'problems' : 'usage']
+    for (let i = 3; i < px.length; i += 4) {
+      const a = px[i]
+      if (a < 6) { px[i] = 0; continue }
+      const o = a * 4
+      px[i - 3] = pal[o]; px[i - 2] = pal[o + 1]; px[i - 1] = pal[o + 2]; px[i] = pal[o + 3] * Math.min(1, a / 40)
+    }
+    ctx.putImageData(img, 0, 0)
+    layer.appendChild(cv)
+    const f = focusOn()
+    if (f) for (const r of geo.get(f) || []) mark(r, C.fg, { width: 3 })
+    if (showNever) for (const t of data.never_clicked || []) for (const r of geo.get(t) || []) mark(r, C.never, { dashed: true, dim: !!f })
+    // The number only on the hottest five (and the one in focus): the colour says the rest.
+    const order = list.filter((e) => geo.has(e.target)).slice(0, 5)
+    if (f && !order.some((e) => e.target === f) && els.get(f) && geo.has(f)) order.unshift(els.get(f))
+    order.sort((a, b) => (b.target === f) - (a.target === f))
     for (const e of order) {
       const r = geo.get(e.target)[0]
-      if (lens === 'problems') badge(r, T.irritates(pc(e.pain)), C.bad, '#fff', e.target === focusOn())
-      else badge(r, T.clicksN(e.clicks), C.fg, C.surface, e.target === focusOn())
+      if (lens === 'problems') badge(r, T.irritates(pc(e.pain)), C.bad, '#fff', e.target === f)
+      else badge(r, T.clicksN(e.clicks), C.fg, C.surface, e.target === f)
     }
   }
 
@@ -511,8 +557,8 @@
     const never = showNever ? `<span>${box(`border:2px dashed ${C.never}`)}${esc(L.never)}</span>` : ''
     if (lens === 'routes') return `<span>${line(C.accent)}${esc(L.next)}</span><span>${line(C.warn)}${esc(L.back)}</span><span>${esc(L.wider)}</span>` +
       `<span>${esc(L.min)}</span>${picked ? `<span>${line(C.faint, true)}${esc(L.in)}</span>` : ''}`
-    if (lens === 'problems') return `<span>${box(`border:2px solid ${C.bad};background:linear-gradient(90deg,rgba(168,28,63,.12),rgba(168,28,63,.55))`)}${esc(L.bad)}</span><span>${esc(L.none)}</span>${never}`
-    return `<span>${box(`border:2px solid ${C.accent};background:linear-gradient(90deg,rgba(254,193,13,.15),rgba(254,193,13,.75))`)}${esc(L.usage)}</span>${never}`
+    const [lo, hi] = T.scale[lens]
+    return `<span style="display:inline-flex;align-items:center;gap:6px">${esc(lo)}<i style="display:inline-block;width:110px;height:10px;border-radius:999px;background:${rampCss(lens)}"></i>${esc(hi)}</span>${never}`
   }
   function renderPanel() {
     panel.style.cssText = `position:fixed;right:12px;bottom:12px;box-sizing:border-box;pointer-events:auto;background:${C.surface};color:${C.fg};` +
