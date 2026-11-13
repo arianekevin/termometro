@@ -46,7 +46,7 @@ and the API:
                        state better | same | worse | waiting
   POST /api/follow     {kind: screen|element|failure|action|account, key, label}: follows it, baseline from the filters
   DELETE /api/follow   ?project=&id= stops following it
-  GET  /  /map.js  /termometro.js
+  GET  /  /map.js  /tour.js  /termometro.js
 
 A screen's frustration score is the weighted signals divided by its visits, times 20, capped at 100. One rage
 click on every visit scores 60; one 5xx on every visit scores 100.
@@ -2404,6 +2404,7 @@ READS = {"/api/ways": ways, "/api/patterns": patterns, "/api/product": product, 
          "/api/report": report, "/api/follow": lambda con, f: {"items": follows_of(con, f)}}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),
+                "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),
                 "/termometro.js": ("termometro.js", "text/javascript; charset=utf-8"),
                 "/termometro_mcp.py": ("termometro_mcp.py", "text/x-python; charset=utf-8")}
 

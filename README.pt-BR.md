@@ -155,7 +155,8 @@ Sem bundler:
 
 No topo ficam o período (1, 7, 30 ou 90 dias), a conta, os **Filtros** (versão, papel, feature) com
 cada filtro em uso como etiqueta, os **Marcos** e, em ⋯, a aparência (tema, tamanho do texto, paleta, modo para
-daltônicos). Tudo o que se escolhe fica no endereço. As abas vêm em grupos:
+daltônicos e idioma). Tudo o que se escolhe fica no endereço. O botão **Tour** percorre a tela aberta de ponto em ponto:
+o que dá para fazer ali, uma dica e um exemplo do dia a dia. As abas vêm em grupos:
 
 **Resumo**
 - **Início:** o veredito do período, os números contra o período anterior, a lista **Para fazer** ordenada por

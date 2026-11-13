@@ -177,7 +177,8 @@ instance; keep it like a password.
 
 At the top: the period (1, 7, 30 or 90 days), the account, **Filters** (version, role, feature)
 with each filter in use as a chip, **Marks** and, under ⋯, the appearance (theme, text size, palette, colour-blind
-mode). Everything you pick lives in the address. The tabs come in groups:
+mode, language). Everything you pick lives in the address. The **Tour** button walks through the open screen point by
+point: what you can do there, a tip and a day-to-day example. The tabs come in groups:
 
 **Summary**
 - **Overview:** the period's verdict, the numbers against the previous period, the **To do** list ranked by impact
