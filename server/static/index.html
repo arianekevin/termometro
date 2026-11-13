@@ -551,6 +551,19 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .acc-cell { display: grid; min-width: 13em; max-width: 18em; }
 .table:has(td.act) { border-radius: 0 0 13px 13px; } .acc-cell .acc-name { min-width: 0; max-width: none; }
 .acc-cell code.tech { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Phones: a table keeps its name, its key number and the trend; the rest sits on a second line (subRow) under the name. */
+.sub { display: none; }
+@media (max-width: 559px) {
+  th[data-lo], td[data-lo] { display: none; }
+  tr.sub { display: table-row; cursor: pointer; }
+  tr.sub td { padding: 0 12px 10px; font-size: 12px; line-height: 18px; color: var(--fg2); background: transparent; overflow-wrap: anywhere; }
+  tr.sub .subk { color: var(--faint); }
+  tr.row:has(+ tr.sub) td { border-bottom: 0; }
+  tr.row:has(+ tr.sub) td, tr.sub td { background: transparent; }
+  tr.row:has(+ tr.sub:hover) td { background: var(--sunken); }
+  .acc-cell { min-width: 0; }
+  .fcell { min-width: 0; } td.fcell { overflow-wrap: anywhere; }
+}
 th.act, td.act { position: sticky; right: 0; width: 1%; padding-left: 8px; padding-right: 8px; background: var(--surface); box-shadow: -1px 0 0 var(--line); }
 tbody tr.row:hover td.act { background: var(--sunken); }
 button.icon { width: 32px; height: 32px; padding: 0; color: var(--fg2); }
@@ -1251,6 +1264,11 @@ const ago = (at) => {
   return m < 1 ? L.now : m < 60 ? L.ago(m, 'm') : m < 1440 ? L.ago(Math.floor(m / 60), 'h') : L.ago(Math.floor(m / 1440), 'd')
 }
 const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
+// Phones (below 560 px): a column marked data-lo is hidden, and what it said moves to the second line of the row (subRow),
+// real text in the DOM that only shows on the phone. The sub row is a .detail, so CSV and paging treat it as part of its row.
+const LO = ' data-lo'
+const subRow = (pairs, attrs = '', cls = '') => { const t = pairs.filter((x) => x && x[1] !== undefined && x[1] !== '').map(([k, v]) => `<span class="subk">${k}</span> ${v}`).join(' · ')
+  return t ? `<tr class="row detail sub ${cls}" ${attrs}><td colspan="12">${t}</td></tr>` : '' }
 const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
 // "No visits in this period" anywhere becomes the empty state that says why and offers the way out (see emptyState).
 const empty = (msg) => msg === L.noVisits && state.status?.events ? emptyState() : `<div class="card empty">${msg}</div>`
@@ -2189,14 +2207,15 @@ async function failures() {
         <button class="small" data-session="${esc(t.session)}">${F().fullSession}</button></details>`).join('')}</div>
     </section>` : ''
   return `${detail}<section class="card"><div class="label">${F().list}${help('failures')}</div><div class="meta">${F().hint}</div>
-    ${table(`<th>${F().failure}</th><th>${FD().perDay}</th><th class="n">${L.sessionsCol}</th><th class="n">${L.users}</th><th class="n">${L.times}</th><th>${F().since}</th><th>${F().last}</th><th><span class="sr">${F().copyIssue}</span></th>`,
+    ${table(`<th>${F().failure}</th><th>${FD().perDay}</th><th class="n">${L.sessionsCol}</th><th class="n" data-lo>${L.users}</th><th class="n" data-lo>${L.times}</th><th data-lo>${F().since}</th><th data-lo>${F().last}</th><th data-lo><span class="sr">${F().copyIssue}</span></th>`,
       list.map((f) => `<tr class="row ${isSel(f) ? 'sel' : ''}" data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}" tabindex="0">
         <td class="fcell"><div><span class="meta">${esc(L.names[f.type] ?? f.type)}</span> ${f.new ? `<span class="pill bad">${F().isNew}</span>` : ''}</div><code>${esc(f.detail)}</code>
           <div class="meta">${esc(screenText(f.route) || f.route)}${f.routes > 1 ? ` +${f.routes - 1}` : ''}</div></td>
         <td>${spark(f.daily, `${FD().byDay}: ${num(Math.min(...f.daily))}–${num(Math.max(...f.daily))}`, 96, 24, days)}</td>
-        <td class="n">${num(f.sessions)}</td><td class="n">${num(f.users)}</td><td class="n">${num(f.n)}</td>
-        <td><code>${esc(f.first_version)}</code></td><td class="meta">${ago(f.last_at)}</td>
-        <td><button class="small" data-copy-failure title="${esc(F().copyIssue)}">${FD().copyRow}</button></td></tr>`).join(''))}</section>`
+        <td class="n">${num(f.sessions)}</td><td class="n" data-lo>${num(f.users)}</td><td class="n" data-lo>${num(f.n)}</td>
+        <td data-lo><code>${esc(f.first_version)}</code></td><td class="meta" data-lo>${ago(f.last_at)}</td>
+        <td data-lo><button class="small" data-copy-failure title="${esc(F().copyIssue)}">${FD().copyRow}</button></td></tr>
+        ${subRow([[L.users, num(f.users)], [L.times, num(f.n)], [F().since, `<code>${esc(f.first_version)}</code>`], [F().last, ago(f.last_at)]], `data-signal="${esc(f.type)}" data-detail="${esc(f.detail)}"`, isSel(f) ? 'sel' : '')}`).join(''))}</section>`
 }
 
 // Every table can leave as CSV: what is on screen, so the numbers match what was read.
@@ -2436,23 +2455,27 @@ async function openMap(route = '', mode = 'heat') {
 }
 
 // People ---------------------------------------------------------------------------------------------------
+// The account's name (the id when it has none), as a link to Contas filtered to it.
+const accLink = (id) => id ? `<a class="acc-link" ${linkAttrs({ tab: 'accounts', params: { account: id } })}>${esc(accountText(id))}</a>` : ''
 async function people() {
   const p = await read('/api/people')
   if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
   const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${num(s.visits)}</span>`).join('<br>')
   const group = (title, hint, list, col, name = (k) => esc(k)) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
-    ${table(`<th>${col}</th><th class="n">${L.users}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
-      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n">${num(g.users)}</td><td class="n">${num(g.visits)}${countDelta(g.visits, g.before?.visits)}</td>
-        <td class="n">${num(g.clicks)}</td><td class="n">${scoreHtml(g.score)}${scoreDelta(g.score, g.before?.score)}</td><td>${top(g.screens)}</td></tr>`).join(''))}</div>`
+    ${table(`<th>${col}</th><th class="n" data-lo>${L.users}</th><th class="n">${L.visits}</th><th class="n" data-lo>${L.clicks}</th><th class="n" data-lo>${L.score}</th><th data-lo>${L.topScreens}</th>`,
+      list.map((g) => `<tr><td><b>${name(g.key)}</b></td><td class="n" data-lo>${num(g.users)}</td><td class="n">${num(g.visits)}${countDelta(g.visits, g.before?.visits)}</td>
+        <td class="n" data-lo>${num(g.clicks)}</td><td class="n" data-lo>${scoreHtml(g.score)}${scoreDelta(g.score, g.before?.score)}</td><td data-lo>${top(g.screens)}</td></tr>
+        ${subRow([[L.users, num(g.users)], [L.clicks, num(g.clicks)], [L.score, scoreHtml(g.score)]])}`).join(''))}</div>`
   // Per account lives on Contas, with trend, frustration and failures: here only the way there.
   return `
     ${p.roles.length ? group(L.byRole, L.roleHint, p.roles, L.role) : ''}
     ${p.accounts.length ? `<section class="card pointer"><span class="meta">${AC().inAccounts}</span><a class="button" ${linkAttrs({ tab: 'accounts', params: {} })}>${AC().openAccounts}</a></section>` : ''}
     <section class="card" data-scroll><div class="label">${L.byUser}${help('byUser')}</div><div class="meta">${L.userHint}</div>
-      ${table(`<th>${L.user}</th><th>${L.role}</th><th>${L.account}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.score}</th><th>${L.topScreens}</th>`,
+      ${table(`<th>${L.user}</th><th data-lo>${L.role}</th><th data-lo>${L.account}</th><th class="n">${L.visits}</th><th class="n" data-lo>${L.clicks}</th><th class="n" data-lo>${L.score}</th><th data-lo>${L.topScreens}</th>`,
         p.users.map((u) => `<tr class="row ${u.key === state.user ? 'sel' : ''}" data-user="${esc(u.key)}" tabindex="0">
-          <td>${personName(u.key) ? `<span class="nm">${esc(personName(u.key))}</span>` : ''}<code class="${personName(u.key) ? 'tech' : ''}" title="${esc(u.key)}">${esc(short(u.key))}</code></td><td>${esc(u.role)}</td><td>${esc(accountText(u.account))}</td>
-          <td class="n">${num(u.visits)}${countDelta(u.visits, u.before?.visits)}</td><td class="n">${num(u.clicks)}</td><td class="n">${scoreHtml(u.score)}${scoreDelta(u.score, u.before?.score)}</td><td>${top(u.screens)}</td></tr>`).join(''))}</section>`
+          <td>${personName(u.key) ? `<span class="nm">${esc(personName(u.key))}</span>` : ''}<code class="${personName(u.key) ? 'tech' : ''}" title="${esc(u.key)}">${esc(short(u.key))}</code></td><td data-lo>${esc(u.role)}</td><td data-lo>${accLink(u.account)}</td>
+          <td class="n">${num(u.visits)}${countDelta(u.visits, u.before?.visits)}</td><td class="n" data-lo>${num(u.clicks)}</td><td class="n" data-lo>${scoreHtml(u.score)}${scoreDelta(u.score, u.before?.score)}</td><td data-lo>${top(u.screens)}</td></tr>
+          ${subRow([[L.role, esc(u.role)], [L.account, accLink(u.account)], [L.clicks, num(u.clicks)], [L.score, scoreHtml(u.score)]], `data-user="${esc(u.key)}"`, u.key === state.user ? 'sel' : '')}`).join(''))}</section>`
 }
 
 // Actions --------------------------------------------------------------------------------------------------
@@ -2796,17 +2819,18 @@ async function accounts() {
     ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
     <div class="chips">${e.comparable ? `<button data-acc-down aria-pressed="${!!state.accDown}" ${down || state.accDown ? '' : 'disabled'}>${AC().onlyDown(down)}</button>` : ''}
       <span class="sep">${AC().sort}</span>${['trend', 'worst'].map((k) => `<button data-acc-sort="${k}" aria-pressed="${sort === k}">${k === 'trend' ? AC().byTrend : AC().worst}</button>`).join('')}</div>
-    ${rows.length ? table(`<th>${AC().account}</th><th>${AC().trendCol}</th><th class="n">${AC().score}</th><th class="n">${AC().failures}</th><th class="n">${AC().usersDay}</th><th class="n">${AC().sessionsDay}</th><th class="n">${AC().people}</th>${feats.map((f) => `<th class="n">${esc(f.name)}</th>`).join('')}<th class="act" data-nocsv><span class="sr">${AC().copySummary}</span></th>`,
+    ${rows.length ? table(`<th>${AC().account}</th><th>${AC().trendCol}</th><th class="n">${AC().score}</th><th class="n" data-lo>${AC().failures}</th><th class="n" data-lo>${AC().usersDay}</th><th class="n" data-lo>${AC().sessionsDay}</th><th class="n" data-lo>${AC().people}</th>${feats.map((f) => `<th class="n" data-lo>${esc(f.name)}</th>`).join('')}<th class="act" data-nocsv data-lo><span class="sr">${AC().copySummary}</span></th>`,
       rows.map((a) => `<tr class="row" data-account="${esc(a.account)}" tabindex="0">
         <td>${accCell(a.account)}</td>
         <td>${trendChip(a.trend)}</td>
         <td class="n">${scoreHtml(a.now.score)}${scoreDelta(a.now.score, a.before?.score)}</td>
-        <td class="n">${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures, true)}</td>
-        <td class="n">${num(a.now.users_day)}${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</td>
-        <td class="n">${num(a.now.sessions_day)}${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</td>
-        <td class="n">${num(a.now.users)}</td>
-        ${a.features.map((f) => `<td class="n">${num(f.now)}${accDelta(f.now, f.before, f.move)}</td>`).join('')}
-        <td class="act" data-nocsv><button class="icon" data-acc-copy="${esc(accountSummary(a, e))}" title="${esc(AC().copySummary)}" aria-label="${esc(AC().copyOf(accountText(a.account)))}">${COPY_ICON}</button></td></tr>`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
+        <td class="n" data-lo>${num(a.now.failures)}${countDelta(a.now.failures, a.before?.failures, true)}</td>
+        <td class="n" data-lo>${num(a.now.users_day)}${a.before ? accDelta(a.now.users_day, a.before.users_day, a.moves?.users_day) : ''}</td>
+        <td class="n" data-lo>${num(a.now.sessions_day)}${a.before ? accDelta(a.now.sessions_day, a.before.sessions_day, a.moves?.sessions_day) : ''}</td>
+        <td class="n" data-lo>${num(a.now.users)}</td>
+        ${a.features.map((f) => `<td class="n" data-lo>${num(f.now)}${accDelta(f.now, f.before, f.move)}</td>`).join('')}
+        <td class="act" data-nocsv data-lo><button class="icon" data-acc-copy="${esc(accountSummary(a, e))}" title="${esc(AC().copySummary)}" aria-label="${esc(AC().copyOf(accountText(a.account)))}">${COPY_ICON}</button></td></tr>
+        ${subRow([[AC().failures, num(a.now.failures)], [AC().usersDay, num(a.now.users_day)], [AC().sessionsDay, num(a.now.sessions_day)], [AC().people, num(a.now.users)], ...a.features.map((f) => [esc(feats.find((x) => x.id === f.id)?.name ?? f.id), num(f.now)])], `data-account="${esc(a.account)}"`)}`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
 }
 
 // What hurts this account: its worst screens (and the element that irritates there) and the failures that hit it most.
@@ -3287,6 +3311,7 @@ async function draw(seq) {
 }
 
 function onContentClick(e) {
+  if (e.target.closest?.('a.acc-link')) return // a link inside a row: it goes to Contas, the row does not also open
   const mapEl = e.target.closest?.('[data-map-el],[data-map-lens],[data-map-view]')
   if (mapEl) return onMapClick(mapEl)
   const none = e.target.closest('[data-empty]')
