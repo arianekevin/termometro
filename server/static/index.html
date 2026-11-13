@@ -396,7 +396,7 @@ code.tech, .tech { display: block; margin-top: 2px; font: 11px/15px ui-monospace
 .h1 { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); } .h2 { background: color-mix(in srgb, var(--bad) 28%, var(--surface)); }
 .h3 { background: color-mix(in srgb, var(--bad) 48%, var(--surface)); } .h4 { background: color-mix(in srgb, var(--bad) 72%, var(--surface)); }
 .h5 { background: var(--bad); }
-.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
 .group .insights li { align-items: center; }
 button.demand { margin-top: 6px; }
 .mag { flex: none; font-weight: 700; font-size: 15px; color: var(--fg); }
@@ -415,6 +415,9 @@ button.demand { margin-top: 6px; }
 .rel-acts .button { height: 36px; font-size: 14px; padding: 0 14px; }
 #todo-all { margin-top: 8px; }
 .todo .group { box-shadow: none; } .todo .groups { margin-top: 12px; }
+/* By type: the same rows in narrower columns, badge above the text, actions under it. */
+.todo .group .todo-row { grid-template-columns: minmax(0, 1fr); } .todo .group .todo-acts { justify-content: flex-start; flex-wrap: wrap; }
+.todo .group > button[data-col-all] { margin-top: 8px; }
 .pill.same { background: var(--sunken); color: var(--fg2); }
 .release { display: grid; gap: 10px; align-content: start; } .rel-nums { display: flex; flex-wrap: wrap; gap: 8px 28px; }
 .release .counts li a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } .release .counts li > span { flex: none; }
@@ -1810,8 +1813,10 @@ function groupTodos(list) {
 }
 const followLabel = (g) => g.kind === 'screen' ? screenText(g.key) || g.key : g.kind === 'account' ? accountText(g.key)
   : g.kind === 'action' ? actionText(g.key) || g.key : `${L.names[g.key.split('\t')[0]] ?? ''}: ${g.key.split('\t')[1]}`
+// What the toast after a copy needs to offer Acompanhar too (the same data-follow the row's own button has).
+const followAttrs = (g) => ` data-fk="${esc(g.kind)}" data-fkey="${esc(g.key)}" data-flabel="${esc(followLabel(g))}"`
 const followOf = (g, follows) => (follows ?? []).find((x) => x.kind === g.kind && x.key === g.key)
-function todoRow(g, k, days, follows) {
+function todoRow(g, k, days, follows, pre = 'todo') {
   const T = L.todo, W = L.fw, i = g.items[0], say = g.says[0], rest = g.items.slice(1)
   const reach = [i.reach_sessions && T.sessions(i.reach_sessions), i.reach_people && T.people(i.reach_people)].filter(Boolean).join(' · ')
   let demand = demandOf(i, say, days)
@@ -1819,18 +1824,18 @@ function todoRow(g, k, days, follows) {
   const followed = followOf(g, follows)
   const follow = !FOLLOWABLE.includes(g.kind) ? '' : followed ? `<span class="pill same fw-on" title="${esc(W.followTip)}">✓ ${W.following}</span>`
     : `<button class="small" data-follow="${esc(g.kind)}" data-key="${esc(g.key)}" data-label="${esc(followLabel(g))}" title="${esc(W.followTip)}">${W.follow}</button>`
-  return `<li class="todo-row" id="todo-${k}" ${k >= TODO_TOP ? 'hidden' : ''}>
+  return `<li class="todo-row" id="${pre}-${k}" ${k >= TODO_TOP ? 'hidden' : ''}>
     <span class="pill ${i.severity} kchip" title="${esc(L.sev[i.severity])}">${T.chip[groupOf(i.kind)]}</span>
     <div class="todo-main"><div class="todo-say" title="${esc(plain(say))}">${say}</div>
       <div class="todo-meta">${reach ? `<b>${reach}</b>` : ''}<span class="tech">${techOf(i)}</span>
-        ${rest.length ? `<button class="link fw-more" data-todo-more="${k}" aria-expanded="false" aria-controls="todo-more-${k}" data-n="${rest.length}" data-kind="${g.kind}">${W.more(rest.length, g.kind)}</button>` : ''}</div>
-      ${rest.length ? `<ul class="fw-rest" id="todo-more-${k}" hidden>${rest.map((x, n) => `<li><span class="pill ${x.severity}">${T.chip[groupOf(x.kind)]}</span>
+        ${rest.length ? `<button class="link fw-more" data-todo-more="${pre}-${k}" aria-expanded="false" aria-controls="todo-more-${pre}-${k}" data-n="${rest.length}" data-kind="${g.kind}">${W.more(rest.length, g.kind)}</button>` : ''}</div>
+      ${rest.length ? `<ul class="fw-rest" id="todo-more-${pre}-${k}" hidden>${rest.map((x, n) => `<li><span class="pill ${x.severity}">${T.chip[groupOf(x.kind)]}</span>
         <span class="fw-say" title="${esc(plain(g.says[n + 1]))}">${g.says[n + 1]}</span><a ${linkAttrs(x.link)}>${L.see} →</a></li>`).join('')}</ul>` : ''}</div>
-    <div class="todo-acts"><button class="small" data-copy="${esc(demand)}">${L.demand.copy}</button>${follow}
+    <div class="todo-acts"><button class="small" data-copy="${esc(demand)}"${followed || !FOLLOWABLE.includes(g.kind) ? '' : followAttrs(g)}>${L.demand.copy}</button>${follow}
       <a class="button small primary" ${linkAttrs(i.link)}>${T.evidence}</a></div></li>`
 }
 function showTodos(open) {
-  document.querySelectorAll('.todo-row').forEach((r, k) => { if (k >= TODO_TOP) r.hidden = !open })
+  document.querySelectorAll('.todo-list .todo-row').forEach((r, k) => { if (k >= TODO_TOP) r.hidden = !open })
   const b = $('#todo-all')
   if (b) { b.setAttribute('aria-expanded', String(open)); b.textContent = open ? L.todo.fewer : L.todo.all(b.dataset.n) }
 }
@@ -1896,6 +1901,13 @@ document.addEventListener('click', async (e) => {
   render()
 })
 document.addEventListener('click', (e) => {
+  const col = e.target.closest?.('[data-col-all]')
+  if (col) {
+    const open = col.getAttribute('aria-expanded') !== 'true'
+    col.closest('.group').querySelectorAll('.todo-row').forEach((r, k) => { if (k >= TODO_TOP) r.hidden = !open })
+    col.setAttribute('aria-expanded', String(open)); col.textContent = open ? L.todo.fewer : L.todo.all(col.dataset.n)
+    return
+  }
   const v = e.target.closest?.('[data-todo-view]')
   if (v) {
     const card = v.closest('.todo'), list = v.dataset.todoView === 'list'
@@ -1985,10 +1997,11 @@ async function overview() {
   const grouped = {}
   for (const i of o.insights) (grouped[groupOf(i.kind)] ??= []).push(i)
   const groups = Object.keys(GROUPS).filter((g) => grouped[g])
-  const byType = o.insights.length ? `<div class="groups">${groups.map((g, n) => `<section class="card group"><div class="label">${L.groups[g]} · ${grouped[g].length}</div>
-      <ul class="insights">${grouped[g].map((i) => `<li><span class="pill ${i.severity}">${L.sev[i.severity]}</span>
-        <div class="text">${sentence(i)} <a ${linkAttrs(i.link)}>${L.see} →</a><div class="tech">${techOf(i)}</div>
-          <button class="small demand" data-copy="${esc(demandOf(i, sentence(i), o.days))}">${L.demand.copy}</button></div>${mini(i)}</li>`).join('')}</ul></section>`).join('')}</div>`
+  // By type: the same rows as the list (todoRow), one column per type, 5 rows then "Ver todos (N)".
+  const byType = o.insights.length ? `<div class="groups">${groups.map((g) => { const rows = groupTodos(grouped[g]); for (const r of rows) r.says = r.items.map(sentence)
+    return `<section class="card group"><div class="label">${L.groups[g]} · ${rows.length}</div>
+      <ol class="todos">${rows.map((r, k) => todoRow(r, k, o.days, follows, 'ty-' + g)).join('')}</ol>
+      ${rows.length > TODO_TOP ? `<button class="small" data-col-all aria-expanded="false" data-n="${rows.length}">${L.todo.all(rows.length)}</button>` : ''}</section>` }).join('')}</div>`
     : ''
   const view = recall('todoView') === 'type' ? 'type' : 'list'
   const insights = `<section class="card todo"><div class="head"><div><div class="label">${L.todo.title}${help('todo')}</div><div class="meta">${L.todo.hint}</div></div>
