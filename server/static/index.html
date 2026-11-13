@@ -784,7 +784,7 @@ const L = PT ? {
     name: 'Nome', namePh: 'ex.: Redesenho de Usuários', date: 'Data', create: 'Criar e usar', remove: 'Apagar marco', confirmRemove: (n) => `Apagar o marco ${n}?`,
     future: 'Escolha uma data de hoje para trás.' },
   failureTab: {
-    list: 'Falhas, das que atingem mais sessões para as que atingem menos', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
+    list: 'Falhas, das que mais pesam: sessões atingidas vezes a gravidade (erro pesa mais que lentidão)', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
     none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
     occurrences: (f) => `${num(f.n)}× em ${plural(f.sessions, 'sessão', 'sessões')} · ${plural(f.users, 'usuário', 'usuários')} · ${plural(f.accounts, 'conta', 'contas')}`,
     where: 'Telas', versions: 'Versões', agents: 'Navegadores', devices: 'Tipo de tela', afterClicking: 'Logo depois de clicar em',
@@ -882,7 +882,7 @@ const L = PT ? {
     unclear: 'A tela muda, mas a pessoa não percebe que deu certo: deixar o retorno mais claro (mensagem, destaque, navegação).' },
   demand: { copy: 'Copiar como demanda', problem: 'Problema', who: 'Quem é afetado', since: 'Desde', suggestion: 'Sugestão', accept: 'Critério de aceite',
     evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', period: (d) => `nos últimos ${d} dias`,
-    reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`].filter(Boolean).join(' · '),
+    reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`, !i.sessions && i.reach_sessions && `${i.reach_sessions} sessões`, i.reach_people && `${i.reach_people} pessoas`].filter(Boolean).join(' · '),
     kinds: {
       version_worse: ['A versão nova deixou a tela mais frustrante', 'Comparar o que mudou na tela entre as duas versões e corrigir o que gerou os sinais (veja "Onde irrita" na aba Frustração).', (i) => `A frustração da tela volta para perto de ${i.before} na versão seguinte.`],
       screen_worse: ['Tela ficou mais frustrante', 'Ver na aba Frustração qual elemento concentra os sinais e o que falhou logo depois do clique.', (i) => `A frustração da tela volta para perto de ${i.before} em 7 dias de uso.`],
@@ -999,13 +999,13 @@ const L = PT ? {
     onlyOne: (b) => `Só a versão ${b} neste período.`, prevHint: (a, n) => `A anterior, ${a}, aparece ampliando o período para ${n} dias.`,
     widen: (n) => `Comparar com a versão anterior (amplia para ${n} dias)`, noPrev: 'Não há versão anterior nos dados guardados.', sinceMark: 'Não há versão anterior desde o marco em uso. Escolha "Todo o período" em Marcos para ver as outras.',
     markIt: 'Criar marco nesta versão', markTip: (v) => `Salva o início da ${v} nos Marcos, para contar a partir dela quando quiser. O período em uso não muda.`, marked: 'Marco salvo', markName: (v) => `Versão ${v}` },
-  todo: { title: 'Para fazer esta semana', hint: 'Da gravidade vezes o alcance (sessões e pessoas atingidas) para baixo.', all: (n) => `Ver todos (${n})`, fewer: 'Ver só os 5 primeiros',
+  todo: { title: (w) => `Para fazer ${w}`, hint: 'Da gravidade vezes o alcance (sessões e pessoas atingidas) para baixo.', all: (n) => `Ver todos (${n})`, fewer: 'Ver só os 5 primeiros',
     byList: 'Por prioridade', byType: 'Ver por tipo', evidence: 'Ver evidência', none: 'Nada para fazer: nenhuma falha, tela ou conta fora do normal neste período.',
     chip: { bugs: 'Bug', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestão', better: 'Melhorou' },
     sessions: (n) => `${num(n)} ${n === 1 ? 'sessão' : 'sessões'}`, people: (n) => `${num(n)} ${n === 1 ? 'pessoa' : 'pessoas'}`, good: 'Melhorou', goodHint: 'Telas com menos frustração que no período anterior.' },
   // The to-do list grouped by screen (or failure, account, action), and the items followed after a fix.
   fw: { things: { screen: ['tela', 'telas'], failure: ['falha', 'falhas'], account: ['conta', 'contas'], action: ['ação', 'ações'], other: ['ponto', 'pontos'] }, and: 'e',
-    bad: (t, n) => `${t} ${n === 1 ? 'precisa' : 'precisam'} de você esta semana`, warn: (t) => `${t} com pontos de atenção, nada grave`, toList: 'Ver a lista ↓',
+    bad: (t, n, w) => `${t} ${n === 1 ? 'precisa' : 'precisam'} de você ${w}`, warn: (t) => `${t} com pontos de atenção, nada grave`, toList: 'Ver a lista ↓',
     more: (n, k) => `+${n} ${{ screen: 'nesta tela', failure: 'nesta falha', account: 'nesta conta', action: 'nesta ação' }[k] ?? 'aqui'}`, less: 'Esconder',
     alsoHere: 'Também aqui', follow: 'Acompanhar', followTip: 'Guarda o valor de hoje como linha de base; o cartão Acompanhando mostra, nas próximas semanas, se melhorou.',
     following: 'Acompanhando', title: 'Acompanhando', hint: 'O que você decidiu corrigir, contra o valor do dia em que passou a acompanhar.',
@@ -1038,7 +1038,7 @@ const L = PT ? {
     name: 'Name', namePh: 'e.g. Users redesign', date: 'Date', create: 'Create and use', remove: 'Delete mark', confirmRemove: (n) => `Delete the mark ${n}?`,
     future: 'Pick a date from today back.' },
   failureTab: {
-    list: 'Failures, the ones hitting the most sessions first', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
+    list: 'Failures, heaviest first: sessions hit times severity (an error weighs more than slowness)', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
     none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
     occurrences: (f) => `${num(f.n)}× in ${plural(f.sessions, 'session', 'sessions')} · ${plural(f.users, 'user', 'users')} · ${plural(f.accounts, 'account', 'accounts')}`,
     where: 'Screens', versions: 'Versions', agents: 'Browsers', devices: 'Kind of screen', afterClicking: 'Right after clicking',
@@ -1136,7 +1136,7 @@ const L = PT ? {
     unclear: 'The screen changes but people do not notice it worked: make the feedback clearer (message, highlight, navigation).' },
   demand: { copy: 'Copy as a request', problem: 'Problem', who: 'Who is affected', since: 'Since', suggestion: 'Suggestion', accept: 'Acceptance criteria',
     evidence: 'See it on Termometro', tech: 'Technical detail', period: (d) => `in the last ${d} days`,
-    reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`].filter(Boolean).join(' · '),
+    reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`, !i.sessions && i.reach_sessions && `${i.reach_sessions} sessions`, i.reach_people && `${i.reach_people} people`].filter(Boolean).join(' · '),
     kinds: {
       version_worse: ['The new version made the screen more frustrating', 'Compare what changed on the screen between the two versions and fix what caused the signals (see "Where it irritates" on the Frustration tab).', (i) => `The screen's frustration goes back near ${i.before} in the next version.`],
       screen_worse: ['Screen got more frustrating', 'See on the Frustration tab which element gathers the signals and what failed right after the click.', (i) => `The screen's frustration goes back near ${i.before} within 7 days of use.`],
@@ -1253,12 +1253,12 @@ const L = PT ? {
     onlyOne: (b) => `Only version ${b} in this period.`, prevHint: (a, n) => `The previous one, ${a}, shows up widening the period to ${n} days.`,
     widen: (n) => `Compare with the previous version (widens to ${n} days)`, noPrev: 'There is no previous version in the kept data.', sinceMark: 'There is no previous version since the mark in use. Pick "Whole period" in Marks to see the others.',
     markIt: 'Create a mark at this version', markTip: (v) => `Saves the start of ${v} in Marks, to count from it whenever you want. The period in use does not change.`, marked: 'Mark saved', markName: (v) => `Version ${v}` },
-  todo: { title: 'To do this week', hint: 'Severity times reach (sessions and people affected), highest first.', all: (n) => `See all (${n})`, fewer: 'See only the top 5',
+  todo: { title: (w) => `To do ${w}`, hint: 'Severity times reach (sessions and people affected), highest first.', all: (n) => `See all (${n})`, fewer: 'See only the top 5',
     byList: 'By priority', byType: 'See by type', evidence: 'See evidence', none: 'Nothing to do: no failure, screen or account out of the ordinary in this period.',
     chip: { bugs: 'Bug', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestion', better: 'Improved' },
     sessions: (n) => `${num(n)} ${n === 1 ? 'session' : 'sessions'}`, people: (n) => `${num(n)} ${n === 1 ? 'person' : 'people'}`, good: 'Improved', goodHint: 'Screens with less frustration than in the period before.' },
   fw: { things: { screen: ['screen', 'screens'], failure: ['failure', 'failures'], account: ['account', 'accounts'], action: ['action', 'actions'], other: ['point', 'points'] }, and: 'and',
-    bad: (t, n) => `${t} ${n === 1 ? 'needs' : 'need'} you this week`, warn: (t) => `${t} with points of attention, nothing serious`, toList: 'See the list ↓',
+    bad: (t, n, w) => `${t} ${n === 1 ? 'needs' : 'need'} you ${w}`, warn: (t) => `${t} with points of attention, nothing serious`, toList: 'See the list ↓',
     more: (n, k) => `+${n} ${{ screen: 'on this screen', failure: 'in this failure', account: 'in this account', action: 'in this action' }[k] ?? 'here'}`, less: 'Hide',
     alsoHere: 'Also here', follow: 'Follow', followTip: 'Keeps today\'s value as the baseline; the Following card shows over the next weeks whether it got better.',
     following: 'Following', title: 'Following', hint: 'What you decided to fix, against its value on the day you started following it.',
@@ -1876,7 +1876,7 @@ const countText = (groups) => {
 function verdictBanner(groups) {
   const bad = groups.filter((g) => g.items.some((i) => i.severity === 'bad')), warn = groups.filter((g) => !bad.includes(g) && g.items.some((i) => i.severity === 'warn'))
   const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
-  const headline = level === 'bad' ? L.fw.bad(countText(bad), bad.length) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok
+  const headline = level === 'bad' ? L.fw.bad(countText(bad), bad.length, inPeriod()) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok
   return `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${{ bad: '!', warn: '•', ok: '✓' }[level]}</span><div class="fw-verdict">
       <div class="vh">${headline}</div>
       <div class="meta">${level === 'ok' ? L.verdict.okHint : `<button class="link" data-todo-go>${L.fw.toList}</button>`}</div></div></section>`
@@ -1971,6 +1971,9 @@ const VERSION_SAME = 2 // points of frustration up or down that still count as t
 const verdictOf = (d) => (d > VERSION_SAME ? 'worse' : d < -VERSION_SAME ? 'better' : 'same')
 const VERDICT_CLS = { worse: 'bad', better: 'ok', same: 'same' }
 // The smallest period on offer that holds `n` days (or the longest there is).
+// The chosen period in words, for headlines: "esta semana" only when it is 7 days.
+const inPeriod = () => { const d = +($('#days')?.value || 7)
+  return PT ? (d === 1 ? 'nas últimas 24 horas' : d === 7 ? 'esta semana' : `nos últimos ${d} dias`) : (d === 1 ? 'in the last 24 hours' : d === 7 ? 'this week' : `in the last ${d} days`) }
 const widenTo = (n) => { const o = [...$('#days').options].map((x) => +x.value); return o.find((x) => x >= n) ?? Math.max(...o) }
 async function lastRelease() {
   let c = await read('/api/compare'), widened = 0
@@ -2053,7 +2056,7 @@ async function overview() {
       ${rows.length > TODO_TOP ? `<button class="small" data-col-all aria-expanded="false" data-n="${rows.length}">${L.todo.all(rows.length)}</button>` : ''}</section>` }).join('')}</div>`
     : ''
   const view = recall('todoView') === 'type' ? 'type' : 'list'
-  const insights = `<section class="card todo"><div class="head"><div><div class="label">${L.todo.title}${help('todo')}</div><div class="meta">${L.todo.hint}</div></div>
+  const insights = `<section class="card todo"><div class="head"><div><div class="label">${L.todo.title(inPeriod())}${help('todo')}</div><div class="meta">${L.todo.hint}</div></div>
       ${o.insights.length ? `<div class="seg" role="group">${[['list', L.todo.byList], ['type', L.todo.byType]].map(([v, t]) =>
         `<button data-todo-view="${v}" aria-pressed="${view === v}">${t}</button>`).join('')}</div>` : ''}</div>
     <div class="todo-list" ${view === 'list' ? '' : 'hidden'}>${todo.length ? `<ol class="todos">${todo.map((g, k) => todoRow(g, k, o.days, follows)).join('')}</ol>
