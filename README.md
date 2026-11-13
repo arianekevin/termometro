@@ -261,6 +261,7 @@ and the **Following** card measures the same number on what came since, with the
 python3 -m unittest discover server/tests      # server
 cd collector && npm install && npm test        # collector
 cd collector && npm run build                  # also copies termometro.js into server/static
+cd e2e && npm ci && npx playwright install chromium && npm test   # the panel in a browser (seeds its own data)
 TERMOMETRO_PASSWORD=dev TERMOMETRO_PROJECTS='[{"name":"dev","key":"tk_dev","origins":[]}]' python3 server/termometro.py
 docker build -t termometro .                   # the image, from source
 ```

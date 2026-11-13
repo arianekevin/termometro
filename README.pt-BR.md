@@ -218,6 +218,14 @@ conta — e o cartão **Acompanhando** mede o mesmo número só no que veio depo
 (até 5 pontos de frustração, ou 20%) ou Piorou, "desde dd/mm (versão x)". Só chaves ficam guardadas, nunca pessoas
 (`GET/POST/DELETE /api/follow`).
 
+## Desenvolver
+
+```bash
+python3 -m unittest discover server/tests                         # servidor
+cd collector && npm install && npm test                           # coletor
+cd e2e && npm ci && npx playwright install chromium && npm test   # o painel num navegador (cria os próprios dados)
+```
+
 ## Licença
 
 [AGPL-3.0](LICENSE). Você pode usar, alterar e hospedar o Termometro livremente; se oferecer uma versão alterada
