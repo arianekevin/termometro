@@ -566,11 +566,15 @@ details.byday > .card + .card { margin-top: 16px; }
 @media (max-width: 559px) {
   th[data-lo], td[data-lo] { display: none; }
   tr.sub { display: table-row; cursor: pointer; }
+  tr.sub.off { display: none; }
+  tr.sub .signals { display: inline; min-width: 0; } tr.sub .signals span { margin-right: 10px; }
+  tr.sub:not([data-route], [data-open], [data-signal], [data-account], [data-user]) { cursor: default; }
   tr.sub td { padding: 0 12px 10px; font-size: 12px; line-height: 18px; color: var(--fg2); background: transparent; overflow-wrap: anywhere; }
   tr.sub .subk { color: var(--faint); }
-  tr.row:has(+ tr.sub) td { border-bottom: 0; }
-  tr.row:has(+ tr.sub) td, tr.sub td { background: transparent; }
-  tr.row:has(+ tr.sub:hover) td { background: var(--sunken); }
+  tr.sub button.sub-copy { float: right; width: 28px; height: 28px; margin: -4px 0 0 8px; }
+  tbody tr:has(+ tr.sub) td { border-bottom: 0; }
+  tbody tr:has(+ tr.sub) td, tr.sub td { background: transparent; }
+  tbody tr:has(+ tr.sub:hover) td { background: var(--sunken); }
   .acc-cell { min-width: 0; }
   .fcell { min-width: 0; } td.fcell { overflow-wrap: anywhere; }
 }
@@ -1293,8 +1297,8 @@ const short = (id) => (id.length > 12 ? id.slice(0, 8) + '…' : id)
 // Phones (below 560 px): a column marked data-lo is hidden, and what it said moves to the second line of the row (subRow),
 // real text in the DOM that only shows on the phone. The sub row is a .detail, so CSV and paging treat it as part of its row.
 const LO = ' data-lo'
-const subRow = (pairs, attrs = '', cls = '') => { const t = pairs.filter((x) => x && x[1] !== undefined && x[1] !== '').map(([k, v]) => `<span class="subk">${k}</span> ${v}`).join(' · ')
-  return t ? `<tr class="row detail sub ${cls}" ${attrs}><td colspan="12">${t}</td></tr>` : '' }
+const subRow = (pairs, attrs = '', cls = '', tail = '') => { const t = pairs.filter((x) => x && x[1] !== undefined && x[1] !== '').map(([k, v]) => `<span class="subk">${k}</span> ${v}`).join(' · ')
+  return t ? `<tr class="row detail sub ${cls}" ${attrs}><td colspan="12">${tail}${t}</td></tr>` : '' }
 const table = (head, rows) => `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
 // "No visits in this period" anywhere becomes the empty state that says why and offers the way out (see emptyState).
 const empty = (msg) => msg === L.noVisits && state.status?.events ? emptyState() : `<div class="card empty">${msg}</div>`
@@ -1710,7 +1714,7 @@ const kindLegend = () => `<div class="legend">${KINDS.map((k) => `<span><i class
 function kindsCard(o) {
   const k = o.kinds, total = KINDS.reduce((a, c) => a + k.now[c], 0) || 1
   const comparable = o.before_daily.length >= Math.max(1, Math.ceil(o.daily.length / 2))
-  const delta = (now, before) => !comparable || now === before ? '' : `<span class="delta ${now > before ? 'bad' : 'ok'}">${now > before ? '▲ +' : '▼ '}${now - before}</span>`
+  const delta = (now, before) => comparable ? deltaChip(now, before, { worseUp: true }) : ''
   const e = k.effort
   return `<section class="card"><div class="head"><div><div class="label">${C().title}${help('kinds')}</div><div class="meta">${C().hint}</div></div></div>
     <div class="kinds">${KINDS.map((c) => `<a class="kind" ${linkAttrs({ tab: 'frustration', params: { cat: c } })}>
@@ -1721,8 +1725,7 @@ function kindsCard(o) {
         ${c === 'irritation' && reasonsText(k.rage_reasons) ? `<span class="why">${C().why}: ${esc(reasonsText(k.rage_reasons))}</span>` : ''}
         <span class="kshare"><i class="k-${c}" style="width:${k.now[c] / total * 100}%"></i></span></a>`).join('')}
       <a class="kind effort" ${linkAttrs({ tab: 'actions', params: {} })}><span class="kname">${C().effort}</span>
-        <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions && e.now.clicks !== e.before.clicks
-          ? `<span class="delta ${e.now.clicks > e.before.clicks ? 'bad' : 'ok'}">${e.now.clicks > e.before.clicks ? '▲' : '▼'}&nbsp;${FT().before(num(e.before.clicks))}</span>` : ''}</span>
+        <span class="kval">${C().effortUnit(e.now.clicks)}${comparable && e.before.actions ? delta(e.now.clicks, e.before.clicks) : ''}</span>
         ${spark(e.daily.map((d) => d.clicks), `${C().effort}: ${L.perDay}`, 96, 24)}
         ${e.now.here_median !== null && e.now.here_median !== undefined ? `<span class="why">${esc(C().effortSplit(e.now.path_median, e.now.here_median))}</span>` : ''}
         <span class="meta">${C().effortWhat} · ${num(e.now.actions)} ${PT ? 'ações' : 'actions'}</span></a>
@@ -2134,18 +2137,20 @@ async function frustration() {
       <div class="label">${L.screensByFrustration}${help('screensByFrustration')}</div><div class="meta">${L.openRow}${cat ? ' · ' + C().by(C().names[cat]) : ''}</div>
       <div class="chips" role="group" aria-label="${C().title}"><button data-cat="" aria-pressed="${!cat}">${C().all}</button>${KINDS.map((k) =>
         `<button data-cat="${k}" aria-pressed="${cat === k}"><i class="sw k-${k}"></i>${C().names[k]}</button>`).join('')}</div>
-      ${table(`<th>${L.screen}</th><th class="n">${cat ? esc(C().names[cat]) : L.score}</th><th class="n">${L.visits}</th><th class="n">${C().effortCol}</th><th>${L.signals}</th>`, routes.map((x, i) => `
+      ${table(`<th>${L.screen}</th><th class="n">${cat ? esc(C().names[cat]) : L.score}</th><th class="n">${L.visits}</th><th class="n" data-lo>${C().effortCol}</th><th data-lo>${L.signals}</th>`, routes.map((x, i) => `
         <tr class="row ${x.key === state.route ? 'sel' : ''}" data-open="${i}" data-key="${esc(x.key)}" tabindex="0" aria-expanded="${x.key === state.route}">
           <td><div class="route">${scr(x.key)}</div></td>
           <td class="n">${cat ? `<b>${x.categories?.[cat] ?? 0}</b>${x.before ? scoreDelta(x.categories?.[cat] ?? 0, x.before.categories?.[cat] ?? 0) : ''}<div class="meta">${L.score} ${x.score}</div>`
             : scoreHtml(x.score) + (x.before ? scoreDelta(x.score, x.before.score) : '')}${kindBar(x.categories, x.score)}</td>
-          <td class="n">${num(x.visits)}</td><td class="n">${x.effort ? `${num(x.effort.clicks)}<div class="meta">${x.effort.here_median !== null && x.effort.here_median !== undefined ? esc(C().effortSplit(x.effort.path_median, x.effort.here_median)) : PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td>${signals(x.signals)}</td></tr>
+          <td class="n">${num(x.visits)}</td><td class="n" data-lo>${x.effort ? `${num(x.effort.clicks)}<div class="meta">${x.effort.here_median !== null && x.effort.here_median !== undefined ? esc(C().effortSplit(x.effort.path_median, x.effort.here_median)) : PT ? 'cliques/ação' : 'clicks/action'}</div>` : '—'}</td><td data-lo>${signals(x.signals)}</td></tr>
+        ${subRow([[C().effortCol, x.effort ? num(x.effort.clicks) : ''], [L.signals, signals(x.signals)]], `data-open="${i}" data-key="${esc(x.key)}"`, x.key === state.route ? 'sel' : '')}
         <tr class="detail" data-of="${i}" ${x.key === state.route ? '' : 'hidden'}><td colspan="5">${detail(x)}</td></tr>`).join(''))}
       ${kindLegend()}
     </section>
     ${r.versions.length ? `<section class="card"><div class="label">${L.byVersion}${help('byVersion')}</div><div class="meta">${L.versionHint}</div>
-      ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
-        <td class="n">${scoreHtml(v.score)}</td><td class="n">${num(v.visits)}</td><td>${signals(v.signals)}</td></tr>`).join(''))}</section>` : ''}
+      ${table(`<th>${L.version}</th><th class="n">${L.score}</th><th class="n">${L.visits}</th><th data-lo>${L.signals}</th>`, r.versions.map((v) => `<tr><td><code>${esc(v.key)}</code></td>
+        <td class="n">${scoreHtml(v.score)}</td><td class="n">${num(v.visits)}</td><td data-lo>${signals(v.signals)}</td></tr>
+        ${subRow([[L.signals, signals(v.signals)]])}`).join(''))}</section>` : ''}
     <details class="card"><summary>${L.how}</summary>
       <p>${L.howText(Object.entries(r.weights).map(([k, w]) => `${esc(L.names[k] ?? k)} ${w}`).join(', '), r.factor)}</p>
       <p class="meta">${L.privacy}</p></details>`
@@ -2489,19 +2494,21 @@ async function usage() {
     <section class="two">
       <div class="card">
         <div class="label">${L.screensByUse}${help('screensByUse')}</div><div class="meta">${L.pickScreen}</div>
-        ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.score}</th>`, screens.map((s) => `
+        ${table(`<th>${L.screen}</th><th class="n">${L.visits}</th><th class="n" data-lo>${L.clicks}</th><th class="n" data-lo>${L.users}</th><th class="n" data-lo>${L.score}</th>`, screens.map((s) => `
           <tr class="row ${s.route === state.route ? 'sel' : ''}" data-route="${esc(s.route)}" tabindex="0">
             <td><div class="route">${scr(s.route)}</div><div class="bar"><i style="width:${s.visits / maxV * 100}%;background:var(--fill)"></i></div></td>
-            <td class="n">${num(s.visits)}${countDelta(s.visits, s.before?.visits)}</td><td class="n">${num(s.clicks)}${countDelta(s.clicks, s.before?.clicks)}</td>
-            <td class="n">${num(s.users)}${countDelta(s.users, s.before?.users)}</td><td class="n">${scoreHtml(s.score)}${scoreDelta(s.score, s.before?.score)}</td></tr>`).join(''))}
+            <td class="n">${num(s.visits)}${countDelta(s.visits, s.before?.visits)}</td><td class="n" data-lo>${num(s.clicks)}${countDelta(s.clicks, s.before?.clicks)}</td>
+            <td class="n" data-lo>${num(s.users)}${countDelta(s.users, s.before?.users)}</td><td class="n" data-lo>${scoreHtml(s.score)}${scoreDelta(s.score, s.before?.score)}</td></tr>
+          ${subRow([[L.clicks, num(s.clicks)], [L.users, num(s.users)], [L.score, scoreHtml(s.score)]], `data-route="${esc(s.route)}"`, s.route === state.route ? 'sel' : '')}`).join(''))}
       </div>
       <div class="card">
         <div class="head"><div><div class="label">${esc(L.elementsOf(screenText(d.route) || d.route))}${help('elements')}</div><div class="meta">${L.visitsN(d.visits)}${countDelta(d.visits, d.visits_before)}</div></div>
           ${project?.url ? `<button class="primary" id="open-map">${L.openMap}</button>` : `<span class="meta">${L.mapNoUrl}</span>`}</div>
-        ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n">${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
+        ${d.elements.length ? table(`<th>${L.element}</th><th class="n">${L.clicks}</th><th class="n" data-lo>${L.users}</th><th class="n">${L.problems}</th>`, d.elements.map((e) => `
           <tr><td><span class="swatch" style="background:${heat(e.clicks / maxC)}"></span><span class="named">${named(controlLabel(d.route, e.target), e.target)}</span></td>
-            <td class="n">${num(e.clicks)}${d.visits_before ? countDelta(e.clicks, Math.round(e.before * d.visits / d.visits_before)) : ''}</td><td class="n">${num(e.users)}</td>
-            <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${num(e.rage + e.dead + e.errors)}</span>` : '<span class="meta">—</span>'}</td></tr>`).join(''))
+            <td class="n">${num(e.clicks)}${d.visits_before ? countDelta(e.clicks, Math.round(e.before * d.visits / d.visits_before)) : ''}</td><td class="n" data-lo>${num(e.users)}</td>
+            <td class="n">${e.rage + e.dead + e.errors ? `<span class="bad" title="${esc(L.problemTip(e))}">${num(e.rage + e.dead + e.errors)}</span>` : '<span class="meta">—</span>'}</td></tr>
+          ${subRow([[L.users, num(e.users)]])}`).join(''))
           : `<p class="meta">${L.noClicks}</p>`}
       </div>
     </section>
@@ -2593,15 +2600,17 @@ async function versions() {
       <div class="card"><div class="label">${L.newFailures}</div><div class="big ${c.new_failures.length ? 'bad' : 'ok'}">${c.new_failures.length}</div></div>
     </section>
     <section class="card"><div class="label">${L.screensCompared}${help('compare')}</div>
-      ${table(`<th>${L.screen}</th><th class="n">${esc(c.a)}</th><th class="n">${esc(c.b)}</th><th class="n">${L.change}</th><th class="n">${L.visits} ${esc(c.b)}</th><th>${L.signals} ${esc(c.b)}</th>`,
+      ${table(`<th>${L.screen}</th><th class="n">${esc(c.a)}</th><th class="n">${esc(c.b)}</th><th class="n">${L.change}</th><th class="n" data-lo>${L.visits} ${esc(c.b)}</th><th data-lo>${L.signals} ${esc(c.b)}</th>`,
         c.routes.map((r) => `<tr><td><div class="route">${scr(r.route)}</div></td>
           <td class="n">${r.a ? scoreHtml(r.a.score) : '<span class="meta">—</span>'}</td><td class="n">${r.b ? scoreHtml(r.b.score) : '<span class="meta">—</span>'}</td>
           <td class="n">${r.delta === null ? `<span class="meta">${esc(L.onlyIn(r.b ? c.b : c.a))}</span>` : delta(r.delta)}</td>
-          <td class="n">${r.b?.visits ?? 0}</td><td>${r.b ? signals(r.b.signals) : ''}</td></tr>`).join(''))}</section>
+          <td class="n" data-lo>${r.b?.visits ?? 0}</td><td data-lo>${r.b ? signals(r.b.signals) : ''}</td></tr>
+          ${subRow([[`${L.visits} ${esc(c.b)}`, String(r.b?.visits ?? 0)], [`${L.signals} ${esc(c.b)}`, r.b ? signals(r.b.signals) : '']])}`).join(''))}</section>
     ${c.actions.length ? `<section class="card"><div class="label">${L.actionsCompared}</div>
-      ${table(`<th>${L.action}</th><th class="n">${L.clicks}</th><th class="n">${L.timeMed}</th><th class="n">${L.times} ${esc(c.b)}</th>`,
+      ${table(`<th>${L.action}</th><th class="n">${L.clicks}</th><th class="n" data-lo>${L.timeMed}</th><th class="n" data-lo>${L.times} ${esc(c.b)}</th>`,
         c.actions.map((x) => `<tr><td>${act(x.action)}</td><td class="n">${pair(x.a?.clicks_median, x.b?.clicks_median)}</td>
-          <td class="n">${pair(x.a?.seconds_median, x.b?.seconds_median, ' s')}</td><td class="n">${x.b?.times ?? 0}</td></tr>`).join(''))}</section>` : ''}
+          <td class="n" data-lo>${pair(x.a?.seconds_median, x.b?.seconds_median, ' s')}</td><td class="n" data-lo>${x.b?.times ?? 0}</td></tr>
+          ${subRow([[L.timeMed, pair(x.a?.seconds_median, x.b?.seconds_median, ' s')], [`${L.times} ${esc(c.b)}`, String(x.b?.times ?? 0)]])}`).join(''))}</section>` : ''}
     <section class="card"><div class="label">${L.newFailures}</div>
       ${c.new_failures.length ? `<ul>${c.new_failures.map((f) => `<li>${esc(L.names[f.type] ?? f.type)}: <code>${esc(f.detail)}</code> <span class="meta">${esc(screenText(f.route) || f.route)}</span> — ${f.n}×</li>`).join('')}</ul>`
         : `<p class="meta">${L.noNewFailures}</p>`}</section>`
@@ -2897,7 +2906,7 @@ async function accounts() {
         <td class="n" data-lo>${num(a.now.users)}</td>
         ${a.features.map((f) => `<td class="n" data-lo>${num(f.now)}${accDelta(f.now, f.before, f.move)}</td>`).join('')}
         <td class="act" data-nocsv data-lo><button class="icon" data-acc-copy="${esc(accountSummary(a, e))}" title="${esc(AC().copySummary)}" aria-label="${esc(AC().copyOf(accountText(a.account)))}">${COPY_ICON}</button></td></tr>
-        ${subRow([[AC().failures, num(a.now.failures)], [AC().usersDay, num(a.now.users_day)], [AC().sessionsDay, num(a.now.sessions_day)], [AC().people, num(a.now.users)], ...a.features.map((f) => [esc(feats.find((x) => x.id === f.id)?.name ?? f.id), num(f.now)])], `data-account="${esc(a.account)}"`)}`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
+        ${subRow([[AC().failures, num(a.now.failures)], [AC().usersDay, num(a.now.users_day)], [AC().sessionsDay, num(a.now.sessions_day)], [AC().people, num(a.now.users)], ...a.features.map((f) => [esc(feats.find((x) => x.id === f.id)?.name ?? f.id), num(f.now)])], `data-account="${esc(a.account)}"`, '', `<button class="icon sub-copy" data-acc-copy="${esc(accountSummary(a, e))}" title="${esc(AC().copySummary)}" aria-label="${esc(AC().copyOf(accountText(a.account)))}">${COPY_ICON}</button>`)}`).join('')) : `<p class="meta">${AC().noneDown}</p>`}</section>`
 }
 
 // What hurts this account: its worst screens (and the element that irritates there) and the failures that hit it most.
@@ -3406,7 +3415,8 @@ function onContentClick(e) {
   }
   const more = e.target.closest('[data-session]')
   if (more) return showSession(more)
-  const tr = e.target.closest('tr.row'); if (!tr) return
+  let tr = e.target.closest('tr.row'); if (!tr) return
+  if (tr.classList.contains('sub') && tr.dataset.open !== undefined) tr = tr.previousElementSibling
   if (tr.dataset.signal !== undefined) return go('failures', { signal: tr.dataset.signal, detail: tr.dataset.detail })
   if (tr.dataset.open !== undefined) {
     const d = document.querySelector(`tr[data-of="${tr.dataset.open}"]`)
