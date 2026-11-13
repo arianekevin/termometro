@@ -91,7 +91,7 @@ from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
 STATIC = HERE / "static"
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 
 # Weight of each frustration signal in the score. "page" is a visit (the denominator); "click" and "action"
 # measure usage and effort and weigh nothing; "inventory" lists what can be clicked on a screen.
