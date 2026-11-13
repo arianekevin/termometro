@@ -105,6 +105,16 @@ class Server(unittest.TestCase):
         self.assertEqual((failure["n"], failure["first_version"], failure["last_version"]), (3, "1.0", "1.1"))
         self.assertLess(failure["first_at"], failure["last_at"])
 
+    def test_a_failure_older_than_the_period_keeps_the_version_it_started_in(self):
+        error = {"type": "js_error", "route": "/cart", "detail": "TypeError: y is undefined"}
+        self.send([{"type": "page", "route": "/cart"}, error], version="1.0")
+        with t.connect() as con:  # ten days ago: outside a 1-day period
+            con.execute("UPDATE events SET at = at - 10 * 86400000")
+        self.send([{"type": "page", "route": "/cart"}, error], version="1.1")
+        [failure] = self.read("/api/summary?project=shop&days=1")["routes"][0]["failures"]
+        listed = self.read("/api/failures?project=shop&days=1")["failures"][0]
+        self.assertEqual((failure["first_version"], listed["first_version"]), ("1.0", "1.0"))
+
     def test_a_fresh_start_hides_what_came_before_until_undone_and_deletes_nothing(self):
         error = {"type": "js_error", "route": "/cart", "detail": "TypeError: old"}
         self.send([{"type": "page", "route": "/cart"}, error])

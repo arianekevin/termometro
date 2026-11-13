@@ -677,6 +677,7 @@ def summary(con, f: Filter) -> dict:
     first = {k[:4]: k[4:] for k in con.execute(f"""
         SELECT route, type, detail, target, MIN(at), version FROM events
         WHERE {f.sql} AND type IN {FAILURES} GROUP BY route, type, detail, target""", f.args)}
+    started = first_seen(con, f)
     failures = con.execute(f"""
         SELECT route, type, detail, target, COUNT(*) n, MAX(at), version, AVG(duration_ms) FROM events
         WHERE {f.sql} AND type IN {FAILURES}
@@ -694,7 +695,9 @@ def summary(con, f: Filter) -> dict:
     for route, kind, detail, target, n, last_at, last_version, ms in failures:
         lst = per_route.setdefault(route, {"targets": [], "failures": []})["failures"]
         if len(lst) < 5:
-            first_at, first_version = first[(route, kind, detail, target)]
+            # When it started: over everything kept since the mark, as in the Failures tab and the issue text, not
+            # only inside this period (the same failure must not say "since 1.3" there and "since 1.4" here).
+            first_at, first_version = started.get((kind, detail)) or first[(route, kind, detail, target)]
             lst.append({"type": kind, "detail": detail, "after": target, "n": n,
                         "first_at": first_at, "first_version": first_version, "last_at": last_at,
                         "last_version": last_version, "seconds": round(ms / 1000, 1) if kind == "slow" and ms else None})

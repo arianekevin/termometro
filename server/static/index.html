@@ -340,7 +340,8 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mappanel li code { font-size: 11px; color: var(--faint); overflow-wrap: anywhere; }
 .mappanel .chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
 .mappanel .chip.warn { color: var(--warn); background: var(--warn-soft); } .mappanel .chip.bad { color: var(--bad); background: var(--bad-soft); }
-.mappanel .note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); color: var(--fg2); font-size: 13px; }
+.mappanel .note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); color: var(--fg2); font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
+.mappanel .note > span { flex: 1; } .mappanel .note .note-copy { flex: none; margin: -4px -6px 0 0; }
 .mappanel .back { font-size: 13px; height: auto; padding: 3px 10px; margin-bottom: 10px; }
 .mappanel h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg2); }
 .mappanel ol.causes li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 10px; border-radius: 10px; }
@@ -3024,6 +3025,14 @@ function mapSteps(m, sel) {
 }
 
 const mapPct = (r) => Math.round(r * 100)
+// The reading's closing sentence, with a button that copies it (for a request or a message to the team).
+const mapNote = (text) => `<div class="note"><span>${esc(text)}</span><button class="icon note-copy" data-copy-text="${esc(text)}" title="${esc(PT ? 'Copiar a frase' : 'Copy the sentence')}" aria-label="${esc(PT ? 'Copiar a frase' : 'Copy the sentence')}">${COPY_ICON}</button></div>`
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-copy-text]')
+  if (!b) return
+  const was = b.title
+  navigator.clipboard?.writeText(b.dataset.copyText).then(() => { b.classList.add('done'); b.title = L.copied; setTimeout(() => { b.classList.remove('done'); b.title = was }, 1500) })
+})
 // The heat: cool to hot, as on the map over the app. Clicks: a square root of the share of the most clicked; problems: how
 // much of its clicks irritate, half or more is the hottest.
 const MAP_HEAT = { usage: [[0, [59, 130, 246]], [0.3, [34, 197, 94]], [0.55, [250, 204, 21]], [0.78, [249, 115, 22]], [1, [220, 38, 38]]],
@@ -3251,7 +3260,7 @@ function mapTop(m, els, steps, lens, unnamed) {
     const never = els.filter((x) => !x.clicks).length
     note = never ? MP().neverN(never) : ''
   }
-  return `<h3>${esc(title)}</h3><p class="lead">${esc(lead)}</p>${items.length ? `<ol>${items.join('')}</ol>` : ''}${note ? `<div class="note">${esc(note)}</div>` : ''}`
+  return `<h3>${esc(title)}</h3><p class="lead">${esc(lead)}</p>${items.length ? `<ol>${items.join('')}</ol>` : ''}${note ? mapNote(note) : ''}`
 }
 
 // One element picked: its numbers, why it irritates, where people go after it and where they come from, and a reading.
@@ -3265,12 +3274,12 @@ function mapPanel(m, x, unnamed) {
   if (state.mapLens === 'problems') return `<button class="back" data-map-el="">${MP().allRoutes}</button>
     <h3>${esc(name)}</h3><p class="lead">${esc(MP().clicks(x.clicks))}${x.bad ? ' · ' + mapChip('bad', MP().irritates(mapPct(x.rate))) : ''}<br><code class="tech">${esc(x.target)}</code></p>
     <h4>${esc(MP().causesTitle)}</h4>${causes.length ? `<ol class="causes">${causes.map((c) => `<li><span class="name">${esc(mapCauseText(c))}</span><span class="num">${mapPct(c.n / (total || 1))}%</span><span class="say">${esc(MP().times(c.n))}</span></li>`).join('')}</ol>` : `<p class="meta">${esc(MP().noCauses)}</p>`}
-    ${causes.length ? `<div class="note">${esc(mapWhyNote(x, name))}</div>` : ''}`
+    ${causes.length ? mapNote(mapWhyNote(x, name)) : ''}`
   const note = !top ? MP().noNext(name) : top.share >= 0.6 ? MP().oneNext(name, unnamed(top.to)) : MP().spread(name)
   return `<button class="back" data-map-el="">${MP().allRoutes}</button>
     <h3>${esc(name)}</h3><p class="lead">${esc(MP().clicks(x.clicks))}${x.bad ? ' · ' + mapChip('bad', MP().irritates(mapPct(x.rate))) : ''}
       ${x.bad && mapWhy(x) ? `<br>${esc(mapWhy(x))}` : ''}<br><code class="tech">${esc(x.target)}</code></p>
-    ${after.length || before.length ? `<ol>${after.join('')}${before.join('')}</ol>` : ''}<div class="note">${esc(note)}</div>`
+    ${after.length || before.length ? `<ol>${after.join('')}${before.join('')}</ol>` : ''}${mapNote(note)}`
 }
 
 // The lens, the element picked and the window size redraw the card only; the screen size reads the other drawing.

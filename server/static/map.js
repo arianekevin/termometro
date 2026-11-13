@@ -53,6 +53,7 @@
     pickedSpread: (a) => `Depois de ${a} as pessoas se espalham: nenhum próximo passo domina. Se existe um caminho esperado, ele não está evidente na tela.`,
     pickedNone: (a) => `Não há clique seguinte registrado depois de ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irrita ${p} das vezes que é clicado: ${why}. ${advice}`,
+    copyNote: 'Copiar a frase', copiedNote: 'Copiado',
     causesTitle: 'Por que irrita', whyNote: (n, p, list, fix) => `${n}: ${p} dos cliques irritam. Por quê: ${list}. O que fazer: ${fix}`,
     noCauses: 'Nada irrita neste elemento no período.',
     cause: { rage_waiting: (c) => `clicou de novo enquanto carregava: o botão seguiu clicável${c.slow ? ` (${c.slow} levou ${secs(c.slow_ms)} na mediana)` : ''}`,
@@ -104,6 +105,7 @@
     pickedSpread: (a) => `After ${a} people scatter: no next step dominates. If there is an expected path, the screen does not make it clear.`,
     pickedNone: (a) => `No next click recorded after ${a}.`,
     noteProblem: (n, p, why, advice) => `${n} irritates ${p} of the times it is clicked: ${why}. ${advice}`,
+    copyNote: 'Copy the sentence', copiedNote: 'Copied',
     causesTitle: 'Why it irritates', whyNote: (n, p, list, fix) => `${n}: ${p} of the clicks irritate. Why: ${list}. What to do: ${fix}`,
     noCauses: 'Nothing about this element irritates in this period.',
     cause: { rage_waiting: (c) => `clicked again while it was loading: the button stayed clickable${c.slow ? ` (${c.slow} took ${secs(c.slow_ms)}, median)` : ''}`,
@@ -591,7 +593,7 @@
         <p style="margin:4px 0 8px;color:${C.fg2}">${r.lead}</p>
         ${r.empty ? `<p style="color:${C.fg2};margin:0">${esc(r.empty)}</p>` : ''}
         <ol style="margin:0;padding:0;display:grid;gap:2px">${r.items}</ol>
-        ${r.note ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:${C.sunken};color:${C.fg2};font-size:12.5px">${esc(r.note)}</div>` : ''}
+        ${r.note ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:${C.sunken};color:${C.fg2};font-size:12.5px">${esc(r.note)}<div style="margin-top:6px;text-align:right"><button data-copy-note style="${btn}">${esc(T.copyNote)}</button></div></div>` : ''}
         <div data-off hidden style="margin-top:8px;color:${C.warn};font-size:12px"></div>
         <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:11.5px;color:${C.fg2}">${legendHtml()}</div>
         <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;font-size:12px;color:${C.fg2}">
@@ -659,6 +661,11 @@
     if (b.dataset.act === 'close') return close()
     if (b.dataset.act === 'collapse') { collapsed = !collapsed; renderPanel(); return redraw() }
     if (b.dataset.act === 'unpick') { picked = null; renderPanel(); return redraw() }
+    if (b.dataset.copyNote !== undefined) {
+      const text = reading().note
+      navigator.clipboard?.writeText(text).then(() => { b.textContent = T.copiedNote; setTimeout(() => { b.textContent = T.copyNote }, 1500) })
+      return
+    }
     if (b.dataset.lens) { lens = b.dataset.lens; picked = null; hovered = null; keepLens(); renderPanel(); return redraw() }
     if (b.dataset.t) pick(b.dataset.t)
   })
