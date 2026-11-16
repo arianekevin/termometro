@@ -84,3 +84,20 @@ test('the language pick switches the panel to English after reload', async ({ pa
   await expect(page.locator('a[data-tab="overview"]')).toHaveText('Overview')
   expect(errors).toEqual([])
 })
+
+test('the verdict link opens the list on what needs you, even with the list already in view', async ({ page }) => {
+  const errors = watch(page)
+  await page.setViewportSize({ width: 1400, height: 2000 })
+  await open(page, 'overview')
+  // The other view first: the link has to bring the list back.
+  await page.locator('[data-todo-view="type"]').click()
+  const go = page.locator('[data-todo-go]')
+  test.skip(!(await go.count()), 'the seed has nothing that needs you')
+  await go.click()
+  await expect(page.locator('.card.todo .todo-list')).toBeVisible()
+  const bad = page.locator('.todo-list .todo-row:has(.kchip.bad)')
+  await expect(bad.first()).toBeVisible()
+  await expect(bad.first()).toHaveClass(/\bhit\b/)
+  expect(await bad.evaluateAll((rows) => rows.every((r) => !(r as HTMLElement).hidden))).toBe(true)
+  expect(errors).toEqual([])
+})

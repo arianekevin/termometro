@@ -1931,7 +1931,16 @@ document.addEventListener('click', async (e) => {
     more.textContent = open ? L.fw.less : L.fw.more(+more.dataset.n, more.dataset.kind)
     return
   }
-  if (e.target.closest?.('[data-todo-go]')) return $('.card.todo')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  // The verdict's link opens the list on what needs you: the card is often already in view, so scrolling alone did nothing.
+  if (e.target.closest?.('[data-todo-go]')) {
+    if ($('.card.todo .todo-list')?.hidden) $('[data-todo-view="list"]')?.click()
+    const rows = [...document.querySelectorAll('.todo-list .todo-row')].filter((r) => r.querySelector('.kchip.bad'))
+    if (rows.some((r) => r.hidden)) showTodos(true)
+    if (!rows.length) return $('.card.todo')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    rows[0].scrollIntoView({ block: 'center', behavior: 'smooth' })
+    rows.forEach((r) => r.classList.add('hit')); setTimeout(() => rows.forEach((r) => r.classList.remove('hit')), 2500)
+    return rows[0].querySelector('a.button')?.focus({ preventScroll: true })
+  }
   const all = e.target.closest?.('#fw-all')
   if (all) {
     const open = all.getAttribute('aria-expanded') !== 'true'
