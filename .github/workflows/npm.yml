@@ -1,0 +1,32 @@
+# Publishes the collector to npm from a v* tag, through npm's Trusted Publishing (OIDC): no token and no one-time code.
+# On npmjs.com the package `termometro` names this repository and this file (npm.yml) as its trusted publisher.
+name: npm
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # the OIDC token npm trusts, and the provenance it attaches
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: collector
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted Publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@latest
+      - name: The tag names the version in package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm publish
