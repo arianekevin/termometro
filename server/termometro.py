@@ -843,6 +843,11 @@ def usage(con, f: Filter) -> dict:
                  for v, n in con.execute(f"""SELECT {col}, COUNT(*) FROM events WHERE {base.sql} AND type = 'click'
                      AND {col} != '' GROUP BY {col} ORDER BY COUNT(*) DESC LIMIT 50""", base.args)]
            for key, col in (("user", "user_id"), ("role", "role"), ("account", "account"))}
+    # Who clicks each element, by role: an element missing from someone's screen is often another role's.
+    for target, role, n in con.execute(f"""SELECT target, role, COUNT(*) FROM events WHERE {f.sql} AND type = 'click'
+            AND target != '' GROUP BY target, role""", f.args):
+        if target in elements:
+            elements[target].setdefault("roles", {})[role or ""] = n
     # Why each element's rage happened, as the collector guessed it (waiting, error, nothing...).
     for target, detail, n in con.execute(f"""SELECT target, detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'rage'
             AND target != '' AND detail != '' GROUP BY target, detail""", f.args):

@@ -645,6 +645,7 @@ class Server(unittest.TestCase):
         u = self.read("/api/usage?project=shop&days=1&route=/users")
         self.assertEqual(u["who"]["user"], [{"id": "u1", "name": "Ana Lima", "clicks": 2}, {"id": "u2", "name": "", "clicks": 1}])
         self.assertEqual([r["id"] for r in u["who"]["role"]], ["Admin", "Agent"])
+        self.assertEqual(u["elements"][0]["roles"], {"Admin": 2, "Agent": 1})  # who has it, for a screen that lacks it
         cut = self.read("/api/usage?project=shop&days=1&route=/users&role=Agent")
         self.assertEqual(cut["elements"][0]["clicks"], 1)
         self.assertEqual(len(cut["who"]["user"]), 2)  # the options stay whole while one is picked
@@ -930,7 +931,7 @@ class Server(unittest.TestCase):
         self.assertEqual([(s["route"], s["visits"], s["clicks"], s["users"]) for s in screens], [("/t", 2, 3, 1), ("/c", 1, 0, 1)])
         screen = self.read("/api/usage?project=shop&route=/t")
         self.assertEqual(screen["elements"][0], {"target": "button#save", "clicks": 2, "users": 1, "rage": 0, "dead": 1, "errors": 0, "retry": 0, "near_miss": 0, "label": "", "before": None,
-                                                 "causes": [{"kind": "dead", "n": 1}]})
+                                                 "causes": [{"kind": "dead", "n": 1}], "roles": {"": 2}})
         self.assertEqual(screen["never_clicked"], ["button#delete"])
 
     def test_usage_says_why_an_element_irritates(self):

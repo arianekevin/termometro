@@ -128,7 +128,27 @@ test.describe('map over the app', () => {
     await expect(who.locator('optgroup[label="Papel"] option')).toHaveCount(2)
     await who.selectOption('role:agent')
     await expect(panel.locator('select[data-act="who"]')).toHaveValue('role:agent')
-    if (process.env.MAP_SHOT) await page.screenshot({ path: process.env.MAP_SHOT.replace('.png', '-heat.png') })
+    expect(errors).toEqual([])
+  })
+
+  test('an element that is not on the screen says what opens it, or who has it', async ({ page }) => {
+    const { panel, errors } = await openMap(page, '<button id="new" style="position:fixed;left:100px;top:100px">New ticket</button>')
+    await panel.locator('[data-absent] button[data-t="button#export"]').click()
+    await expect(panel).toContainText('Aparece depois de clicar em New ticket')
+    await panel.locator('button[data-t="button#new"]', { hasText: 'Mostrar' }).click()
+    await expect(panel.locator('h2')).toHaveText('New ticket') // now on what opens it, marked on the screen
+    const box = (await page.locator('#new').boundingBox())!
+    const marked = await page.evaluate(([x, y]) => [...document.querySelectorAll('[data-termometro] div')].some((d) => {
+      const r = d.getBoundingClientRect(); return Math.abs(r.left - x) < 2 && Math.abs(r.top - y) < 2 && getComputedStyle(d).borderTopWidth === '3px' }), [box.x, box.y])
+    expect(marked).toBe(true)
+    await expect(panel.locator('[data-off]')).toBeHidden() // missing from the screen is not "out of view"
+    expect(errors).toEqual([])
+  })
+
+  test('an element nobody reaches from this screen says who clicks it', async ({ page }) => {
+    const { panel, errors } = await openMap(page, '<button id="export" style="position:fixed;left:100px;top:100px">Export</button>')
+    await panel.locator('[data-absent] button[data-t="button#new"]').click()
+    await expect(panel).toContainText(/Quem clica: (agent|manager) \(\d+ cliques\)/)
     expect(errors).toEqual([])
   })
 
@@ -147,7 +167,6 @@ test.describe('map over the app', () => {
     await expect(panel.locator('select[data-act="unit"]')).toHaveValue('none')
     await panel.locator('select[data-act="unit"]').selectOption('min')
     await expect(panel.locator('input[data-act="step"]')).toHaveValue('1')
-    if (process.env.MAP_SHOT) { await steps.first().hover(); await page.screenshot({ path: process.env.MAP_SHOT }) }
     expect(errors).toEqual([])
   })
 })

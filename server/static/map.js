@@ -84,7 +84,11 @@
     step: 'Próximo clique em até', units: { s: 'segundos', min: 'minutos', none: 'sem limite' },
     who: 'De quem', everyone: 'Todo mundo', whoKinds: { role: 'Papel', user: 'Pessoa', account: 'Conta' },
     absentTitle: 'Clicado por outros, não existe na sua tela', absentLead: 'Outro papel, outra configuração ou outro registro: não dá para desenhar aqui.',
-    routesHover: 'Passe o mouse num passo para ver a seta na tela; clique para ver tudo o que vem depois.'
+    routesHover: 'Passe o mouse num passo para ver a seta na tela; clique para ver tudo o que vem depois.',
+    opensAfter: (a) => `Não está na tela agora. Aparece depois de clicar em ${a}: clique ali no app e ele surge.`,
+    showOpener: (a) => `Mostrar ${a} na tela`,
+    onlyFor: (list) => `Não existe na sua tela. Quem clica: ${list}. Provavelmente é de outro papel ou de outra configuração.`,
+    noRole: 'sem papel'
   } : {
     title: 'Termometro · map', close: 'Close', collapse: 'Collapse', expand: 'Open', loading: 'Loading…',
     days: 'days', expired: 'The map link expired: open it again from the dashboard.', down: 'Termometro did not answer.',
@@ -144,7 +148,11 @@
     step: 'Next click within', units: { s: 'seconds', min: 'minutes', none: 'no limit' },
     who: 'Whose', everyone: 'Everyone', whoKinds: { role: 'Role', user: 'Person', account: 'Account' },
     absentTitle: 'Clicked by others, not on your screen', absentLead: 'Another role, setting or record: it cannot be drawn here.',
-    routesHover: 'Hover a step to see its arrow on the screen; click it to see everything that comes next.'
+    routesHover: 'Hover a step to see its arrow on the screen; click it to see everything that comes next.',
+    opensAfter: (a) => `Not on the screen now. It shows up after clicking ${a}: click it in the app and it appears.`,
+    showOpener: (a) => `Show ${a} on the screen`,
+    onlyFor: (list) => `Not on your screen. Who clicks it: ${list}. Probably another role's or another setting's.`,
+    noRole: 'no role'
   }
 
   // Nectar warm palette (the approved reference's light theme).
@@ -296,6 +304,17 @@
   const exits = () => (data?.exits || []).filter((x) => x.n >= minN())
   const exitShare = (x) => x.n / (outTotal.get(x.from) || 1)
   // In the app's own words when it can: the dictionary's screen name is not here, the route is.
+  // What people click right before an element that is not on the screen, and is here: what opens it (a menu, a dialog).
+  const opener = (t) => (data?.paths || []).filter((p) => p.to === t && p.from !== t && (found.get(p.from) || []).length)
+    .sort((a, b) => b.n - a.n)[0]?.from ?? null
+  const rolesOf = (t) => Object.entries(els.get(t)?.roles || {}).sort((a, b) => b[1] - a[1])
+    .map(([r, n]) => `${r || T.noRole} (${T.clicksN(n)})`).join(', ')
+  // Where an element that is not on the screen lives, in words, and the button that shows what opens it.
+  function whereIs(t) {
+    const o = opener(t)
+    if (o) return `<br><span style="color:${C.warn}">${esc(T.opensAfter(nameOf(o)))}</span><br><button data-t="${esc(o)}" style="${btn};margin-top:6px">${esc(T.showOpener(nameOf(o)))}</button>`
+    return `<br><span style="color:${C.warn}">${esc(T.onlyFor(rolesOf(t) || '—'))}</span>`
+  }
   const absent = () => [...els.values()].filter((e) => e.clicks > 0 && !(found.get(e.target) || []).length).sort((a, b) => b.clicks - a.clicks)
   const stepOf = (a, b) => paths().find((p) => p.from === a && p.to === b)
   const backAndForth = (p) => { const r = stepOf(p.to, p.from); return share(p) >= MIN && !!r && share(r) >= MIN }
@@ -472,6 +491,8 @@
       mark(r, on ? C.fg : C.accent, { width: on ? 3 : 1.5, fill: on ? 'rgba(254,193,13,.22)' : 'transparent', dim: picked && t !== picked && !on ? false : false })
     }
     if (hovered && !ends.has(hovered)) for (const r of geo.get(hovered) || []) mark(r, C.fg, { width: 3, fill: 'rgba(254,193,13,.22)' })
+    // The element picked in the panel is always marked, even with no arrow to draw (what comes next is not on screen).
+    if (picked && !ends.has(picked)) for (const r of geo.get(picked) || []) mark(r, C.fg, { width: 3, fill: 'rgba(254,193,13,.35)' })
     for (const l of labels) {
       const b = pill(l.text, l.loop ? C.warn : C.accent, '#fff')
       b.style.left = Math.max(2, Math.min(innerWidth - b.offsetWidth - 2, l.x - b.offsetWidth / 2)) + 'px'
@@ -495,12 +516,13 @@
       drawHeat()
       off = (lens === 'problems' ? problems() : used()).slice(0, 5).map((e) => e.target).filter((t) => !shown(t))
     }
+    off = off.filter((t) => (found.get(t) || []).length) // what is not on the screen at all is explained in the panel
     const note = panel.querySelector('[data-off]')
     const text = off.length ? T.offscreen([...new Set(off.map(nameOf))].slice(0, 5).join(', ')) : ''
     if (note && note.textContent !== text) { note.textContent = text; note.hidden = !text }
     for (const row of panel.querySelectorAll('[data-t]')) {
       const tag = row.querySelector('[data-offtag]')
-      if (tag) tag.hidden = shown(row.dataset.t)
+      if (tag) tag.hidden = shown(row.dataset.t) || !(found.get(row.dataset.t) || []).length
     }
   }
 
@@ -533,13 +555,13 @@
   const btn = `font:inherit;font-size:12px;background:${C.surface};border:1px solid ${C.line};color:${C.fg};border-radius:8px;padding:3px 10px;cursor:pointer`
   const chip = (text, color) => `<span style="display:inline-block;font-size:11px;font-weight:600;padding:0 8px;border-radius:999px;color:${color};background:${color}22">${esc(text)}</span>`
   const code = (s) => `<code style="font:11px ui-monospace,'SF Mono',Menlo,monospace;color:${C.faint};overflow-wrap:anywhere">${esc(s)}</code>`
-  function item(t, name, num, say, { dim = false, flat = false } = {}) {
+  function item(t, name, num, say, { dim = false, flat = false, tag = true } = {}) {
     return `<li style="list-style:none"><button data-t="${esc(t)}" style="width:100%;text-align:left;font:inherit;color:inherit;border:0;border-radius:10px;` +
       `padding:7px 10px;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;opacity:${dim ? 0.55 : 1};` +
       `background:${picked === t && !flat && !name.includes(':') ? C.sunken : 'none'}">` +
       `<span style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:${flat ? 'normal' : 'nowrap'}">${esc(name)}</span>` +
       `<span style="font-variant-numeric:tabular-nums;font-weight:600;text-align:right">${esc(num)}</span>` +
-      `<span style="grid-column:1/-1;color:${C.fg2};font-size:12px">${say}<span data-offtag ${shown(t) ? 'hidden' : ''} style="color:${C.faint}"> · ${esc(T.offTag)}</span></span></button></li>`
+      `<span style="grid-column:1/-1;color:${C.fg2};font-size:12px">${say}${tag ? `<span data-offtag ${shown(t) ? 'hidden' : ''} style="color:${C.faint}"> · ${esc(T.offTag)}</span>` : ''}</span></button></li>`
   }
   // Title, lead, items and the reading note for the current lens.
   function reading() {
@@ -553,7 +575,8 @@
         const list = causes(e), total = list.reduce((a, c) => a + c.n, 0)
         return {
           title: name,
-          lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}`,
+          lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}` +
+            ((found.get(picked) || []).length ? '' : whereIs(picked)),
           items: list.map((c) => item(picked, causeText(c), pc(c.n / (total || 1)), esc(T.times(c.n)), { flat: true })).join(''),
           empty: list.length ? '' : T.noCauses, note: list.length ? whyNote(e) : ''
         }
@@ -561,9 +584,9 @@
       return {
         title: name,
         lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}` +
-          (count > 1 ? `<br>${esc(T.many(count))}` : count ? '' : `<br><span style="color:${C.bad}">${esc(T.notHere)}</span>`),
+          (count > 1 ? `<br>${esc(T.many(count))}` : count ? '' : whereIs(picked)),
         items: go.map((p) => item(p.to, T.after(nameOf(p.to)), pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''), { dim: share(p) < MIN })).join('') +
-          exits().filter((x) => x.from === picked).map((x) => item(picked, T.leaves(x.route_label || x.route), pc(exitShare(x)), esc(T.times(x.n)), { flat: true })).join('') +
+          exits().filter((x) => x.from === picked).map((x) => item(picked, T.leaves(x.route_label || x.route), pc(exitShare(x)), esc(T.times(x.n)), { flat: true, tag: false })).join('') +
           come.map((p) => item(p.from, T.before(nameOf(p.from)), pc(p.n / (inTotal.get(picked) || 1)), esc(T.arrivals(p.n, inTotal.get(picked) || 0)))).join(''),
         note: !go.length && !exits().some((x) => x.from === picked) ? T.pickedNone(name) : !go.length ? '' : share(go[0]) >= DOMINANT ? T.pickedDominant(name, nameOf(go[0].to)) : T.pickedSpread(name)
       }
@@ -618,9 +641,9 @@
     if (!list.length) return ''
     return `<div data-absent style="margin-top:12px;padding-top:10px;border-top:1px solid ${C.line}">
       <div style="font-weight:600">${esc(T.absentTitle)}</div><div style="color:${C.fg2};font-size:12px;margin:2px 0 6px">${esc(T.absentLead)}</div>
-      <ul style="margin:0;padding:0;display:grid;gap:2px">${list.map((e) => `<li style="list-style:none;display:flex;gap:10px;padding:3px 10px">
+      <ul style="margin:0;padding:0;display:grid;gap:2px">${list.map((e) => `<li style="list-style:none"><button data-t="${esc(e.target)}" style="width:100%;display:flex;gap:10px;padding:5px 10px;font:inherit;color:inherit;text-align:left;background:none;border:0;border-radius:8px;cursor:pointer">
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.target)}">${esc(nameOf(e.target))}</span>
-        <span style="font-variant-numeric:tabular-nums;color:${C.fg2}">${esc(T.clicksN(e.clicks))}</span></li>`).join('')}</ul></div>`
+        <span style="font-variant-numeric:tabular-nums;color:${C.fg2}">${esc(T.clicksN(e.clicks))} ›</span></button></li>`).join('')}</ul></div>`
   }
   // Whose clicks: everyone, or one role, person or account (the server lists who clicked on this screen).
   function whoHtml() {
