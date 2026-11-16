@@ -267,6 +267,8 @@ a.kind:hover, a.kind:focus-visible { border-color: var(--accent); outline: none;
 .mstep .arrow { font-size: 18px; color: var(--accent); flex: none; }
 .mbar { display: flex; align-items: center; gap: 8px; } .mbar i { display: block; height: 8px; border-radius: 999px; background: var(--fill); }
 @media (max-width: 640px) { .mroutes li { grid-template-columns: 1fr; } }
+.mstep.exit > span:first-child { flex: 0 1 auto; max-width: 45%; }
+.mto { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; vertical-align: middle; } .mto .chip.dest { height: 24px; padding: 0 10px; font-size: 12.5px; }
 /* Screen map: the screen drawn from where its controls sit, with a lens (problems, use, routes) and the picked element's numbers. */
 .mapbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; justify-content: space-between; margin-top: 12px; }
 .mapstep { display: flex; align-items: center; gap: 6px; } .mapstep input { width: 64px; }
@@ -416,6 +418,7 @@ button.demand { margin-top: 6px; }
 .kchip { justify-self: start; margin-top: 1px; }
 .todo-say { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .todo-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--fg2); min-width: 0; }
+.todo-origin { margin-top: 4px; font-size: 12px; color: var(--accent); font-weight: 500; } .todo-origin code { color: inherit; }
 .todo-meta b { color: var(--fg); white-space: nowrap; } .todo-meta .tech { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
 .todo-acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 .todo-acts .button, .rel-acts .button { height: 28px; padding: 0 10px; font-size: 12px; border: 1px solid var(--fill); white-space: nowrap; }
@@ -655,7 +658,7 @@ const HELP_PT = {
   release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas por sessão (o esperado é 0). O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
   follow: ['O que é', 'O que você decidiu corrigir. Ao clicar em Acompanhar, o valor de hoje vira a linha de base: a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da conta. Depois, o mesmo número é medido só com o que veio desde então, com os filtros em uso.', 'Melhorou ou piorou só quando a mudança passa da tolerância (5 pontos de frustração, ou 20% nas outras medidas); dentro dela é Igual. Sem dados ainda: ninguém passou por ali desde que começou.'],
   since: ['O que é', 'A linha sob o veredito: o que mudou desde a versão mais nova, quando ela chegou nos últimos 7 dias, ou senão nas últimas 24 horas, contra o mesmo tempo logo antes. Não depende do período escolhido; segue o marco e os filtros. Uma tela piorou ou melhorou quando a frustração mudou 10 pontos ou mais, com pelo menos 10 visitas nos dois lados; uma falha é nova quando nunca tinha aparecido antes; uma falha parou quando sumiu depois de acontecer além do acaso.', 'De manhã, comece por aqui: cada etiqueta abre a evidência. "Pouco dado" quer dizer que ainda não dá para comparar, não que está tudo bem.'],
-  todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
+  todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Mesma origem" marca itens que vêm da mesma requisição. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog, com período, filtros e link. Sugestões são hipóteses para o produto validar, não ordens.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
   adoption: ['O que é', 'A parte das sessões do período em que a feature foi usada ao menos uma vez. Abaixo, quantas das pessoas ativas usaram. A adoção por pessoa chega a 100% rápido num produto de uso diário e deixa de separar uma feature da outra; a parte das sessões continua separando.', 'Presente em poucas sessões e usada por muita gente: é de uso esporádico. Em poucas sessões e por pouca gente: pede divulgação ou revisão.'],
   featureScore: ['O que é', 'A frustração da feature: sinais nas telas e botões dela, divididos pelos usos.', 'Feature importante com frustração alta é a melhor candidata a revisão de experiência.'],
@@ -697,7 +700,7 @@ const HELP_EN = {
   release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per session. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
   follow: ['What it is', 'What you decided to fix. Clicking Follow keeps today\'s value as the baseline: the screen\'s frustration, failures per 100 sessions, the action\'s clicks per use or the account\'s people a day. Afterwards the same number is measured only on what came since, with the filters in use.', 'Improved or worse only when the change goes past the tolerance (5 frustration points, or 20% for the other measures); within it, Same. No data yet: nobody went there since it started.'],
   since: ['What it is', 'The line under the verdict: what changed since the newest version, when it arrived in the last 7 days, or else in the last 24 hours, against the same length of time just before. It does not follow the chosen period; it follows the mark and the filters. A screen got worse or better when its frustration moved 10 points or more, with at least 10 visits on both sides; a failure is new when it had never shown up before; a failure stopped when it vanished after happening beyond chance.', 'In the morning, start here: each chip opens the evidence. "Too little data" means it cannot compare yet, not that all is well.'],
-  todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
+  todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "Same origin" marks items coming from the same request. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog, with period, filters and link. Suggestions are hypotheses for the product team to check, not orders.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
   adoption: ['What it is', 'The share of the period\'s sessions in which the feature was used at least once. Below it, how many of the active people used it. Adoption per person reaches 100% fast in a product used every day and stops telling features apart; the share of the sessions keeps doing it.', 'In few sessions but used by many people: occasional use. In few sessions and by few people: it needs announcing or a second look.'],
   featureScore: ['What it is', 'The feature\'s frustration: signals on its screens and buttons, divided by its uses.', 'An important feature with high frustration is the best candidate for an experience review.'],
@@ -901,7 +904,7 @@ const L = PT ? {
     fixFirst: (a, p, fix) => `${a} irrita ${p}% das vezes que é clicado. ${fix}`, neverN: (n) => `${n} elemento(s) desenhado(s) nunca clicado(s) no período: escondidos, mal nomeados ou sobrando.`,
     noProblems: 'Nada irrita nos elementos desta tela no período.', noSteps: 'Nenhum passo se repete o bastante (15% ou mais do que vem depois) entre os elementos desenhados: as pessoas se espalham, ou ainda há pouco uso.', noSeq: 'Ainda não há sequências de cliques nesta tela: cada visita teve um clique só, ou nenhum.',
     drawn: (when, w) => `Desenho de ${when}, numa janela de ${w} px.`, offMap: (n) => `${n} elemento(s) clicado(s) no período sem posição no desenho (campos de texto, ou telas vistas antes da atualização): estão na lista abaixo.`,
-    noLayout: 'Ainda não há desenho desta tela. A prévia aparece quando o app atualizar o pacote termometro para a versão que envia as posições dos elementos (a seguinte à 0.2.5) e alguém abrir esta tela. Até lá, use a lista abaixo ou abra no app.',
+    noLayout: 'Ainda não há desenho desta tela. Para ter o desenho: atualize o pacote termometro do app para a 0.2.6 ou mais nova (npm i termometro@latest) e abra esta tela no app uma vez. Enquanto isso, use as listas abaixo ou "Ver por cima da tela real".',
     openApp: 'Ver por cima da tela real (com a sua conta):',
     step: 'Próximo clique em até', units: { s: 'segundos', min: 'minutos', none: 'sem limite' },
     exits: 'Saídas para outras telas', exitsHint: 'O último clique antes de trocar de tela, e para onde foi.', leaves: (r) => `Sai para ${r}`,
@@ -916,7 +919,7 @@ const L = PT ? {
     disabled: 'Explicar por que o botão está desabilitado e o que falta para liberar.',
     unclear: 'A tela muda, mas a pessoa não percebe que deu certo: deixar o retorno mais claro (mensagem, destaque, navegação).' },
   demand: { copy: 'Copiar como demanda', problem: 'Problema', who: 'Quem é afetado', since: 'Desde', suggestion: 'Sugestão', accept: 'Critério de aceite',
-    evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', period: (d) => `nos últimos ${d} dias`,
+    evidence: 'Ver no Termômetro', tech: 'Detalhe técnico', filters: 'Filtros', period: 'Período', range: (a, b) => `de ${a} a ${b}`, steps: 'Passos até a falha',
     reach: (i) => i.account ? `a conta ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessões`, i.visits && `${i.visits} visitas`, i.uses && `${i.uses} usos`, i.times && `${i.times} vezes`, i.n && !i.sessions && `${i.n} ocorrências`, !i.sessions && i.reach_sessions && `${i.reach_sessions} sessões`, i.reach_people && `${i.reach_people} pessoas`].filter(Boolean).join(' · '),
     kinds: {
       version_worse: ['A versão nova deixou a tela mais frustrante', 'Comparar o que mudou na tela entre as duas versões e corrigir o que gerou os sinais (veja "Onde irrita" na aba Frustração).', (i) => `A frustração da tela volta para perto de ${i.before} na versão seguinte.`],
@@ -1047,7 +1050,9 @@ const L = PT ? {
     sessions: (n) => `${num(n)} ${n === 1 ? 'sessão' : 'sessões'}`, people: (n) => `${num(n)} ${n === 1 ? 'pessoa' : 'pessoas'}`, good: 'Melhorou', goodHint: 'Telas com menos frustração que no período anterior.' },
   // The to-do list grouped by screen (or failure, account, action), and the items followed after a fix.
   fw: { things: { screen: ['tela', 'telas'], failure: ['falha', 'falhas'], account: ['conta', 'contas'], action: ['ação', 'ações'], other: ['ponto', 'pontos'] }, and: 'e',
-    bad: (t, n, w) => `${t} ${n === 1 ? 'precisa' : 'precisam'} de você ${w}`, warn: (t) => `${t} com pontos de atenção, nada grave`, toList: 'Ver a lista ↓',
+    bad: (t, n, w) => `${t} ${n === 1 ? 'precisa' : 'precisam'} de você ${w}`, warn: (t) => `${t} com pontos de atenção, nada grave`, toList: 'Ver a lista ↓', origin: 'Mesma origem',
+    kindsListed: { bugs: ['bug', 'bugs'], irritation: ['irritação', 'irritações'], engagement: ['ponto de engajamento', 'pontos de engajamento'], ideas: ['sugestão', 'sugestões'] },
+    alsoListed: (t) => `mais ${t} na lista`,
     more: (n, k) => `+${n} ${{ screen: 'nesta tela', failure: 'nesta falha', account: 'nesta conta', action: 'nesta ação' }[k] ?? 'aqui'}`, less: 'Esconder',
     alsoHere: 'Também aqui', follow: 'Acompanhar', followTip: 'Guarda o valor de hoje como linha de base; o cartão Acompanhando mostra, nas próximas semanas, se melhorou.',
     following: 'Acompanhando', title: 'Acompanhando', hint: 'O que você decidiu corrigir, contra o valor do dia em que passou a acompanhar.',
@@ -1170,7 +1175,7 @@ const L = PT ? {
     fixFirst: (a, p, fix) => `${a} irritates ${p}% of the times it is clicked. ${fix}`, neverN: (n) => `${n} drawn element(s) never clicked in the period: hidden, badly named or not needed.`,
     noProblems: 'Nothing on this screen\'s elements irritates in the period.', noSteps: 'No step repeats enough (15% or more of what follows) between the drawn elements: people scatter, or there is little use yet.', noSeq: 'No click sequences on this screen yet: each visit had one click, or none.',
     drawn: (when, w) => `Drawn ${when}, in a ${w} px window.`, offMap: (n) => `${n} element(s) clicked in the period with no place in the drawing (text fields, or screens seen before the update): they are in the list below.`,
-    noLayout: 'There is no drawing of this screen yet. The preview appears once the app updates the termometro package to the version that sends where elements sit (the one after 0.2.5) and someone opens this screen. Until then, use the list below or open it in the app.',
+    noLayout: 'There is no drawing of this screen yet. To get the drawing: update the termometro package in the app to 0.2.6 or newer (npm i termometro@latest) and open this screen in the app once. Meanwhile, use the lists below or "See it over the real screen".',
     openApp: 'See it over the real screen (with your account):',
     step: 'Next click within', units: { s: 'seconds', min: 'minutes', none: 'no limit' },
     exits: 'Exits to other screens', exitsHint: 'The last click before changing screens, and where it went.', leaves: (r) => `Leaves to ${r}`,
@@ -1185,7 +1190,7 @@ const L = PT ? {
     disabled: 'Explain why the button is disabled and what is missing to enable it.',
     unclear: 'The screen changes but people do not notice it worked: make the feedback clearer (message, highlight, navigation).' },
   demand: { copy: 'Copy as a request', problem: 'Problem', who: 'Who is affected', since: 'Since', suggestion: 'Suggestion', accept: 'Acceptance criteria',
-    evidence: 'See it on Termometro', tech: 'Technical detail', period: (d) => `in the last ${d} days`,
+    evidence: 'See it on Termometro', tech: 'Technical detail', filters: 'Filters', period: 'Period', range: (a, b) => `from ${a} to ${b}`, steps: 'Steps up to the failure',
     reach: (i) => i.account ? `the account ${accountText(i.account)}` : [i.sessions && `${i.sessions} sessions`, i.visits && `${i.visits} visits`, i.uses && `${i.uses} uses`, i.times && `${i.times} times`, i.n && !i.sessions && `${i.n} occurrences`, !i.sessions && i.reach_sessions && `${i.reach_sessions} sessions`, i.reach_people && `${i.reach_people} people`].filter(Boolean).join(' · '),
     kinds: {
       version_worse: ['The new version made the screen more frustrating', 'Compare what changed on the screen between the two versions and fix what caused the signals (see "Where it irritates" on the Frustration tab).', (i) => `The screen's frustration goes back near ${i.before} in the next version.`],
@@ -1314,7 +1319,9 @@ const L = PT ? {
     chip: { bugs: 'Bug', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestion', better: 'Improved' },
     sessions: (n) => `${num(n)} ${n === 1 ? 'session' : 'sessions'}`, people: (n) => `${num(n)} ${n === 1 ? 'person' : 'people'}`, good: 'Improved', goodHint: 'Screens with less frustration than in the period before.' },
   fw: { things: { screen: ['screen', 'screens'], failure: ['failure', 'failures'], account: ['account', 'accounts'], action: ['action', 'actions'], other: ['point', 'points'] }, and: 'and',
-    bad: (t, n, w) => `${t} ${n === 1 ? 'needs' : 'need'} you ${w}`, warn: (t) => `${t} with points of attention, nothing serious`, toList: 'See the list ↓',
+    bad: (t, n, w) => `${t} ${n === 1 ? 'needs' : 'need'} you ${w}`, warn: (t) => `${t} with points of attention, nothing serious`, toList: 'See the list ↓', origin: 'Same origin',
+    kindsListed: { bugs: ['bug', 'bugs'], irritation: ['irritation', 'irritations'], engagement: ['engagement point', 'engagement points'], ideas: ['suggestion', 'suggestions'] },
+    alsoListed: (t) => `${t} more in the list`,
     more: (n, k) => `+${n} ${{ screen: 'on this screen', failure: 'in this failure', account: 'in this account', action: 'in this action' }[k] ?? 'here'}`, less: 'Hide',
     alsoHere: 'Also here', follow: 'Follow', followTip: 'Keeps today\'s value as the baseline; the Following card shows over the next weeks whether it got better.',
     following: 'Following', title: 'Following', hint: 'What you decided to fix, against its value on the day you started following it.',
@@ -1880,6 +1887,12 @@ function wireSearch() {
 }
 
 // An insight as a request for the backlog: the business story first, the technical detail last.
+const rangeText = (days) => { const f = (t) => new Date(t).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit' }), now = Date.now()
+  return L.demand.range(f(now - days * 864e5), f(now)) }
+// The filters on, in words ("conta Acme (4821) · versão 1.1 · pessoa Ana"), so the request says whose numbers they are.
+const filtersText = () => [$('#account')?.value && `${L.account}: ${accountText($('#account').value)}`, $('#version')?.value && `${L.version}: ${$('#version').value}`,
+  $('#role')?.value && `${L.role}: ${$('#role').value}`, $('#feature')?.value && `${L.feature}: ${optText('feature')}`,
+  state.user && `${L.user}: ${personName(state.user) || short(state.user)}`].filter(Boolean).join(' · ')
 function demandOf(i, sentenceHtml, days) {
   const M = L.demand, k = M.kinds[i.kind] ?? ['', '', () => '']
   const plain = Object.assign(document.createElement('div'), { innerHTML: sentenceHtml }).textContent.replace(/\s+/g, ' ').trim()
@@ -1888,7 +1901,8 @@ function demandOf(i, sentenceHtml, days) {
   const url = location.origin + location.pathname + hashFor(i.link.tab, i.link.params)
   return [`## ${k[0]}${where ? ': ' + where : ''}`, '',
     `**${M.problem}:** ${plain}`,
-    `**${M.who}:** ${M.reach(i) || '—'}${i.account ? '' : ' ' + M.period(days)}`,
+    `**${M.who}:** ${M.reach(i) || '—'}`,
+    `**${M.period}:** ${rangeText(days)}`, ...(filtersText() ? [`**${M.filters}:** ${filtersText()}`] : []),
     ...(i.b || i.first_version ? [`**${M.since}:** ${i.b || i.first_version}`] : []),
     `**${M.suggestion}:** ${i.kind === 'element_irritating' && i.reason && L.rageFix[i.reason] ? L.rageFix[i.reason] : k[1]}`,
     `**${M.accept}:** ${k[2](i)}`,
@@ -2028,11 +2042,23 @@ const FOLLOWABLE = ['screen', 'failure', 'account', 'action']
 function groupTodos(list) {
   const by = new Map()
   for (const i of list) { const r = rootOf(i), id = r.kind + '\n' + r.key; if (!by.has(id)) by.set(id, { ...r, items: [] }); by.get(id).items.push(i) }
-  return [...by.values()].map((g) => {
+  const groups = [...by.values()].map((g) => {
     g.items.sort((a, b) => b.impact - a.impact)
     g.impact = g.items[0].impact + g.items.slice(1).reduce((t, i) => t + i.impact, 0) / 10
     return g
   }).sort((a, b) => b.impact - a.impact)
+  return sameOrigin(groups)
+}
+// Items that hit the same request ("POST /api/invites" failing with a 500 and answering slowly) have one cause: the row
+// says so, and the rows that share it sit together (behind the strongest of them) instead of far apart in the list.
+const requestOf = (i) => { const d = i.kind.startsWith('failure_') ? i.detail : i.action, m = typeof d === 'string' && d.match(/^([A-Z]{3,7} \/\S*?)(?: \d{3})?$/); return m ? m[1] : '' }
+function sameOrigin(groups) {
+  const seen = new Map()
+  for (const g of groups) for (const i of g.items) { const r = requestOf(i); if (r) seen.set(r, (seen.get(r) ?? 0) + 1) }
+  for (const g of groups) g.origin = g.items.map(requestOf).find((r) => r && seen.get(r) > 1) ?? ''
+  const out = []
+  for (const g of groups) if (!out.includes(g)) { out.push(g); if (g.origin) out.push(...groups.filter((h) => h !== g && !out.includes(h) && h.origin === g.origin)) }
+  return out
 }
 const followLabel = (g) => g.kind === 'screen' ? screenText(g.key) || g.key : g.kind === 'account' ? accountText(g.key)
   : g.kind === 'action' ? actionText(g.key) || g.key : `${L.names[g.key.split('\t')[0]] ?? ''}: ${g.key.split('\t')[1]}`
@@ -2050,11 +2076,12 @@ function todoRow(g, k, days, follows, pre = 'todo') {
   return `<li class="todo-row" id="${pre}-${k}" ${k >= TODO_TOP ? 'hidden' : ''}>
     <span class="pill ${i.severity} kchip" title="${esc(L.sev[i.severity])}">${T.chip[groupOf(i.kind)]}</span>
     <div class="todo-main"><div class="todo-say" title="${esc(plain(say))}">${say}</div>
+      ${g.origin ? `<div class="todo-origin">${W.origin}: <code>${esc(g.origin)}</code></div>` : ''}
       <div class="todo-meta">${reach ? `<b>${reach}</b>` : ''}<span class="tech">${techOf(i)}</span>
         ${rest.length ? `<button class="link fw-more" data-todo-more="${pre}-${k}" aria-expanded="false" aria-controls="todo-more-${pre}-${k}" data-n="${rest.length}" data-kind="${g.kind}">${W.more(rest.length, g.kind)}</button>` : ''}</div>
       ${rest.length ? `<ul class="fw-rest" id="todo-more-${pre}-${k}" hidden>${rest.map((x, n) => `<li><span class="pill ${x.severity}">${T.chip[groupOf(x.kind)]}</span>
         <span class="fw-say" title="${esc(plain(g.says[n + 1]))}">${g.says[n + 1]}</span><a ${linkAttrs(x.link)}>${L.see} →</a></li>`).join('')}</ul>` : ''}</div>
-    <div class="todo-acts"><button class="small" data-copy="${esc(demand)}"${followed || !FOLLOWABLE.includes(g.kind) ? '' : followAttrs(g)}>${L.demand.copy}</button>${follow}
+    <div class="todo-acts"><button class="small" data-copy="${esc(demand)}"${g.kind === 'failure' ? ` data-steps="${esc(i.type + '\t' + i.detail)}"` : ''}${followed || !FOLLOWABLE.includes(g.kind) ? '' : followAttrs(g)}>${L.demand.copy}</button>${follow}
       <a class="button small primary" ${linkAttrs(i.link)}>${T.evidence}</a></div></li>`
 }
 function showTodos(open) {
@@ -2088,10 +2115,18 @@ function sinceBand(r) {
     ${chips.join('')}</div>`
 }
 // The banner: one line, the verdict in roots, never the list again; its link goes to the list.
+// What else the list holds besides what the headline counts: " · mais 1 bug, 2 sugestões na lista".
+const listedText = (rest) => {
+  const n = {}
+  for (const g of rest) { const k = groupOf(g.items[0].kind); n[k] = (n[k] ?? 0) + 1 }
+  const parts = Object.keys(L.fw.kindsListed).filter((k) => n[k]).map((k) => `${n[k]} ${L.fw.kindsListed[k][n[k] === 1 ? 0 : 1]}`)
+  return parts.length ? ` · ${L.fw.alsoListed(parts.join(', '))}` : ''
+}
 function verdictBanner(groups, recent) {
   const bad = groups.filter((g) => g.items.some((i) => i.severity === 'bad')), warn = groups.filter((g) => !bad.includes(g) && g.items.some((i) => i.severity === 'warn'))
   const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
-  const headline = level === 'bad' ? L.fw.bad(countText(bad), bad.length, inPeriod()) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok
+  const counted = level === 'bad' ? bad : level === 'warn' ? warn : []
+  const headline = (level === 'bad' ? L.fw.bad(countText(bad), bad.length, inPeriod()) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok) + listedText(groups.filter((g) => !counted.includes(g)))
   return `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${{ bad: '!', warn: '•', ok: '✓' }[level]}</span><div class="fw-verdict">
       <div class="vh">${headline}</div>
       <div class="meta">${level === 'ok' ? L.verdict.okHint : `<button class="link" data-todo-go>${L.fw.toList}</button>`}</div>${sinceBand(recent)}</div></section>`
@@ -2424,6 +2459,12 @@ const counts = (title, list, name = (k) => k) => `<div><div class="label">${titl
   ? `<ul class="counts">${list.map((x) => `<li><span>${esc(name(x.key) || F().unknown)}</span><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 const sameStep = (a, b) => a.at === b.at && a.type === b.type && a.detail === b.detail
 
+// A session's steps up to the failure as a numbered list, the failure in bold; `before` keeps only the last steps.
+const trailMd = (t, before = Infinity) => {
+  const all = [...t.before.slice(-before), t.failure]
+  return all.map((s, i) => { const g = i ? gap(s.at - all[i - 1].at) : '', b = i === all.length - 1 ? '**' : ''
+    return `${i + 1}. ${b}${stepText(namedStep(s))}${s.type !== 'page' ? ` — ${s.route}` : ''}${b}${g ? ` (${g})` : ''}` })
+}
 function issueMarkdown(d, link = location.href) {
   const I = F().issue, name = L.names[d.type] ?? d.type, list = (xs) => xs.map((x) => `${x.key || F().unknown} (${x.n})`).join(', ')
   const t = d.trails[0]
@@ -2437,9 +2478,7 @@ function issueMarkdown(d, link = location.href) {
   if (d.stacks.length) lines.push('', `### ${F().stack}`, '```', d.stacks[0].key, '```')
   if (t) {
     const ctx = [t.agent, t.device && (F().devicesNames[t.device] ?? t.device), t.version].filter(Boolean).join(', ')
-    lines.push('', `### ${I.steps}${ctx ? ` (${ctx})` : ''}`)
-    ;[...t.before, t.failure].forEach((s, i, all) => { const g = i ? gap(s.at - all[i - 1].at) : ''
-      lines.push(`${i + 1}. ${i === all.length - 1 ? '**' : ''}${stepText(namedStep(s))}${s.type !== 'page' ? ` — ${s.route}` : ''}${i === all.length - 1 ? '**' : ''}${g ? ` (${g})` : ''}`) })
+    lines.push('', `### ${I.steps}${ctx ? ` (${ctx})` : ''}`, ...trailMd(t))
   }
   lines.push('', `${I.link}: ${link}`)
   return lines.join('\n')
@@ -2617,6 +2656,20 @@ document.addEventListener('click', (e) => {
     .then(() => { b.textContent = L.copied; setTimeout(() => { b.textContent = was }, 1500); const f = followOfButton(b); if (f) toast(L.copied, f) }, () => {})
 }, true)
 
+// "Copiar como demanda" on a failure: the steps of a real session before it are read inside the click (the failure's detail
+// has them) and added above the technical line; with the promise handed to the clipboard the browser still allows the write.
+function copyWithSteps(b) {
+  const [signal, detail] = b.dataset.steps.split('\t'), was = b.textContent, base = b.dataset.copy
+  const text = read('/api/failure', { signal, detail }).then((d) => {
+    const t = d?.trails?.[0]
+    if (!t) return base
+    const cut = base.lastIndexOf('\n---')
+    return base.slice(0, cut) + `**${L.demand.steps}:**\n${trailMd(t, 3).join('\n')}\n` + base.slice(cut)
+  }, () => base)
+  const item = typeof ClipboardItem !== 'undefined' ? new ClipboardItem({ 'text/plain': text.then((x) => new Blob([x], { type: 'text/plain' })) }) : null
+  ;(item ? navigator.clipboard.write([item]) : text.then((x) => navigator.clipboard.writeText(x)))
+    .then(() => { b.textContent = L.copied; setTimeout(() => { b.textContent = was }, 1500); const f = followOfButton(b); if (f) toast(L.copied, f) }, () => {})
+}
 async function showSession(button) {
   // In a list of sessions the steps open in the row under the session and the button closes them again; in a failure's
   // trail the whole session takes the place of the steps around the failure.
@@ -3271,6 +3324,10 @@ async function map() {
   const project = state.me.projects.find((p) => p.name === $('#project').value)
   const max = Math.max(1, ...d.paths.map((p) => p.n))
   const nameOf = (t, label) => `${screenText(d.route) || d.route} › ${label || L.unnamed}`
+  // One row per element, its destinations as chips ("Export → Home 14, Users 9"), the busiest element first.
+  const exitBy = new Map()
+  for (const x of d.exits ?? []) { const g = exitBy.get(x.from) ?? { from: x.from, label: x.from_label, n: 0, to: [] }; g.n += x.n; g.to.push(x); exitBy.set(x.from, g) }
+  const exitRows = [...exitBy.values()].map((g) => ({ ...g, to: g.to.sort((a, b) => b.n - a.n) })).sort((a, b) => b.n - a.n)
   const lens = state.mapLens || 'usage'
   const open = project?.url
     ? `<div class="open"><span class="meta">${MP().openApp}</span><button class="link" data-open-map="heat">${MP().openHeat}</button><button class="link" data-open-map="routes">${MP().openRoutes}</button></div>`
@@ -3290,9 +3347,10 @@ async function map() {
         <div class="mbar"><i style="width:${p.n / max * 100}%"></i><b>${num(p.n)}</b></div></li>`).join('')}</ol>` : `<p class="meta">${MP().noRoutes}</p>`}
     </section>
     ${(d.exits ?? []).length ? `<section class="card"><div class="label">${MP().exits}</div><div class="meta">${MP().exitsHint}</div>
-      <ol class="mroutes">${d.exits.slice(0, 15).map((x) => `<li>
-        <div class="mstep"><span>${named(nameOf(x.from, x.from_label), x.from)}</span><span class="arrow" aria-hidden="true">→</span><span>${esc(x.route_label || screenText(x.route) || x.route)}</span></div>
-        <div class="mbar"><i style="width:${x.n / Math.max(1, ...d.exits.map((y) => y.n)) * 100}%"></i><b>${num(x.n)}</b></div></li>`).join('')}</ol></section>` : ''}
+      <ol class="mroutes">${exitRows.slice(0, 15).map((g) => `<li>
+        <div class="mstep exit"><span>${named(nameOf(g.from, g.label), g.from)}</span><span class="arrow" aria-hidden="true">→</span>
+          <span class="mto">${g.to.map((x) => `<span class="chip dest">${esc(x.route_label || screenText(x.route) || x.route)} <b>${num(x.n)}</b></span>`).join('')}</span></div>
+        <div class="mbar"><i style="width:${g.n / Math.max(1, ...exitRows.map((y) => y.n)) * 100}%"></i><b>${num(g.n)}</b></div></li>`).join('')}</ol></section>` : ''}
     <div class="mapopen">${open}</div>`
 }
 
@@ -3738,6 +3796,7 @@ function onContentClick(e) {
   const none = e.target.closest('[data-empty]')
   if (none) return onEmptyClick(none)
   const copy = e.target.closest('[data-copy]')
+  if (copy?.dataset.steps) return copyWithSteps(copy)
   if (copy) {
     const was = copy.textContent
     navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = L.copied; setTimeout(() => { copy.textContent = was }, 1500)

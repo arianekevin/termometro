@@ -412,3 +412,98 @@ test.describe('sessions of a person or an account', () => {
     expect(errors).toEqual([])
   })
 })
+
+// The clipboard stand-in: both ways the panel writes (a promise of a blob, or plain text) end in window.__clip.
+const stubClipboard = (page: Page) => page.addInitScript(() => {
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+    writeText: async (t: string) => { (window as any).__clip = t },
+    write: async (items: any[]) => { (window as any).__clip = await (await items[0].getType('text/plain')).text() } } })
+})
+// SHOTS_DIR=/some/dir keeps screenshots of the new views; without it nothing is written.
+const SHOTS = process.env.SHOTS_DIR || ''
+const shot = (page: Page, name: string) => (SHOTS ? page.screenshot({ path: `${SHOTS}/${name}.png` }) : Promise.resolve())
+
+test.describe('usability: from the panel to the devs', () => {
+  test('copying a failure as a request carries filters, period, the link with them and real steps', async ({ page }) => {
+    const errors = watch(page)
+    await stubClipboard(page)
+    await page.setViewportSize({ width: 1400, height: 1800 })
+    await open(page, 'overview', '&version=1.1&role=agent')
+    const row = page.locator('.todo-list .todo-row', { hasText: 'POST /api/invites 500' }).first()
+    await row.locator('[data-copy]').click()
+    await expect.poll(() => page.evaluate(() => (window as any).__clip)).toContain('Passos até a falha')
+    const text: string = await page.evaluate(() => (window as any).__clip)
+    console.log('--- demand text ---\n' + text + '\n--- end ---')
+    expect(text).toMatch(/\*\*Período:\*\* de \d\d\/\d\d a \d\d\/\d\d/)
+    expect(text).toMatch(/\*\*Filtros:\*\*.*Versão: 1\.1.*Papel: agent/)
+    const link = text.match(/\*\*Ver no Termômetro:\*\* (\S+)/)![1]
+    expect(link).toContain('version=1.1')
+    expect(link).toContain('role=agent')
+    expect(link).toContain('signal=http_5xx')
+    expect(text).toMatch(/\*\*Passos até a falha:\*\*\n1\. /)
+    expect(text.split('\n---')[0].match(/^\d\. /gm)!.length).toBeLessThanOrEqual(4)
+    expect(errors).toEqual([])
+  })
+
+  test('the banner says what it counts and what else the list holds', async ({ page }) => {
+    const errors = watch(page)
+    await page.setViewportSize({ width: 1400, height: 1000 })
+    await open(page, 'overview')
+    const head = page.locator('section.verdict .vh')
+    await expect(head).toContainText(/precisam? de você/)
+    await expect(head).toContainText(/mais .* na lista/)
+    await shot(page, 'overview')
+    expect(errors).toEqual([])
+  })
+
+  test('failures on the same request say so and sit together', async ({ page }) => {
+    const errors = watch(page)
+    await page.setViewportSize({ width: 1400, height: 1000 })
+    await open(page, 'overview')
+    const origin = page.locator('.todo-list .todo-origin')
+    await expect(origin).toHaveCount(2)
+    await expect(origin.first()).toHaveText('Mesma origem: POST /api/invites')
+    const flags = await page.locator('.todo-list .todo-row').evaluateAll((rs) => rs.map((r) => (r.querySelector('.todo-origin') ? 1 : 0)))
+    expect(flags.join('')).toContain('11') // next to each other
+    expect(errors).toEqual([])
+  })
+
+  test('the map tab: exits grouped by element, and a screen without a drawing says what to do', async ({ page }) => {
+    const errors = watch(page)
+    await page.setViewportSize({ width: 1400, height: 1400 })
+    await open(page, 'map', '&route=/tickets')
+    const card = page.locator('.card', { hasText: 'Saídas para outras telas' })
+    const rows = card.locator('ol.mroutes li')
+    await expect(rows).toHaveCount(1) // Export → Home and Export → Users are one element
+    await expect(rows.first().locator('.chip.dest')).toHaveCount(2)
+    await expect(rows.first()).toContainText(/Home\s*14/)
+    await expect(rows.first()).toContainText(/Users\s*14/)
+    if (SHOTS) await card.screenshot({ path: `${SHOTS}/map-exits.png` })
+    await open(page, 'map', '&route=/users')
+    const note = page.locator('#map-body .mapnote')
+    await expect(note).toContainText('0.2.6')
+    await expect(note).toContainText('abra esta tela no app uma vez')
+    await expect(note).toContainText('Ver por cima da tela real')
+    await shot(page, 'map-no-drawing')
+    expect(errors).toEqual([])
+  })
+
+  test('the overlay lists the exits of an element once', async ({ page }) => {
+    const errors = watch(page)
+    await page.goto(`${process.env.PANEL_URL}/api/status`)
+    const { token } = await page.evaluate(async () => (await fetch('/api/map-token?project=demo', { method: 'POST' })).json())
+    await page.evaluate(([token]) => {
+      document.body.innerHTML = '<button id="new" style="position:fixed;left:100px;top:100px">New ticket</button><button id="export" style="position:fixed;left:500px;top:300px">Export</button>'
+      ;(window as any).termometroMap = { url: location.origin, token, route: () => '/tickets' }
+      sessionStorage.setItem('termometro.lang', 'pt')
+    }, [token])
+    await page.addScriptTag({ url: '/map.js' })
+    const panel = page.locator('[data-termometro] [role="dialog"]')
+    await expect(panel).toContainText('visitas')
+    await panel.locator('[data-lens="routes"]').click()
+    const exits = panel.locator('ol [data-t]', { hasText: /Export → abre/ })
+    await expect(exits).toHaveCount(1)
+    await expect(exits.first()).toContainText(/Home \(14\), Users \(14\)|Users \(14\), Home \(14\)/)
+    expect(errors).toEqual([])
+  })
+})

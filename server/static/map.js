@@ -303,6 +303,12 @@
   const paths = () => (data?.paths || []).filter((p) => p.n >= minN())
   const exits = () => (data?.exits || []).filter((x) => x.n >= minN())
   const exitShare = (x) => x.n / (outTotal.get(x.from) || 1)
+  // One row per element, not per destination: "Export → abre Home (14), Users (9)"; the busiest element first.
+  const exitGroups = () => {
+    const by = new Map()
+    for (const x of exits()) { const g = by.get(x.from) ?? { from: x.from, n: 0, to: [] }; g.n += x.n; g.to.push(x); by.set(x.from, g) }
+    return [...by.values()].map((g) => ({ ...g, to: g.to.sort((a, b) => b.n - a.n), share: g.n / (outTotal.get(g.from) || 1) })).sort((a, b) => b.share - a.share)
+  }
   // In the app's own words when it can: the dictionary's screen name is not here, the route is.
   // What people click right before an element that is not on the screen, and is here: what opens it (a menu, a dialog).
   const opener = (t) => (data?.paths || []).filter((p) => p.to === t && p.from !== t && (found.get(p.from) || []).length)
@@ -603,8 +609,8 @@
       return {
         title: T.look, lead: esc(T.lookLead) + (best.length ? `<br><span style="font-size:12px;color:${C.faint}">${esc(T.routesHover)}</span>` : ''),
         items: best.map((p, k) => item(p.from, `${k + 1}. ${nameOf(p.from)} → ${nameOf(p.to)}`, pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''))).join('') +
-          exits().filter((x) => exitShare(x) >= MIN).sort((a, b) => exitShare(b) - exitShare(a)).slice(0, 6)
-            .map((x) => item(x.from, T.exitTo(nameOf(x.from), x.route_label || x.route), pc(exitShare(x)), esc(T.times(x.n)))).join(''),
+          exitGroups().filter((g) => g.share >= MIN).slice(0, 6)
+            .map((g) => item(g.from, T.exitTo(nameOf(g.from), g.to.map((x) => `${x.route_label || x.route} (${fmt(x.n)})`).join(', ')), pc(g.share), esc(T.times(g.n)))).join(''),
         empty: !(data?.paths || []).length && !exits().length ? T.noSteps : !(data?.paths || []).length ? '' : !paths().length ? T.fewSteps((data.paths || []).length, minN()) : !best.length ? T.noStrong : '', note: notes.join(' ')
       }
     }
