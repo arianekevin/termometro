@@ -200,8 +200,11 @@ point: what you can do there, a tip and a day-to-day example. The tabs come in g
   - **Problems:** the same heat for the share of clicks that irritate (half or more is the deepest red). Beside it,
     why each element irritates, with counts: clicked again while it was loading (with the slow request and how long
     it took), nothing changed on screen, an error (which one), not clickable, nearly hit. And what to do.
-  - **Routes:** the most common next step after each element, as arrows; click an element for everything before and
-    after it.
+  - **Routes:** the most common next step after each element, as a list; hover a step to see its arrow on the screen,
+    click it for everything before and after. It also lists which screen people leave to right after a click. The
+    longest time between two clicks of a route is picked on the map (30 s by default; seconds, minutes or no limit).
+  - **Whose:** everyone, or one role, person or account. What others clicked that your screen does not have (another
+    role, setting or record) is listed apart instead of lost.
   - What a click opens (a dialog, a menu) is part of the drawing. **Open with the heat** and **Open with the routes**
     take the same map over the real app, which stays clickable.
 - **Product:** use by area of the app, what is little used and what is new.

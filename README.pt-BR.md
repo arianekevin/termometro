@@ -179,8 +179,12 @@ o que dá para fazer ali, uma dica e um exemplo do dia a dia. As abas vêm em gr
   - **Problemas:** o mesmo calor pela parte dos cliques que irrita (metade ou mais é o vermelho mais forte). Ao lado,
     o porquê de cada elemento com a contagem: clicou de novo enquanto carregava (com a requisição lenta e quanto levou),
     nada mudou na tela, deu erro (qual), não é clicável, quase acertou. E o que fazer.
-  - **Rotas:** o próximo passo mais comum depois de cada elemento, em setas; clique num elemento para ver tudo o
-    que vem antes e depois dele.
+  - **Rotas:** o próximo passo mais comum depois de cada elemento, numa lista; passe o mouse num passo para ver a
+    seta na tela, clique para ver tudo o que vem antes e depois. Também lista para qual tela as pessoas saem logo
+    depois de um clique. O tempo máximo entre dois cliques de uma rota se escolhe no mapa (padrão 30 s, em segundos,
+    minutos ou sem limite).
+  - **De quem:** todo mundo, ou só um papel, uma pessoa ou uma conta. O que outras pessoas clicaram e não existe na
+    sua tela (outro papel, outra configuração, outro registro) aparece numa lista à parte, em vez de sumir.
   - O que um clique abre (uma janela, um menu) entra no desenho. **Abrir com o calor** e **Abrir com as rotas**
     levam o mesmo mapa para cima do app de verdade, que continua clicável.
 - **Produto:** uso por área do app, o que é pouco usado e as novidades.

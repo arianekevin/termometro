@@ -615,6 +615,31 @@ class Server(unittest.TestCase):
         self.assertEqual([(p["from"], p["to"], p["n"]) for p in u["paths"]],
                          [("button#new", "input#email", 3), ("input#email", "button#save", 3)])
 
+    def test_map_routes_take_the_chosen_step_window_and_list_exits_to_other_screens(self):
+        clk = lambda t, at: {"type": "click", "route": "/tickets/:id", "target": t, "t": at}
+        for i in range(2):  # opened the reply, wrote it for two minutes, sent it, and went back to the list
+            self.send([{"type": "page", "route": "/tickets/:id", "t": 1000}, clk("button#reply", 2000), clk("button#send", 122_000),
+                       {"type": "page", "route": "/tickets", "t": 125_000}], session=f"w{i}", sent=200_000)
+        pairs = lambda u: [(p["from"], p["to"], p["n"]) for p in u["paths"]]
+        u = self.read("/api/usage?project=shop&days=1&route=/tickets/:id")
+        self.assertEqual((u["step"], pairs(u)), (30, []))  # 30 s by default: the two-minute reply is cut
+        self.assertEqual([(x["from"], x["route"], x["n"]) for x in u["exits"]], [("button#send", "/tickets", 2)])
+        u = self.read("/api/usage?project=shop&days=1&route=/tickets/:id&step=180")
+        self.assertEqual(pairs(u), [("button#reply", "button#send", 2)])
+        u = self.read("/api/usage?project=shop&days=1&route=/tickets/:id&step=0")  # no limit
+        self.assertEqual((u["step"], pairs(u)), (0, [("button#reply", "button#send", 2)]))
+
+    def test_map_says_whose_clicks_it_shows_and_cuts_by_person_or_role(self):
+        clk = {"type": "click", "route": "/users", "target": "button#new"}
+        self.send([{"type": "page", "route": "/users"}, clk, clk], session="a", user="u1", role="Admin", user_name="Ana Lima")
+        self.send([{"type": "page", "route": "/users"}, clk], session="b", user="u2", role="Agent")
+        u = self.read("/api/usage?project=shop&days=1&route=/users")
+        self.assertEqual(u["who"]["user"], [{"id": "u1", "name": "Ana Lima", "clicks": 2}, {"id": "u2", "name": "", "clicks": 1}])
+        self.assertEqual([r["id"] for r in u["who"]["role"]], ["Admin", "Agent"])
+        cut = self.read("/api/usage?project=shop&days=1&route=/users&role=Agent")
+        self.assertEqual(cut["elements"][0]["clicks"], 1)
+        self.assertEqual(len(cut["who"]["user"]), 2)  # the options stay whole while one is picked
+
     def test_usage_of_a_screen_carries_its_latest_layout_per_kind_of_window(self):
         def inv(vw, boxes, targets=("button#new", "a#help", "span.x"), **extra):
             return {"type": "inventory", "route": "/users", "targets": list(targets), "labels": ["Novo", "Ajuda", ""],

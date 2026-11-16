@@ -728,7 +728,7 @@ def summary(con, f: Filter) -> dict:
             "versions": sorted(frustration_by(con, f, "version") if not f.q.get("version") else [], key=lambda g: g["key"])}
 
 
-STEP_MS = 30_000  # a click this soon after another on the same screen is the next step of a route
+STEP_S = 30  # by default, a click this soon after another on the same screen is the next step of a route (?step=, 0 = no limit)
 PATHS_MAX = 40
 
 
@@ -798,24 +798,48 @@ def usage(con, f: Filter) -> dict:
     for e in elements.values():
         e["before"] = clicks_before.get(e["target"], 0) if visits_before is not None else None
     seen = [t for (t,) in con.execute("SELECT target FROM elements WHERE project = ? AND route = ?", (f.q.get("project"), route))]
-    # Click routes on this screen: one element to the next within the same visit, for the map's arrows.
+    # Click routes on this screen: one element to the next within the same visit, no more than `step` seconds apart (the
+    # map picks it; 0 = any time, since writing a reply takes minutes). And where a visit went when it left the screen
+    # right after a click: an "exit" to another screen, which the map lists apart.
+    try:
+        step_ms = max(0, int(f.q.get("step", STEP_S))) * 1000
+    except ValueError:
+        step_ms = STEP_S * 1000
     steps: dict = {}
-    session, last = None, None
-    for sid, kind, target, at in con.execute(f"""SELECT session, type, target, at FROM events WHERE {f.sql}
-            AND type IN ('page', 'click') ORDER BY session, at, id""", f.args):
-        if sid != session or kind == "page":
-            session, last = sid, None
+    exits: dict = {}
+    wide = Filter({**f.q, "route": ""})
+    session, here, last = None, False, None
+    for sid, kind, r, target, at in con.execute(f"""SELECT session, type, route, target, at FROM events WHERE {wide.sql}
+            AND type IN ('page', 'click') AND session IN (SELECT session FROM events WHERE {f.sql} AND type = 'page')
+            ORDER BY session, at, id""", wide.args + f.args):
+        if sid != session:
+            session, here, last = sid, False, None
+        if kind == "page":
+            if here and last and r != route and (not step_ms or at - last[1] <= step_ms):
+                exits[(last[0], r)] = exits.get((last[0], r), 0) + 1
+            here, last = r == route, None
             continue
-        if not target:
+        if not here or r != route or not target:
             continue
-        if last and last[0] != target and at - last[1] <= STEP_MS:
+        if last and last[0] != target and (not step_ms or at - last[1] <= step_ms):
             steps[(last[0], target)] = steps.get((last[0], target), 0) + 1
         last = (target, at)
-    labels = names(con, f.q.get("project", ""))["controls"]
+    dictionary_names = names(con, f.q.get("project", ""))
+    labels = dictionary_names["controls"]
     for e in elements.values():
         e["label"] = labels.get(route + "\t" + e["target"], "")
     paths = [{"from": a, "to": b, "n": n, "from_label": labels.get(route + "\t" + a, ""), "to_label": labels.get(route + "\t" + b, "")}
              for (a, b), n in sorted(steps.items(), key=lambda kv: -kv[1])[:PATHS_MAX]]
+    exit_list = [{"from": a, "route": b, "n": n, "from_label": labels.get(route + "\t" + a, ""),
+                  "route_label": dictionary_names["screens"].get(b, "")}
+                 for (a, b), n in sorted(exits.items(), key=lambda kv: -kv[1])[:PATHS_MAX]]
+    # Who the numbers are from, for the map's cut by person, role or account (names only where the project keeps them).
+    named = {"user": dictionary_names["people"], "account": dictionary_names["accounts"], "role": {}}
+    base = Filter({k: v for k, v in f.q.items() if k not in ("user", "role", "account")})
+    who = {key: [{"id": v, "name": named[key].get(v, ""), "clicks": n}
+                 for v, n in con.execute(f"""SELECT {col}, COUNT(*) FROM events WHERE {base.sql} AND type = 'click'
+                     AND {col} != '' GROUP BY {col} ORDER BY COUNT(*) DESC LIMIT 50""", base.args)]
+           for key, col in (("user", "user_id"), ("role", "role"), ("account", "account"))}
     # Why each element's rage happened, as the collector guessed it (waiting, error, nothing...).
     for target, detail, n in con.execute(f"""SELECT target, detail, COUNT(*) FROM events WHERE {f.sql} AND type = 'rage'
             AND target != '' AND detail != '' GROUP BY target, detail""", f.args):
@@ -835,7 +859,8 @@ def usage(con, f: Filter) -> dict:
             slow.setdefault(target, {}).setdefault(detail, []).append(ms)
     for target, e in elements.items():
         e["causes"] = causes_of(e, failed.get(target, []), slow.get(target, {}))
-    return {"route": route, "visits": visits, "visits_before": visits_before, "paths": paths,
+    return {"route": route, "visits": visits, "visits_before": visits_before, "paths": paths, "exits": exit_list,
+            "step": step_ms // 1000, "who": who,
             **layout_read(con, f.q.get("project", ""), route, f.q.get("viewport"), labels),
             "elements": sorted(elements.values(), key=lambda e: -e["clicks"]),
             "never_clicked": sorted(t for t in seen if not elements.get(t, {}).get("clicks"))}

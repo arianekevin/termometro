@@ -37,7 +37,7 @@
     back: '← Todas as rotas', times: (n) => `${fmt(n)} ${n === 1 ? 'vez' : 'vezes'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'clique' : 'cliques'}`,
     irritates: (p) => `${p} irrita`, backForth: 'vai e volta', after: (n) => `Depois: ${n}`, before: (n) => `Antes: ${n}`,
     arrivals: (n, total) => `${fmt(n)} das ${fmt(total)} chegadas`,
-    noSteps: 'Ainda não há sequências de cliques nesta tela: cada visita teve um clique só, ou nenhum.', fewSteps: (n, k) => `Há ${fmt(n)} sequências de cliques, mas nenhuma se repetiu ${k} vezes ainda: com mais uso, as setas aparecem.`, noStrong: 'Nenhum passo chega a 15% do que vem depois: as pessoas se espalham.',
+    noSteps: 'Ainda não há sequências de cliques nesta tela com esse tempo: aumente o tempo entre cliques, ou cada visita teve um clique só.', fewSteps: (n, k) => `Há ${fmt(n)} sequências de cliques, mas nenhuma se repetiu ${k} vezes ainda: com mais uso, as setas aparecem.`, noStrong: 'Nenhum passo chega a 15% do que vem depois: as pessoas se espalham.',
     noProblems: 'Nada nesta tela irrita quem usa neste período.', noClicks: 'Nenhum clique nesta tela neste período.',
     kinds: { rage: 'cliques repetidos de irritação', dead: 'clicou e nada aconteceu', errors: 'erro logo depois',
       retry: 'precisou clicar de novo', near_miss: 'clicou do lado, quase acertou' },
@@ -79,7 +79,12 @@
       usage: 'amarelo mais forte = mais cliques', never: 'tracejado = pode ser clicado e ninguém clicou' },
     never: 'nunca clicados', offscreen: (names) => `Fora da vista agora (menu fechado, janela, rolagem ou outra tela): ${names}.`,
     offTag: 'fora da vista', many: (n) => `Aparece ${n} vezes nesta tela; os números são de todas juntas.`, notHere: 'Não está na tela agora.',
-    total: (v, c) => `${fmt(v)} visitas · ${fmt(c)} cliques`
+    total: (v, c) => `${fmt(v)} visitas · ${fmt(c)} cliques`,
+    exitTo: (a, r) => `${a} → abre ${r}`, leaves: (r) => `Sai para ${r}`,
+    step: 'Próximo clique em até', units: { s: 'segundos', min: 'minutos', none: 'sem limite' },
+    who: 'De quem', everyone: 'Todo mundo', whoKinds: { role: 'Papel', user: 'Pessoa', account: 'Conta' },
+    absentTitle: 'Clicado por outros, não existe na sua tela', absentLead: 'Outro papel, outra configuração ou outro registro: não dá para desenhar aqui.',
+    routesHover: 'Passe o mouse num passo para ver a seta na tela; clique para ver tudo o que vem depois.'
   } : {
     title: 'Termometro · map', close: 'Close', collapse: 'Collapse', expand: 'Open', loading: 'Loading…',
     days: 'days', expired: 'The map link expired: open it again from the dashboard.', down: 'Termometro did not answer.',
@@ -92,7 +97,7 @@
     back: '← All routes', times: (n) => `${fmt(n)} ${n === 1 ? 'time' : 'times'}`, clicksN: (n) => `${fmt(n)} ${n === 1 ? 'click' : 'clicks'}`,
     irritates: (p) => `${p} irritate`, backForth: 'back and forth', after: (n) => `Next: ${n}`, before: (n) => `Before: ${n}`,
     arrivals: (n, total) => `${fmt(n)} of ${fmt(total)} arrivals`,
-    noSteps: 'No click sequences on this screen yet: each visit had one click, or none.', fewSteps: (n, k) => `There are ${fmt(n)} click sequences, but none repeated ${k} times yet: with more use, the arrows show up.`, noStrong: 'No step reaches 15% of what comes next: people scatter.',
+    noSteps: 'No click sequences on this screen with this time: raise the time between clicks, or each visit had one click.', fewSteps: (n, k) => `There are ${fmt(n)} click sequences, but none repeated ${k} times yet: with more use, the arrows show up.`, noStrong: 'No step reaches 15% of what comes next: people scatter.',
     noProblems: 'Nothing on this screen irritates people in this period.', noClicks: 'No clicks on this screen in this period.',
     kinds: { rage: 'angry repeated clicks', dead: 'clicked and nothing happened', errors: 'error right after',
       retry: 'had to click again', near_miss: 'clicked beside it, nearly hit' },
@@ -134,7 +139,12 @@
       usage: 'stronger yellow = more clicks', never: 'dashed = clickable and nobody clicked' },
     never: 'never clicked', offscreen: (names) => `Out of view now (closed menu, dialog, scrolling or another screen): ${names}.`,
     offTag: 'out of view', many: (n) => `Appears ${n} times on this screen; the numbers are for all of them.`, notHere: 'Not on the screen now.',
-    total: (v, c) => `${fmt(v)} visits · ${fmt(c)} clicks`
+    total: (v, c) => `${fmt(v)} visits · ${fmt(c)} clicks`,
+    exitTo: (a, r) => `${a} → opens ${r}`, leaves: (r) => `Leaves to ${r}`,
+    step: 'Next click within', units: { s: 'seconds', min: 'minutes', none: 'no limit' },
+    who: 'Whose', everyone: 'Everyone', whoKinds: { role: 'Role', user: 'Person', account: 'Account' },
+    absentTitle: 'Clicked by others, not on your screen', absentLead: 'Another role, setting or record: it cannot be drawn here.',
+    routesHover: 'Hover a step to see its arrow on the screen; click it to see everything that comes next.'
   }
 
   // Nectar warm palette (the approved reference's light theme).
@@ -181,6 +191,10 @@
   document.body.appendChild(root)
 
   let days = 30
+  // The time between two clicks that still makes them one route, in seconds (0 = no limit), and whose clicks: kept for the tab.
+  let step = Number(ss('termometro.mapStep') ?? 30), stepUnit = ss('termometro.mapStepUnit') || (step === 0 ? 'none' : step % 60 ? 's' : 'min')
+  if (!Number.isFinite(step) || step < 0) step = 30
+  let cut = (() => { try { return JSON.parse(ss('termometro.mapWho') || 'null') || null } catch { return null } })() // { kind, id }
   let showNever = false // the dashed never-clicked marks crowd the heat: a box in the panel turns them on
   let collapsed = false
   let data = null, loadedRoute = null, message = null
@@ -199,6 +213,7 @@
     const s = new Set(data.elements.map((e) => e.target))
     for (const t of data.never_clicked || []) s.add(t)
     for (const p of data.paths || []) { s.add(p.from); s.add(p.to) }
+    for (const x of data.exits || []) s.add(x.from)
     return [...s]
   }
   function requery() {
@@ -259,6 +274,8 @@
       outTotal.set(p.from, (outTotal.get(p.from) || 0) + p.n)
       inTotal.set(p.to, (inTotal.get(p.to) || 0) + p.n)
     }
+    // Leaving the screen right after a click is also "what comes next": it counts in the element's share.
+    for (const x of exits()) outTotal.set(x.from, (outTotal.get(x.from) || 0) + x.n)
   }
   function nameOf(t) {
     const e = els.get(t)
@@ -274,16 +291,21 @@
   // A step's share: of everything that came right after `from`, how much went to `to`.
   const share = (p) => p.n / (outTotal.get(p.from) || 1)
   // A step taken fewer times than this is an accident, not a route; a screen with little use needs fewer.
-  const minN = () => { const v = data?.visits || 0; return v < 100 ? 2 : v < 300 ? 3 : 5 }
+  const minN = () => { const v = data?.visits || 0; return v < 20 ? 1 : v < 100 ? 2 : v < 300 ? 3 : 5 }
   const paths = () => (data?.paths || []).filter((p) => p.n >= minN())
-  const step = (a, b) => paths().find((p) => p.from === a && p.to === b)
-  const backAndForth = (p) => { const r = step(p.to, p.from); return share(p) >= MIN && !!r && share(r) >= MIN }
+  const exits = () => (data?.exits || []).filter((x) => x.n >= minN())
+  const exitShare = (x) => x.n / (outTotal.get(x.from) || 1)
+  // In the app's own words when it can: the dictionary's screen name is not here, the route is.
+  const absent = () => [...els.values()].filter((e) => e.clicks > 0 && !(found.get(e.target) || []).length).sort((a, b) => b.clicks - a.clicks)
+  const stepOf = (a, b) => paths().find((p) => p.from === a && p.to === b)
+  const backAndForth = (p) => { const r = stepOf(p.to, p.from); return share(p) >= MIN && !!r && share(r) >= MIN }
   function bestSteps() { // each element's single most common next step, when it is a real share
     const best = new Map()
     for (const p of paths()) if (!best.has(p.from) || p.n > best.get(p.from).n) best.set(p.from, p)
     return [...best.values()].filter((p) => share(p) >= MIN).sort((a, b) => share(b) - share(a))
   }
-  const problems = () => [...els.values()].filter((e) => e.irr >= MIN_IRR).sort((a, b) => b.pain - a.pain || b.irr - a.irr)
+  const here = (e) => !data || (found.get(e.target) || []).length > 0
+  const problems = () => [...els.values()].filter((e) => e.irr >= MIN_IRR && here(e)).sort((a, b) => b.pain - a.pain || b.irr - a.irr)
   // Why it irritates, from the server's count of each cause: the sentence, the count, and what to do about the first.
   const causes = (e) => (e?.causes || []).filter((c) => T.cause[c.kind])
   const causeText = (c) => T.cause[c.kind](c)
@@ -291,7 +313,7 @@
     return top ? `${causeText(top)} · ${T.times(top.n)}` : (T.why[e.main] || '') }
   const whyNote = (e) => { const list = causes(e).slice(0, 3); if (!list.length) return T.noteProblem(nameOf(e.target), pc(e.pain), T.why[e.main], T.advice[e.main])
     return T.whyNote(nameOf(e.target), pc(e.pain), list.map((c) => `${causeText(c)} (${T.times(c.n)})`).join('; '), T.fix[list[0].kind](list[0])) }
-  const used = () => [...els.values()].filter((e) => e.clicks > 0).sort((a, b) => b.clicks - a.clicks)
+  const used = () => [...els.values()].filter((e) => e.clicks > 0 && here(e)).sort((a, b) => b.clicks - a.clicks)
 
   // ---------- drawing ----------
   let placed = []
@@ -391,10 +413,11 @@
     const order = list.filter((e) => geo.has(e.target)).slice(0, 5)
     if (f && !order.some((e) => e.target === f) && els.get(f) && geo.has(f)) order.unshift(els.get(f))
     order.sort((a, b) => (b.target === f) - (a.target === f))
+    // Numbered like the panel's list, so the list and the screen read together.
     for (const e of order) {
-      const r = geo.get(e.target)[0]
-      if (lens === 'problems') badge(r, T.irritates(pc(e.pain)), C.bad, '#fff', e.target === f)
-      else badge(r, T.clicksN(e.clicks), C.fg, C.surface, e.target === f)
+      const r = geo.get(e.target)[0], k = list.indexOf(e) + 1
+      if (lens === 'problems') badge(r, `${k}. ${T.irritates(pc(e.pain))}`, C.bad, '#fff', e.target === f)
+      else badge(r, `${k}. ${T.clicksN(e.clicks)}`, C.fg, C.surface, e.target === f)
     }
   }
 
@@ -440,8 +463,9 @@
       for (const p of paths().filter((p) => p.to === picked && share(p) >= MIN)) arrow(p, { faint: true })
       for (const p of paths().filter((p) => p.from === picked)) arrow(p)
       if (!shown(picked)) missing.add(picked)
-    } else {
-      for (const p of bestSteps()) arrow(p)
+    } else if (hovered) {
+      // The list leads: the screen shows the arrow of the step being pointed at, not all of them at once.
+      for (const p of bestSteps().filter((p) => p.from === hovered)) arrow(p)
     }
     for (const t of ends) for (const r of geo.get(t) || []) {
       const on = t === picked || t === hovered
@@ -539,8 +563,9 @@
         lead: `${esc(T.clicksN(e.clicks))}${e.irr >= MIN_IRR ? ' · ' + chip(T.irritates(pc(e.pain)), C.bad) : ''}<br>${code(picked)}` +
           (count > 1 ? `<br>${esc(T.many(count))}` : count ? '' : `<br><span style="color:${C.bad}">${esc(T.notHere)}</span>`),
         items: go.map((p) => item(p.to, T.after(nameOf(p.to)), pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''), { dim: share(p) < MIN })).join('') +
+          exits().filter((x) => x.from === picked).map((x) => item(picked, T.leaves(x.route_label || x.route), pc(exitShare(x)), esc(T.times(x.n)), { flat: true })).join('') +
           come.map((p) => item(p.from, T.before(nameOf(p.from)), pc(p.n / (inTotal.get(picked) || 1)), esc(T.arrivals(p.n, inTotal.get(picked) || 0)))).join(''),
-        note: !go.length ? T.pickedNone(name) : share(go[0]) >= DOMINANT ? T.pickedDominant(name, nameOf(go[0].to)) : T.pickedSpread(name)
+        note: !go.length && !exits().some((x) => x.from === picked) ? T.pickedNone(name) : !go.length ? '' : share(go[0]) >= DOMINANT ? T.pickedDominant(name, nameOf(go[0].to)) : T.pickedSpread(name)
       }
     }
     if (lens === 'routes') {
@@ -553,9 +578,11 @@
       if (pairs.length) notes.push(T.notePairs(pairs.join(', ')))
       if (!notes.length && best.length) notes.push(T.noteSpread)
       return {
-        title: T.look, lead: esc(T.lookLead),
-        items: best.map((p) => item(p.from, `${nameOf(p.from)} → ${nameOf(p.to)}`, pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''))).join(''),
-        empty: !(data?.paths || []).length ? T.noSteps : !paths().length ? T.fewSteps((data.paths || []).length, minN()) : !best.length ? T.noStrong : '', note: notes.join(' ')
+        title: T.look, lead: esc(T.lookLead) + (best.length ? `<br><span style="font-size:12px;color:${C.faint}">${esc(T.routesHover)}</span>` : ''),
+        items: best.map((p, k) => item(p.from, `${k + 1}. ${nameOf(p.from)} → ${nameOf(p.to)}`, pc(share(p)), esc(T.times(p.n)) + (backAndForth(p) ? ' · ' + chip(T.backForth, C.warn) : ''))).join('') +
+          exits().filter((x) => exitShare(x) >= MIN).sort((a, b) => exitShare(b) - exitShare(a)).slice(0, 6)
+            .map((x) => item(x.from, T.exitTo(nameOf(x.from), x.route_label || x.route), pc(exitShare(x)), esc(T.times(x.n)))).join(''),
+        empty: !(data?.paths || []).length && !exits().length ? T.noSteps : !(data?.paths || []).length ? '' : !paths().length ? T.fewSteps((data.paths || []).length, minN()) : !best.length ? T.noStrong : '', note: notes.join(' ')
       }
     }
     if (lens === 'problems') {
@@ -563,14 +590,14 @@
       const top = list[0]
       return {
         title: T.irritTitle, lead: esc(T.irritLead),
-        items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), pc(e.pain), esc(causeLine(e)))).join(''),
+        items: list.slice(0, 10).map((e, k) => item(e.target, `${k + 1}. ${nameOf(e.target)}`, pc(e.pain), esc(causeLine(e)))).join(''),
         empty: list.length ? '' : T.noProblems, note: top ? whyNote(top) : ''
       }
     }
     const list = used(), total = list.reduce((s, e) => s + e.clicks, 0)
     return {
       title: T.usageTitle, lead: esc(T.usageLead(days)),
-      items: list.slice(0, 6).map((e) => item(e.target, nameOf(e.target), fmt(e.clicks), code(e.target))).join(''),
+      items: list.slice(0, 10).map((e, k) => item(e.target, `${k + 1}. ${nameOf(e.target)}`, fmt(e.clicks), code(e.target))).join(''),
       empty: list.length ? '' : T.noClicks, note: list.length ? T.noteUsage(nameOf(list[0].target), pc(list[0].clicks / (total || 1))) : ''
     }
   }
@@ -584,6 +611,38 @@
     const [lo, hi] = T.scale[lens]
     return `<span style="display:inline-flex;align-items:center;gap:6px">${esc(lo)}<i style="display:inline-block;width:110px;height:10px;border-radius:999px;background:${rampCss(lens)}"></i>${esc(hi)}</span>${never}`
   }
+  // What others clicked that this screen does not have (another role, setting or record): listed, since it cannot be drawn.
+  function absentHtml() {
+    if (picked || lens === 'routes') return ''
+    const list = absent().slice(0, 8)
+    if (!list.length) return ''
+    return `<div data-absent style="margin-top:12px;padding-top:10px;border-top:1px solid ${C.line}">
+      <div style="font-weight:600">${esc(T.absentTitle)}</div><div style="color:${C.fg2};font-size:12px;margin:2px 0 6px">${esc(T.absentLead)}</div>
+      <ul style="margin:0;padding:0;display:grid;gap:2px">${list.map((e) => `<li style="list-style:none;display:flex;gap:10px;padding:3px 10px">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.target)}">${esc(nameOf(e.target))}</span>
+        <span style="font-variant-numeric:tabular-nums;color:${C.fg2}">${esc(T.clicksN(e.clicks))}</span></li>`).join('')}</ul></div>`
+  }
+  // Whose clicks: everyone, or one role, person or account (the server lists who clicked on this screen).
+  function whoHtml() {
+    const who = data?.who || {}
+    const label = (kind, x) => kind === 'user' && x.name ? x.name : kind === 'account' && x.name ? x.name : x.id
+    const groups = ['role', 'user', 'account'].filter((k) => (who[k] || []).length).map((k) => `<optgroup label="${esc(T.whoKinds[k])}">` +
+      who[k].map((x) => `<option value="${esc(k + ':' + x.id)}" ${cut && cut.kind === k && cut.id === x.id ? 'selected' : ''}>${esc(label(k, x))}</option>`).join('') + '</optgroup>').join('')
+    return `<select data-act="who" aria-label="${esc(T.who)}" style="${btn};padding:2px 4px;max-width:150px"><option value="">${esc(T.everyone)}</option>${groups}</select>`
+  }
+  function stepHtml() {
+    const value = stepUnit === 'min' ? Math.round(step / 60) : step
+    return `<span style="display:inline-flex;gap:4px;align-items:center;white-space:nowrap">${esc(T.step)}
+      ${stepUnit === 'none' ? '' : `<input data-act="step" type="number" min="1" value="${value}" aria-label="${esc(T.step)}" style="${btn};width:56px;padding:2px 4px">`}
+      <select data-act="unit" aria-label="${esc(T.step)}" style="${btn};padding:2px 4px">${['s', 'min', 'none'].map((u) => `<option value="${u}" ${u === stepUnit ? 'selected' : ''}>${esc(T.units[u])}</option>`).join('')}</select></span>`
+  }
+  function setStep(value, unit) {
+    stepUnit = unit
+    step = unit === 'none' ? 0 : Math.max(1, Math.round(Number(value) || 30)) * (unit === 'min' ? 60 : 1)
+    ss('termometro.mapStep', String(step)); ss('termometro.mapStepUnit', stepUnit)
+    load()
+  }
+
   function renderPanel() {
     panel.style.cssText = `position:fixed;right:12px;bottom:12px;box-sizing:border-box;pointer-events:auto;background:${C.surface};color:${C.fg};` +
       `border:1px solid ${C.line};border-radius:14px;box-shadow:0 10px 30px rgba(42,36,24,.22);padding:${collapsed ? '8px 10px' : '14px 16px'};` +
@@ -608,12 +667,15 @@
         <p style="margin:4px 0 8px;color:${C.fg2}">${r.lead}</p>
         ${r.empty ? `<p style="color:${C.fg2};margin:0">${esc(r.empty)}</p>` : ''}
         <ol style="margin:0;padding:0;display:grid;gap:2px">${r.items}</ol>
+        ${absentHtml()}
         ${r.note ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:${C.sunken};color:${C.fg2};font-size:12.5px">${esc(r.note)}<div style="margin-top:6px;text-align:right"><button data-copy-note style="${btn}">${esc(T.copyNote)}</button></div></div>` : ''}
         <div data-off hidden style="margin-top:8px;color:${C.warn};font-size:12px"></div>
         <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:11.5px;color:${C.fg2}">${legendHtml()}</div>
         <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;font-size:12px;color:${C.fg2}">
           <select data-act="days" aria-label="${esc(T.days)}" style="${btn};padding:2px 4px">
             ${[7, 30, 90].map((n) => `<option value="${n}" ${n === days ? 'selected' : ''}>${n} ${esc(T.days)}</option>`).join('')}</select>
+          ${whoHtml()}
+          ${lens === 'routes' ? stepHtml() : ''}
           ${lens !== 'routes' ? `<label style="display:flex;gap:5px;align-items:center;cursor:pointer;white-space:nowrap"><input type="checkbox" data-act="never" ${showNever ? 'checked' : ''}>${esc(T.never)}</label>` : ''}
           <span style="margin-left:auto">${esc(T.total(data.visits, data.elements.reduce((s, e) => s + e.clicks, 0)))}</span>
         </div>`
@@ -628,7 +690,8 @@
     data = null; message = null; picked = null; hovered = null
     renderPanel()
     layer.replaceChildren()
-    const q = new URLSearchParams({ project, route: loadedRoute, days: String(days) })
+    const q = new URLSearchParams({ project, route: loadedRoute, days: String(days), step: String(step) })
+    if (cut) q.set(cut.kind, cut.id)
     try {
       const res = await fetch(`${cfg.url}/api/usage?${q}`, { headers: { Authorization: 'Bearer ' + cfg.token }, credentials: 'omit' })
       if (res.status === 401) throw new Error(T.expired)
@@ -686,6 +749,18 @@
   })
   panel.addEventListener('change', (e) => {
     if (e.target.matches('[data-act="days"]')) { days = Number(e.target.value); load() }
+    if (e.target.matches('[data-act="step"]')) setStep(e.target.value, stepUnit)
+    if (e.target.matches('[data-act="unit"]')) {
+      const u = e.target.value
+      // Switching unit keeps the amount of time: 120 seconds become 2 minutes; leaving "no limit" starts at 30 s.
+      setStep(u === 'none' ? 0 : stepUnit === 'none' ? (u === 'min' ? 1 : 30) : u === 'min' ? Math.max(1, Math.round(step / 60)) : step, u)
+    }
+    if (e.target.matches('[data-act="who"]')) {
+      const v = e.target.value, i = v.indexOf(':')
+      cut = v ? { kind: v.slice(0, i), id: v.slice(i + 1) } : null
+      ss('termometro.mapWho', cut ? JSON.stringify(cut) : null)
+      load()
+    }
     if (e.target.matches('[data-act="never"]')) { showNever = e.target.checked; renderPanel(); redraw() }
   })
   panel.addEventListener('mouseover', (e) => {

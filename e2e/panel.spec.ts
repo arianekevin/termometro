@@ -101,3 +101,53 @@ test('the verdict link opens the list on what needs you, even with the list alre
   expect(await bad.evaluateAll((rows) => rows.every((r) => !(r as HTMLElement).hidden))).toBe(true)
   expect(errors).toEqual([])
 })
+
+// The map drawn over a stand-in for the app: the seed's /tickets controls, plus one control other people clicked that this
+// screen does not have (it must be listed, not lost).
+test.describe('map over the app', () => {
+  async function openMap(page: Page, html: string) {
+    const errors = watch(page)
+    await page.goto(`${process.env.PANEL_URL}/api/status`) // same origin, no panel scripts
+    const { token } = await page.evaluate(async () => (await fetch('/api/map-token?project=demo', { method: 'POST' })).json())
+    await page.evaluate(([body, token]) => {
+      document.body.innerHTML = body
+      ;(window as any).termometroMap = { url: location.origin, token, route: () => '/tickets' }
+      sessionStorage.setItem('termometro.lang', 'pt')
+    }, [html, token])
+    await page.addScriptTag({ url: '/map.js' })
+    const panel = page.locator('[data-termometro] [role="dialog"]')
+    await expect(panel).toContainText('visitas')
+    return { panel, errors }
+  }
+
+  test('lists what is not on this screen, numbers the list and cuts by role', async ({ page }) => {
+    const { panel, errors } = await openMap(page, '<button id="new" style="margin:200px">New ticket</button>')
+    await expect(panel.locator('[data-absent]')).toContainText('Export') // clicked by others, missing here
+    await expect(panel.locator('ol [data-t]').first()).toContainText(/^1\./)
+    const who = panel.locator('select[data-act="who"]')
+    await expect(who.locator('optgroup[label="Papel"] option')).toHaveCount(2)
+    await who.selectOption('role:agent')
+    await expect(panel.locator('select[data-act="who"]')).toHaveValue('role:agent')
+    if (process.env.MAP_SHOT) await page.screenshot({ path: process.env.MAP_SHOT.replace('.png', '-heat.png') })
+    expect(errors).toEqual([])
+  })
+
+  test('routes: arrows only on the step pointed at, the time window and leaving the screen', async ({ page }) => {
+    const { panel, errors } = await openMap(page,
+      '<button id="new" style="position:fixed;left:100px;top:100px">New ticket</button><button id="export" style="position:fixed;left:500px;top:300px">Export</button>')
+    await panel.locator('[data-lens="routes"]').click()
+    const steps = panel.locator('ol [data-t]')
+    await expect(steps.first()).toContainText('New ticket → Export')
+    await expect(panel).toContainText(/abre (Home|Users)/) // the last click leaves to another screen, by its name
+    await expect(page.locator('[data-termometro] path[data-step]')).toHaveCount(0) // nothing drawn until pointed at
+    await steps.first().hover()
+    await expect(page.locator('[data-termometro] path[data-step]')).toHaveCount(1)
+    await panel.locator('select[data-act="unit"]').selectOption('none')
+    await expect(panel.locator('input[data-act="step"]')).toHaveCount(0)
+    await expect(panel.locator('select[data-act="unit"]')).toHaveValue('none')
+    await panel.locator('select[data-act="unit"]').selectOption('min')
+    await expect(panel.locator('input[data-act="step"]')).toHaveValue('1')
+    if (process.env.MAP_SHOT) { await steps.first().hover(); await page.screenshot({ path: process.env.MAP_SHOT }) }
+    expect(errors).toEqual([])
+  })
+})
