@@ -9,7 +9,8 @@ and the API:
   GET  /auth/google    sign in with Google (then /auth/google/callback); only allowed e-mails or domains get in
   POST /api/logout
   GET  /api/me         is this browser signed in, and which projects exist
-  GET  /api/overview   the period against the one before, and what deserves a look ┐
+  GET  /api/overview   the period against the one before, and what deserves a look; `recent`: what changed since ┐
+                       the latest deploy (if in the last 7 days) or else in the last 24 h, against as long before │
   GET  /api/search     screens, elements, failures, actions and ids containing ?q=  │
   GET  /api/failures   every failure, grouped by kind and message, per day │
   GET  /api/failure    one failure in depth (?signal=&detail=): stack, browsers, trails │
@@ -22,7 +23,7 @@ and the API:
   GET  /api/people     usage per role, account and user (ids only)  │ for /api/usage)
   GET  /api/actions    effort (clicks and time) per accepted write  │
   GET  /api/compare    one version against another (default: latest) │
-  GET  /api/filters    accounts, roles and versions seen             │
+  GET  /api/filters    accounts, roles and versions seen, and when the last 5 versions arrived │
   GET  /api/names      what people call screens, buttons, actions and accounts │
   GET  /api/dictionary everything that can be named, with its automatic name, its given name and its use
   POST /api/names      the dictionary: {kind, key, name} names a screen, control, action or account (empty = back to auto)
@@ -583,7 +584,7 @@ SIGNALS = "(" + ",".join(f"'{t}'" for t in WEIGHTS) + ")"
 class Filter:
     """The WHERE every read shares: project, period and the optional cuts."""
 
-    def __init__(self, q: dict, before: bool = False):
+    def __init__(self, q: dict, before: bool = False, span: tuple[int, int] | None = None):
         try:
             self.days = max(1, min(CONFIG.retention_days, int(q.get("days", "7"))))
         except ValueError:
@@ -598,6 +599,10 @@ class Filter:
             self.sql += " AND at < ?"
             self.args = [q.get("project", ""), self.since, end]
             self.until = end
+        elif span:  # an explicit window [since, until): the morning check's cut and the one just before it
+            self.since, self.until = max(self.mark, span[0]), span[1]
+            self.sql += " AND at < ?"
+            self.args = [q.get("project", ""), self.since, self.until]
         for field, column in (("version", "version"), ("account", "account"), ("role", "role"),
                               ("user", "user_id"), ("route", "route")):
             if q.get(field):
@@ -1262,7 +1267,65 @@ def overview(con, f: Filter) -> dict:
     insights.sort(key=lambda i: (-i["impact"], -i["weight"]))
     return {"days": f.days, "now": totals(con, f), "before": totals(con, prev), "daily": daily(con, f),
             "before_daily": daily(con, prev), "deploys": deploys(con, f), "screens": screens_daily(con, f), "kinds": kinds(con, f),
-            "insights": insights[:20]}
+            "insights": insights[:20], "recent": recent(con, f)}
+
+
+def arrivals(con, project: str, limit: int = 5) -> list[dict]:
+    """When each version first sent something, newest deploy first, over everything kept (mark or not, no cuts): a
+    deploy is a fact of the project, not of one account. What the morning check cuts at and what a mark can start from."""
+    return [{"version": v, "at": at} for v, at in con.execute(
+        "SELECT version, MIN(at) FROM events WHERE project = ? AND version != '?' GROUP BY version ORDER BY MIN(id) DESC LIMIT ?",
+        (project, limit))]
+
+
+RECENT_DEPLOY_DAYS = 7  # a version that arrived this recently is the morning check's cut; else the last 24 hours
+RECENT_TOP = 5          # items per list (the band shows fewer)
+
+
+def recent(con, f: Filter) -> dict:
+    """The morning check: what changed since the latest deploy (when it came in the last week and something came before it)
+    or else in the last 24 hours, against as long a time just before. Apart from the chosen period, with the mark and the
+    cuts. The overview's rules: a screen moves by INSIGHT_RISE points with INSIGHT_MIN_VISITS visits on both sides; a
+    failure is new when nothing of it was kept before the cut; one that stopped must have dropped beyond chance.
+    state: moved | still (enough data, nothing moved) | thin (too little in the cut, or nothing before it to compare)."""
+    now = int(time.time() * 1000)
+    project = f.q.get("project", "")
+    cut = {"cut": "day", "version": "", "since": now - 86_400_000}
+    last = arrivals(con, project, 2)
+    # One version picked: within it there is no deploy to cut at. A mark after the deploy: "since 1.1" would lie.
+    if not f.q.get("version") and len(last) == 2 and last[0]["at"] >= max(f.mark, now - RECENT_DEPLOY_DAYS * 86_400_000):
+        cut = {"cut": "version", "version": last[0]["version"], "since": last[0]["at"]}
+    fc = Filter(f.q, span=(cut["since"], now + 1))
+    fp = Filter(f.q, span=(cut["since"] - (now - cut["since"]), cut["since"]))
+    out = {**cut, "before_since": fp.since, "state": "thin", "visits": 0, "worse": [], "new_failures": [], "better": [], "gone": []}
+    # As the summary does: the time before says something when it has data on at least half as much of its length.
+    if not covered_days(con, fc) or covered_days(con, fp) < covered_days(con, fc) / 2:
+        return out
+    a = {g["key"]: g for g in frustration_by(con, fp, "route")}
+    for g in frustration_by(con, fc, "route"):
+        b = a.get(g["key"])
+        if not b or min(b["visits"], g["visits"]) < INSIGHT_MIN_VISITS or abs(g["score"] - b["score"]) < INSIGHT_RISE:
+            continue
+        out["worse" if g["score"] > b["score"] else "better"].append(
+            {"route": g["key"], "before": b["score"], "now": g["score"], "visits": g["visits"],
+             "link": {"tab": "frustration", "params": {"route": g["key"]}}})
+    out["worse"].sort(key=lambda x: x["before"] - x["now"])
+    out["better"].sort(key=lambda x: x["now"] - x["before"])
+    first = first_seen(con, f)
+    count = lambda fl: {(k, d): (n, r) for k, d, n, r in con.execute(f"""SELECT type, detail, COUNT(*), MIN(route) FROM events
+        WHERE {fl.sql} AND type IN {FAILURES} GROUP BY type, detail ORDER BY COUNT(*) DESC""", fl.args)}
+    now_f, before_f = count(fc), count(fp)
+    link = lambda k, d: {"tab": "failures", "params": {"signal": k, "detail": d}}
+    out["new_failures"] = [{"type": k, "detail": d, "route": r, "n": n, "link": link(k, d)} for (k, d), (n, r) in now_f.items()
+                           if first.get((k, d), (0,))[0] >= fc.since]
+    out["gone"] = [{"type": k, "detail": d, "route": r, "before": n, "link": link(k, d)} for (k, d), (n, r) in before_f.items()
+                   if (k, d) not in now_f and dropped(n, 0)]
+    for k in ("worse", "new_failures", "better", "gone"):
+        out[k] = out[k][:RECENT_TOP]
+    out["visits"] = con.execute(f"SELECT COUNT(*) FROM events WHERE {fc.sql} AND type = 'page'", fc.args).fetchone()[0]
+    out["state"] = "moved" if any(out[k] for k in ("worse", "new_failures", "better", "gone")) else (
+        "still" if out["visits"] >= INSIGHT_MIN_VISITS else "thin")
+    return out
 
 
 def covered_days(con, f: Filter) -> float:
@@ -2231,7 +2294,8 @@ def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
             f"SELECT DISTINCT {column} FROM events WHERE project = ? AND {column} != '' ORDER BY {column}", (project,))]
-    return {"accounts": distinct("account"), "roles": distinct("role"), "versions": distinct("version")}
+    return {"accounts": distinct("account"), "roles": distinct("role"), "versions": distinct("version"),
+            "arrivals": arrivals(con, project)}
 
 
 def apply_retention(con, now: float | None = None) -> int:

@@ -182,7 +182,9 @@ mode, language). Everything you pick lives in the address. The **Tour** button w
 point: what you can do there, a tip and a day-to-day example. The tabs come in groups:
 
 **Summary**
-- **Overview:** the period's verdict, the numbers against the previous period, the **To do** list ranked by impact
+- **Overview:** the period's verdict and, under it, what changed since the latest version (if it arrived this week)
+  or in the last 24 hours — screens that got worse or better, new failures and the ones that stopped, each linking to
+  its evidence —, the numbers against the previous period, the **To do** list ranked by impact
   (how many people and sessions each item reaches), the latest version's card and what you are following.
 
 **Problems**
@@ -236,7 +238,7 @@ time since the previous one; two idle minutes start the count again, and a write
 ## Marks
 
 After a redesign, a version or a big fix, save a **mark** (Marks, at the top): a name and a date — today or any
-day before. The dashboard, the alerts, the report and "new failure" then count only what came after the mark in
+day before —, or, in one click, the moment one of the latest versions arrived. The dashboard, the alerts, the report and "new failure" then count only what came after the mark in
 use; pick another one, or the whole period, at any time. Nothing is deleted, and old data still leaves with the
 retention. (`all=1` on any read still shows everything.)
 

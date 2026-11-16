@@ -117,6 +117,42 @@ test('the verdict link opens the list on what needs you, even with the list alre
   expect(errors).toEqual([])
 })
 
+// The seed's 1.1 arrived 4 days ago, slower on Invite and with a new 500 there: the band under the verdict cuts at it.
+test('the morning check says since which version and each chip opens its evidence', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'overview')
+  const band = page.locator('section.verdict .since')
+  await expect(band).toContainText(/Desde a 1\.1, que chegou em \d\d\/\d\d/)
+  await expect(band).toContainText(/1 tela piorou, 2 falhas novas/) // the slow Invite and its 500
+  await expect(band.locator('a.pill', { hasText: 'Users' })).toHaveAttribute('href', /#frustration\?.*route=%2Fusers/)
+  const fresh = band.locator('a.pill', { hasText: 'POST /api/invites 500' })
+  await expect(fresh).toHaveAttribute('href', /#failures\?.*signal=http_5xx/)
+  await fresh.click()
+  await expect(page.locator('a[data-tab="failures"]')).toHaveAttribute('aria-current', 'page')
+  expect(errors).toEqual([])
+})
+
+test('the marks dialog offers the versions that arrived as one-click marks', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'overview')
+  // The mark is shared by every test on this server: the answer is faked here, the request is what is checked.
+  let sent: any = null
+  await page.route('**/api/mark?*', async (route) => {
+    sent = route.request().postDataJSON()
+    await route.fulfill({ json: { mark: sent.at, marks: [{ id: 'x1', name: sent.name, at: sent.at }] } })
+  })
+  await page.locator('#marks-open').click()
+  const sug = page.locator('#mark-sug')
+  await expect(sug.locator('button')).toHaveCount(2) // 1.1 and 1.0, newest first
+  await expect(sug.locator('button').first()).toContainText(/1\.1\s+chegou em/)
+  await sug.locator('button').first().click()
+  await expect(page.locator('#marks')).toHaveCount(0)
+  expect(sent).toMatchObject({ action: 'create', name: 'Versão 1.1' })
+  expect(sent.at).toBeLessThan(Date.now() - 3 * 86400_000) // when 1.1 arrived, not now
+  await expect(page.locator('#marks-open')).toContainText('Versão 1.1')
+  expect(errors).toEqual([])
+})
+
 // The map drawn over a stand-in for the app: the seed's /tickets controls, plus one control other people clicked that this
 // screen does not have (it must be listed, not lost).
 test.describe('map over the app', () => {

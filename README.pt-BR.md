@@ -160,7 +160,9 @@ daltônicos e idioma). Tudo o que se escolhe fica no endereço. O botão **Tour*
 o que dá para fazer ali, uma dica e um exemplo do dia a dia. As abas vêm em grupos:
 
 **Resumo**
-- **Início:** o veredito do período, os números contra o período anterior, a lista **Para fazer** ordenada por
+- **Início:** o veredito do período e, embaixo dele, o que mudou desde a última versão (se chegou nesta semana) ou
+  nas últimas 24 horas — telas que pioraram ou melhoraram, falhas novas e as que pararam, cada uma com o link para a
+  evidência —, os números contra o período anterior, a lista **Para fazer** ordenada por
   impacto (quantas pessoas e sessões cada item atinge), o cartão da última versão e o que você está acompanhando.
 
 **Problemas**
@@ -213,7 +215,7 @@ de 0 a 100: quanto maior, pior. Até 19 é baixa, de 20 a 49 moderada, de 50 par
 ## Marcos
 
 Depois de um redesenho, uma versão ou uma correção grande, guarde um **marco** (Marcos, no topo): um nome e uma
-data — hoje ou qualquer dia antes. O painel, os alertas, o relatório e "falha nova" passam a contar só o que veio
+data — hoje ou qualquer dia antes —, ou, com um clique, o momento em que uma das últimas versões chegou. O painel, os alertas, o relatório e "falha nova" passam a contar só o que veio
 depois do marco em uso; troque por outro, ou volte ao período todo, quando quiser. Nada é apagado, e o dado antigo
 continua saindo pela retenção. (`all=1` em qualquer leitura ainda mostra tudo.)
 

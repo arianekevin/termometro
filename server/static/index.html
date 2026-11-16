@@ -542,6 +542,15 @@ code.idm { color: var(--faint); font-size: 11px; } .steps:not(:has(.t:not(:empty
 .fw-rest .fw-say { flex: 1; }
 .fw-on { height: 28px; }
 .fw-verdict .meta { margin-top: 2px; }
+/* Since the last deploy (or the last 24 h): one line and a few chips under the verdict, links to the evidence. */
+.fw-verdict { flex: 1; min-width: 0; }
+.since { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.since .since-say { font-size: 13px; line-height: 18px; color: var(--fg2); } .since .since-say b { color: var(--fg); font-weight: 600; }
+.since a.pill { max-width: min(280px, 100%); min-width: 0; gap: 4px; color: inherit; text-decoration: none; }
+.since a.pill:hover { box-shadow: inset 0 0 0 1px var(--line-strong); } .since a.pill b { font-weight: 700; }
+.since.thin .since-say { color: var(--faint); }
+.marksug { display: grid; gap: 4px; } .marksug button { width: 100%; justify-content: flex-start; gap: 6px; height: auto; min-height: 32px; padding: 5px 10px; text-align: left; }
+.marksug button .meta { margin-left: auto; white-space: nowrap; }
 .follow .fw-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
 .fw-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .fw-row:first-child { border-top-color: transparent; } .fw-row[hidden] { display: none; } .fw-row > .pill { justify-self: start; }
@@ -633,6 +642,7 @@ const HELP_PT = {
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
   release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas a cada 100 sessões. O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
   follow: ['O que é', 'O que você decidiu corrigir. Ao clicar em Acompanhar, o valor de hoje vira a linha de base: a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da conta. Depois, o mesmo número é medido só com o que veio desde então, com os filtros em uso.', 'Melhorou ou piorou só quando a mudança passa da tolerância (5 pontos de frustração, ou 20% nas outras medidas); dentro dela é Igual. Sem dados ainda: ninguém passou por ali desde que começou.'],
+  since: ['O que é', 'A linha sob o veredito: o que mudou desde a versão mais nova, quando ela chegou nos últimos 7 dias, ou senão nas últimas 24 horas, contra o mesmo tempo logo antes. Não depende do período escolhido; segue o marco e os filtros. Uma tela piorou ou melhorou quando a frustração mudou 10 pontos ou mais, com pelo menos 10 visitas nos dois lados; uma falha é nova quando nunca tinha aparecido antes; uma falha parou quando sumiu depois de acontecer além do acaso.', 'De manhã, comece por aqui: cada etiqueta abre a evidência. "Pouco dado" quer dizer que ainda não dá para comparar, não que está tudo bem.'],
   todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
   features: ['O que é', 'Features que o produto escolheu acompanhar: um nome e as telas, botões, ações ou eventos do app que a formam.', 'Compare os usos com o período anterior e a adoção. Feature nova com adoção baixa pede divulgação ou revisão.'],
   adoption: ['O que é', 'A parte das sessões do período em que a feature foi usada ao menos uma vez. Abaixo, quantas das pessoas ativas usaram. A adoção por pessoa chega a 100% rápido num produto de uso diário e deixa de separar uma feature da outra; a parte das sessões continua separando.', 'Presente em poucas sessões e usada por muita gente: é de uso esporádico. Em poucas sessões e por pouca gente: pede divulgação ou revisão.'],
@@ -673,6 +683,7 @@ const HELP_EN = {
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
   release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per 100 sessions. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
   follow: ['What it is', 'What you decided to fix. Clicking Follow keeps today\'s value as the baseline: the screen\'s frustration, failures per 100 sessions, the action\'s clicks per use or the account\'s people a day. Afterwards the same number is measured only on what came since, with the filters in use.', 'Improved or worse only when the change goes past the tolerance (5 frustration points, or 20% for the other measures); within it, Same. No data yet: nobody went there since it started.'],
+  since: ['What it is', 'The line under the verdict: what changed since the newest version, when it arrived in the last 7 days, or else in the last 24 hours, against the same length of time just before. It does not follow the chosen period; it follows the mark and the filters. A screen got worse or better when its frustration moved 10 points or more, with at least 10 visits on both sides; a failure is new when it had never shown up before; a failure stopped when it vanished after happening beyond chance.', 'In the morning, start here: each chip opens the evidence. "Too little data" means it cannot compare yet, not that all is well.'],
   todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
   features: ['What it is', 'Features the product team chose to watch: a name and the screens, buttons, actions or app events that make it up.', 'Compare uses with the period before and adoption. A new feature with low adoption needs announcing or a second look.'],
   adoption: ['What it is', 'The share of the period\'s sessions in which the feature was used at least once. Below it, how many of the active people used it. Adoption per person reaches 100% fast in a product used every day and stops telling features apart; the share of the sessions keeps doing it.', 'In few sessions but used by many people: occasional use. In few sessions and by few people: it needs announcing or a second look.'],
@@ -785,7 +796,8 @@ const L = PT ? {
   mark: { button: 'Marcos', whole: 'Todo o período', since: (w) => `Desde ${w}`, untitled: 'Marco', title: 'Contar a partir de um marco',
     hint: 'O painel, os alertas e o relatório só olham o que veio depois do marco escolhido. Nada é apagado: dá para trocar ou voltar ao período todo.',
     name: 'Nome', namePh: 'ex.: Redesenho de Usuários', date: 'Data', create: 'Criar e usar', remove: 'Apagar marco', confirmRemove: (n) => `Apagar o marco ${n}?`,
-    future: 'Escolha uma data de hoje para trás.' },
+    future: 'Escolha uma data de hoje para trás.', arrivals: 'Versões que chegaram', arrived: (d) => `chegou em ${d}`, useArrival: 'usar como marco',
+    arrivalTip: (v, d) => `Cria o marco "${v}" no momento em que a versão chegou (${d}) e passa a contar dali.` },
   failureTab: {
     list: 'Falhas, das que mais pesam: sessões atingidas vezes a gravidade (erro pesa mais que lentidão)', hint: 'Clique numa falha para ver o código, os navegadores e os passos até ela.',
     none: 'Nenhuma falha neste período.', failure: 'Falha', since: 'Desde', last: 'Última vez', isNew: 'nova',
@@ -949,6 +961,13 @@ const L = PT ? {
   sev: { bad: 'grave', warn: 'atenção', ok: 'melhorou', idea: 'sugestão' },
   verdict: { bad: (n) => `${n} ${n === 1 ? 'coisa precisa' : 'coisas precisam'} de você`, warn: (n) => `${n} ${n === 1 ? 'ponto' : 'pontos'} de atenção, nada grave`,
     ok: 'Tudo tranquilo neste período', okHint: 'Nenhuma falha nova, nenhuma tela piorou ou passou de 50.' },
+  // The morning check: since the latest deploy (or the last 24 h) against as long a time just before.
+  recent: { version: (v, d) => `<b>Desde a ${v}</b>, que chegou em ${d}`, day: '<b>Nas últimas 24 h</b>',
+    worse: (n) => `${n} ${n === 1 ? 'tela piorou' : 'telas pioraram'}`, fresh: (n) => `${n} ${n === 1 ? 'falha nova' : 'falhas novas'}`,
+    better: (n) => `${n} ${n === 1 ? 'tela melhorou' : 'telas melhoraram'}`, gone: (n) => `${n} ${n === 1 ? 'falha parou' : 'falhas pararam'}`,
+    still: 'nada mudou contra o mesmo tempo antes.', thin: 'pouco dado ainda para comparar.', newChip: 'nova', goneChip: 'parou',
+    tipScreen: (r, b, n) => `${r}: frustração ${b} → ${n}`, tipNew: (d, n) => `${d}: ${n}× agora, nunca antes`, tipGone: (d, n) => `${d}: ${n}× antes, nenhuma agora`,
+    label: 'O que mudou desde o último deploy' },
   short: { version_worse: (i) => `${i.route}: frustração ${i.before} → ${i.now} na ${i.b}`, screen_worse: (i) => `${i.route}: frustração ${i.before} → ${i.now}`,
     screen_frustrating: (i) => `${i.route} com frustração ${i.now}`, failure_new: (i) => `falha nova em ${i.route} (${i.n}×)`, failure_recurring: (i) => `falha recorrente em ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritação', engagement: 'Engajamento', ideas: 'Sugestões', better: 'Melhorou' },
@@ -1046,7 +1065,8 @@ const L = PT ? {
   mark: { button: 'Marks', whole: 'The whole period', since: (w) => `Since ${w}`, untitled: 'Mark', title: 'Count from a mark',
     hint: 'The dashboard, alerts and report only look at what came after the chosen mark. Nothing is deleted: switch or go back to the whole period any time.',
     name: 'Name', namePh: 'e.g. Users redesign', date: 'Date', create: 'Create and use', remove: 'Delete mark', confirmRemove: (n) => `Delete the mark ${n}?`,
-    future: 'Pick a date from today back.' },
+    future: 'Pick a date from today back.', arrivals: 'Versions that arrived', arrived: (d) => `arrived on ${d}`, useArrival: 'use as a mark',
+    arrivalTip: (v, d) => `Creates the mark "${v}" at the moment the version arrived (${d}) and counts from there.` },
   failureTab: {
     list: 'Failures, heaviest first: sessions hit times severity (an error weighs more than slowness)', hint: 'Click a failure to see the code, the browsers and the steps up to it.',
     none: 'No failures in this period.', failure: 'Failure', since: 'Since', last: 'Last seen', isNew: 'new',
@@ -1210,6 +1230,12 @@ const L = PT ? {
   sev: { bad: 'serious', warn: 'attention', ok: 'improved', idea: 'suggestion' },
   verdict: { bad: (n) => `${n} ${n === 1 ? 'thing needs' : 'things need'} you`, warn: (n) => `${n} ${n === 1 ? 'point' : 'points'} of attention, nothing serious`,
     ok: 'All calm in this period', okHint: 'No new failure, no screen got worse or went past 50.' },
+  recent: { version: (v, d) => `<b>Since ${v}</b>, which arrived on ${d}`, day: '<b>In the last 24 h</b>',
+    worse: (n) => `${n} ${n === 1 ? 'screen' : 'screens'} got worse`, fresh: (n) => `${n} new ${n === 1 ? 'failure' : 'failures'}`,
+    better: (n) => `${n} ${n === 1 ? 'screen' : 'screens'} got better`, gone: (n) => `${n} ${n === 1 ? 'failure' : 'failures'} stopped`,
+    still: 'nothing changed against the same time before.', thin: 'too little data yet to compare.', newChip: 'new', goneChip: 'stopped',
+    tipScreen: (r, b, n) => `${r}: frustration ${b} → ${n}`, tipNew: (d, n) => `${d}: ${n}× now, never before`, tipGone: (d, n) => `${d}: ${n}× before, none now`,
+    label: 'What changed since the last deploy' },
   short: { version_worse: (i) => `${i.route}: frustration ${i.before} → ${i.now} in ${i.b}`, screen_worse: (i) => `${i.route}: frustration ${i.before} → ${i.now}`,
     screen_frustrating: (i) => `${i.route} at frustration ${i.now}`, failure_new: (i) => `new failure on ${i.route} (${i.n}×)`, failure_recurring: (i) => `recurring failure on ${i.route}` },
   groups: { bugs: 'Bugs', irritation: 'Irritation', engagement: 'Engagement', ideas: 'Suggestions', better: 'Improved' },
@@ -1488,6 +1514,8 @@ function shell() {
 // Marks: saved moments (a redesign, a version) the dashboard can count from, one at a time, or the whole period.
 const projectNow = () => state.me.projects.find((p) => p.name === $('#project').value)
 const dateOf = (at) => new Date(at).toLocaleDateString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit', year: 'numeric' })
+// "12/11, 09:07": when a deploy arrived, short enough for a line.
+const arrivedAt = (at) => new Date(at).toLocaleString(PT ? 'pt-BR' : 'en', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 function markChip() {
   const p = projectNow(), M = L.mark, active = (p?.marks ?? []).find((m) => m.at === p?.mark)
   const b = $('#marks-open')
@@ -1508,10 +1536,22 @@ const marksPanel = () => {
       ${(p.marks ?? []).map((m) => `<div class="markrow"><button data-mark-use="${esc(m.id)}" aria-pressed="${p.mark === m.at}" ${m.id ? '' : 'disabled'}>
         <b>${esc(m.name || M.untitled)}</b> <span class="meta">${esc(when(m.at))}</span></button>
         ${m.id ? `<button class="small" data-mark-del="${esc(m.id)}" aria-label="${M.remove}" title="${M.remove}">×</button>` : ''}</div>`).join('')}</div>
+    <div class="marksug" id="mark-sug" hidden></div>
     <form id="mark-new" class="markform"><label><span class="meta">${M.name}</span><input name="name" placeholder="${M.namePh}" maxlength="80"></label>
       <label><span class="meta">${M.date}</span><input name="date" type="date" value="${iso}" max="${iso}" required></label>
       <button class="primary" type="submit">${M.create}</button></form>
     <p class="error" id="mark-error" hidden></p></div>`
+}
+// The server knows when each version first sent something: the last ones, not yet a mark, are offered as one-click marks.
+async function markArrivals() {
+  const p = projectNow(), M = L.mark
+  let f = {}
+  try { f = await (await fetch('/api/filters?project=' + encodeURIComponent(p.name))).json() } catch { return }
+  const box = $('#mark-sug'), list = (f.arrivals ?? []).filter((a) => !(p.marks ?? []).some((m) => m.at === a.at))
+  if (!box || !list.length) return
+  box.innerHTML = `<span class="meta">${M.arrivals}</span>${list.map((a) => `<button data-mark-arrival="${esc(a.version)}" data-at="${a.at}"
+    title="${esc(M.arrivalTip(L.rel.markName(a.version), when(a.at)))}"><b>${esc(a.version)}</b> <span>${esc(M.arrived(arrivedAt(a.at)))}</span><span class="meta">${M.useArrival}</span></button>`).join('')}`
+  box.hidden = false
 }
 async function markAction(body) {
   const p = projectNow()
@@ -1531,9 +1571,12 @@ document.addEventListener('click', (e) => {
       open.insertAdjacentHTML('afterend', marksPanel())
       const box = $('#marks'), r = open.getBoundingClientRect()
       box.style.top = r.bottom + 6 + 'px'; box.style.left = Math.max(16, Math.min(r.left, innerWidth - box.offsetWidth - 16)) + 'px'
+      markArrivals()
     }
     open.setAttribute('aria-expanded', String(!panel)); return
   }
+  const arrival = e.target.closest?.('[data-mark-arrival]')
+  if (arrival) { arrival.disabled = true; return markAction({ action: 'create', name: L.rel.markName(arrival.dataset.markArrival), at: Number(arrival.dataset.at) }) }
   const use = e.target.closest?.('[data-mark-use]')
   if (use && !use.disabled) return markAction(use.dataset.markUse ? { action: 'use', id: use.dataset.markUse } : { action: 'none' })
   const del = e.target.closest?.('[data-mark-del]')
@@ -1893,14 +1936,32 @@ const countText = (groups) => {
   const parts = Object.keys(L.fw.things).filter((k) => n[k]).map((k) => `${n[k]} ${L.fw.things[k][n[k] === 1 ? 0 : 1]}`)
   return parts.length > 1 ? parts.slice(0, -1).join(', ') + ` ${L.fw.and} ` + parts.at(-1) : parts[0] ?? ''
 }
+// The morning check under the verdict: since the latest deploy (or the last 24 h) against as long before, in one line and
+// a few chips, each to its evidence. The server decides what moved (recent() in termometro.py), with the overview's rules.
+const RECENT_CHIPS = 5
+function sinceBand(r) {
+  if (!r) return ''
+  const R = L.recent, head = r.cut === 'version' ? R.version(esc(r.version), arrivedAt(r.since)) : R.day
+  const counts = [[r.worse, R.worse], [r.new_failures, R.fresh], [r.better, R.better], [r.gone, R.gone]].filter(([x]) => x.length).map(([x, say]) => say(x.length))
+  const fail = (x) => `${L.names[x.type] ?? x.type}: ${x.detail}`, screen = (x) => screenText(x.route) || x.route
+  const chip = (link, cls, html, tip) => `<a class="pill ${cls}" ${linkAttrs(link)} title="${esc(tip)}">${html}</a>`
+  const chips = r.state !== 'moved' ? [] : [
+    ...r.worse.slice(0, 2).map((x) => chip(x.link, 'bad', `▲ <span class="ell">${esc(screen(x))}</span> <b>${x.before} → ${x.now}</b>`, R.tipScreen(x.route, x.before, x.now))),
+    ...r.new_failures.slice(0, 2).map((x) => chip(x.link, ['js_error', 'http_5xx'].includes(x.type) ? 'bad' : 'warn', `<b>${R.newChip}</b> <span class="ell">${esc(fail(x))}</span>`, R.tipNew(fail(x), x.n))),
+    ...r.better.slice(0, 1).map((x) => chip(x.link, 'ok', `▼ <span class="ell">${esc(screen(x))}</span> <b>${x.before} → ${x.now}</b>`, R.tipScreen(x.route, x.before, x.now))),
+    ...r.gone.slice(0, 1).map((x) => chip(x.link, 'ok', `<b>${R.goneChip}</b> <span class="ell">${esc(fail(x))}</span>`, R.tipGone(fail(x), x.before))),
+  ].slice(0, RECENT_CHIPS)
+  return `<div class="since ${r.state}" role="group" aria-label="${esc(R.label)}"><span class="since-say">${head}: ${r.state === 'moved' ? counts.join(', ') + '.' : R[r.state]}${help('since')}</span>
+    ${chips.join('')}</div>`
+}
 // The banner: one line, the verdict in roots, never the list again; its link goes to the list.
-function verdictBanner(groups) {
+function verdictBanner(groups, recent) {
   const bad = groups.filter((g) => g.items.some((i) => i.severity === 'bad')), warn = groups.filter((g) => !bad.includes(g) && g.items.some((i) => i.severity === 'warn'))
   const level = bad.length ? 'bad' : warn.length ? 'warn' : 'ok'
   const headline = level === 'bad' ? L.fw.bad(countText(bad), bad.length, inPeriod()) : level === 'warn' ? L.fw.warn(countText(warn)) : L.verdict.ok
   return `<section class="card verdict ${level}"><span class="dot" aria-hidden="true">${{ bad: '!', warn: '•', ok: '✓' }[level]}</span><div class="fw-verdict">
       <div class="vh">${headline}</div>
-      <div class="meta">${level === 'ok' ? L.verdict.okHint : `<button class="link" data-todo-go>${L.fw.toList}</button>`}</div></div></section>`
+      <div class="meta">${level === 'ok' ? L.verdict.okHint : `<button class="link" data-todo-go>${L.fw.toList}</button>`}</div>${sinceBand(recent)}</div></section>`
 }
 // Following: what someone decided to fix, its baseline against now (since the day it was followed).
 const FW_CLS = { better: 'ok', same: 'same', worse: 'bad', waiting: 'same' }
@@ -2067,7 +2128,7 @@ async function overview() {
   const todo = groupTodos(o.insights.filter((i) => groupOf(i.kind) !== 'better'))
   for (const g of todo) g.says = g.items.map(sentence)
   const follows = fw.items ?? []
-  const verdict = verdictBanner(todo)
+  const verdict = verdictBanner(todo, o.recent)
 
   const byRoute = Object.fromEntries(o.screens.map((r) => [r.route, r]))
   const mini = (i) => {

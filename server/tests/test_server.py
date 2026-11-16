@@ -256,6 +256,57 @@ class Server(unittest.TestCase):
                          (50, 100, "js_error", {"tab": "frustration", "params": {"route": "/cart"}}))
         self.assertEqual(len(o["daily"]), 1)
 
+    def test_the_morning_check_says_what_changed_in_the_last_24_hours_against_the_day_before(self):
+        page = lambda r: {"type": "page", "route": r}
+        err = lambda d, n, kind="js_error", r="/cart": [{"type": kind, "route": r, "detail": d}] * n
+        rage = lambda r, n: [{"type": "rage", "route": r, "target": "button#go"}] * n
+        self.send([page("/cart")] * 10 + [page("/home")] * 10 + rage("/home", 5) + err("TypeError: old", 1)
+                  + err("GET /api/old 500", 10, "http_5xx", "/home"))
+        self.age(1.6)  # 38 hours ago: inside the day before, and that day is mostly covered
+        self.send([page("/cart")] * 10 + rage("/cart", 5) + [page("/home")] * 10 + err("TypeError: old", 1) + err("TypeError: fresh", 2))
+        r = self.read("/api/overview?project=shop&days=30")["recent"]
+        self.assertEqual((r["cut"], r["version"], r["state"], r["visits"]), ("day", "", "moved", 20))
+        self.assertAlmostEqual(r["since"], time.time() * 1000 - 86400_000, delta=5000)
+        self.assertEqual([(x["route"], x["before"], x["now"]) for x in r["worse"]], [("/cart", 10, 60)])  # (1 x 5) / 10 * 20, then (5 x 3 + 3 x 5) / 10 * 20
+        self.assertEqual(r["worse"][0]["link"], {"tab": "frustration", "params": {"route": "/cart"}})
+        self.assertEqual([x["route"] for x in r["better"]], ["/home"])
+        self.assertEqual([(x["detail"], x["n"]) for x in r["new_failures"]], [("TypeError: fresh", 2)])  # "old" was seen before
+        self.assertEqual(r["new_failures"][0]["link"], {"tab": "failures", "params": {"signal": "js_error", "detail": "TypeError: fresh"}})
+        self.assertEqual([(x["detail"], x["before"]) for x in r["gone"]], [("GET /api/old 500", 10)])
+        # The cuts apply: another account had nothing, and the chosen period does not change the cut.
+        self.assertEqual(self.read("/api/overview?project=shop&days=1&account=other")["recent"]["state"], "thin")
+        self.assertEqual(self.read("/api/overview?project=shop&days=1")["recent"]["worse"], r["worse"])
+
+    def test_the_morning_check_is_still_when_nothing_moved_and_quiet_with_nothing_to_compare(self):
+        visit = [{"type": "page", "route": "/cart"}] * 10 + [{"type": "rage", "route": "/cart", "target": "button#go"}] * 2
+        self.send(visit)
+        r = self.read("/api/overview?project=shop&days=7")["recent"]
+        self.assertEqual((r["state"], r["worse"], r["new_failures"]), ("thin", [], []))  # no day before: a first day is not "new"
+        self.age(1.6)
+        self.send(visit + [{"type": "rage", "route": "/cart", "target": "button#go"}])  # 12 -> 18: a small move
+        self.assertEqual(self.read("/api/overview?project=shop&days=7")["recent"]["state"], "still")
+
+    def test_the_morning_check_cuts_at_the_latest_deploy_and_the_marks_dialog_offers_the_arrivals(self):
+        self.send([{"type": "page", "route": "/old"}], version="1.0")
+        self.age(0.5)
+        self.send([{"type": "page", "route": "/cart"}] * 10, version="1.0")
+        self.age(0.25)
+        self.send([{"type": "page", "route": "/cart"}] * 10 + [{"type": "rage", "route": "/cart", "target": "button#go"}] * 5
+                  + [{"type": "js_error", "route": "/cart", "detail": "TypeError: in 1.1"}], version="1.1")
+        self.age(0.5)  # 1.1 came 12 hours ago, 1.0 was used 6 hours before it
+        r = self.read("/api/overview?project=shop&days=7")["recent"]
+        self.assertEqual((r["cut"], r["version"], r["state"]), ("version", "1.1", "moved"))
+        self.assertAlmostEqual(r["since"], time.time() * 1000 - 12 * 3600_000, delta=5000)
+        self.assertAlmostEqual(r["since"] - r["before_since"], 12 * 3600_000, delta=5000)  # as long a time just before
+        self.assertEqual([(x["route"], x["before"], x["now"]) for x in r["worse"]], [("/cart", 0, 40)])  # (5 x 3 + 5) / 10 * 20
+        self.assertEqual([x["detail"] for x in r["new_failures"]], ["TypeError: in 1.1"])
+        self.assertEqual(self.read("/api/overview?project=shop&days=7&version=1.0")["recent"]["cut"], "day")  # no deploy inside one version
+        arrivals = self.read("/api/filters?project=shop")["arrivals"]
+        self.assertEqual([a["version"] for a in arrivals], ["1.1", "1.0"])
+        self.assertEqual(arrivals[0]["at"], r["since"])
+        self.age(8)  # a week later the deploy is old news: back to the last 24 hours
+        self.assertEqual(self.read("/api/overview?project=shop&days=30")["recent"]["cut"], "day")
+
     def test_overview_says_which_version_made_a_screen_worse_and_draws_the_days(self):
         page = {"type": "page", "route": "/cart"}
         self.send([page] * 10 + [{"type": "rage", "route": "/cart", "target": "button#pay"}] * 1, version="1.0", user="u1")
@@ -964,7 +1015,7 @@ class Server(unittest.TestCase):
         u1 = next(g for g in p["users"] if g["key"] == "u1")
         self.assertEqual((u1["role"], u1["account"], u1["screens"]), ("agent", "77", [{"route": "/queue", "visits": 2}]))
         self.assertEqual(self.read("/api/summary?project=shop&role=agent")["overall"]["visits"], 2)
-        self.assertEqual(self.read("/api/filters?project=shop"), {"accounts": ["77"], "roles": ["agent", "manager"], "versions": ["1.0"]})
+        self.assertEqual({k: v for k, v in self.read("/api/filters?project=shop").items() if k != "arrivals"}, {"accounts": ["77"], "roles": ["agent", "manager"], "versions": ["1.0"]})
 
     def test_actions_median_and_p90(self):
         self.send([{"type": "action", "route": "/t", "detail": "POST /api/orders", "clicks": c, "duration_ms": c * 1000}
