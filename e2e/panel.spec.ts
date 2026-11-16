@@ -88,6 +88,11 @@ test.describe('tour', () => {
   }
 })
 
+test('a corner says which version of the server runs', async ({ page }) => {
+  await open(page, 'overview')
+  await expect(page.locator('footer.version')).toHaveText(/^Termometro \d+\.\d+\.\d+$/)
+})
+
 test('the language pick switches the panel to English after reload', async ({ page }) => {
   const errors = watch(page)
   await open(page, 'overview')

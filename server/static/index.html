@@ -448,6 +448,7 @@ a.widen { min-height: 36px; padding: 6px 14px; border: 1px solid var(--fill); te
 .share button { width: 100%; justify-content: flex-start; text-align: left; }
 .share button.done { border-color: var(--accent); background: var(--accent-soft); }
 .tile .unit { color: var(--fg2); }
+footer.version { max-width: 1200px; margin: 0 auto; padding: 0 16px 20px; text-align: right; font-size: 12px; color: var(--faint); }
 #prefs-open { width: 36px; padding: 0; font-size: 18px; letter-spacing: 1px; }
 .fpanel[hidden] { display: none; }
 .fpanel { width: min(320px, calc(100vw - 32px)); gap: 10px; }
@@ -1475,7 +1476,8 @@ function shell() {
       <div class="active-filters" id="active-filters" role="group" aria-label="${L.bar.active}" hidden></div>
     </header>
     <div class="sr-only" id="live" role="status" aria-live="polite"></div>
-    <main id="content">${skeleton()}</main>`
+    <main id="content">${skeleton()}</main>
+    ${state.me.version ? `<footer class="version" title="${PT ? 'Versão do Termometro neste servidor' : 'Termometro version on this server'}">Termometro ${esc(state.me.version)}</footer>` : ''}`
   const project = state.hash.get('project') ?? recall('project'); if (projects.some((p) => p.name === project)) $('#project').value = project
   // A link without the period is an old one, from when 7 days went unsaid; a bare #tab keeps the remembered period.
   const days = state.hash.get('days') ?? (state.hash.toString() ? '7' : recall('days')); if ([...$('#days').options].some((o) => o.value === days)) $('#days').value = days

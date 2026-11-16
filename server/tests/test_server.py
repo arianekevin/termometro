@@ -689,6 +689,9 @@ class Server(unittest.TestCase):
         call(self.base, "/api/names?project=shop", {"kind": "account", "key": "4821", "name": "Acme"}, cookie=self.cookie)
         self.assertEqual(self.read("/api/names?project=shop")["accounts"]["4821"], "Acme")
 
+    def test_me_says_which_version_of_the_server_runs(self):
+        self.assertEqual(self.read("/api/me")["version"], t.VERSION)
+
     def test_map_says_whose_clicks_it_shows_and_cuts_by_person_or_role(self):
         clk = {"type": "click", "route": "/users", "target": "button#new"}
         self.send([{"type": "page", "route": "/users"}, clk, clk], session="a", user="u1", role="Admin", user_name="Ana Lima")
@@ -1040,7 +1043,7 @@ class Server(unittest.TestCase):
         status, _, _ = call(self.base, "/api/summary?project=shop")
         self.assertEqual(status, 401)
         self.assertEqual(self.read("/api/me", cookie=None), {"signed_in": False, "email": "", "no_auth": False,
-                                                             "methods": {"google": False, "password": True}, "projects": []})
+                                                             "methods": {"google": False, "password": True}, "projects": [], "version": t.VERSION})
         self.assertEqual(self.read("/api/me")["projects"], [{"name": "shop", "url": ORIGIN, "key": KEY, "origins": [ORIGIN], "mark": None, "marks": []},
                                                             {"name": "blog", "url": "", "key": "tk_blog", "origins": [], "mark": None, "marks": []}])
         forged = "termometro_session=s.9999999999.AAAA"

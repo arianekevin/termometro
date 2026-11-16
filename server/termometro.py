@@ -2798,6 +2798,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(200, {"signed_in": who is not None, "email": who["email"] if who else "",
                                    "methods": {"google": CONFIG.google, "password": bool(CONFIG.password)},
                                    "no_auth": CONFIG.no_auth,
+                                   "version": VERSION,  # shown in a corner of the dashboard: which server is running
                                    # The key is public by design (it ships in the app's bundle); the dashboard shows it
                                    # to whoever signed in, for the setup snippet.
                                    "projects": [{"name": p["name"], "url": p["url"], "key": k, "origins": p["origins"],
