@@ -46,6 +46,21 @@ test('map draws the screen that has a layout', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
+test('the map tab: time between clicks, exits to other screens, and the real screen as a secondary link', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'map', '&route=/tickets')
+  await expect(page.locator('.card', { hasText: 'Saídas para outras telas' })).toContainText(/Home|Users/)
+  const unit = page.locator('#map-step-unit')
+  await expect(page.locator('#map-step')).toHaveValue('30')
+  const asked = page.waitForRequest((r) => r.url().includes('/api/usage') && r.url().includes('route=') && r.url().includes('step=0'))
+  await unit.selectOption('none')
+  await asked
+  await expect(page.locator('#map-step')).toHaveCount(0)
+  await expect(page.locator('.mapbar [data-open-map]')).toHaveCount(0) // the real screen is a link below, not the main bar
+  await expect(page.locator('.mapopen')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test.describe('tour', () => {
   for (const tab of TABS) {
     test(`${tab}: opens, moves and closes`, async ({ page }) => {

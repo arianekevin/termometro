@@ -204,6 +204,8 @@ point: what you can do there, a tip and a day-to-day example. The tabs come in g
   - **Routes:** the most common next step after each element, as a list; hover a step to see its arrow on the screen,
     click it for everything before and after. It also lists which screen people leave to right after a click. The
     longest time between two clicks of a route is picked on the map (30 s by default; seconds, minutes or no limit).
+  - The main map is the screen's drawing, in the dashboard, with nothing from anyone's account; seeing it over the app
+    (with your account) is a link at the bottom of the page.
   - **Whose:** everyone, or one role, person or account. What others clicked that your screen does not have (another
     role, setting or record) is listed apart instead of lost.
   - What a click opens (a dialog, a menu) is part of the drawing. **Open with the heat** and **Open with the routes**

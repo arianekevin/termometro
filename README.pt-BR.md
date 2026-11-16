@@ -184,6 +184,8 @@ o que dá para fazer ali, uma dica e um exemplo do dia a dia. As abas vêm em gr
     seta na tela, clique para ver tudo o que vem antes e depois. Também lista para qual tela as pessoas saem logo
     depois de um clique. O tempo máximo entre dois cliques de uma rota se escolhe no mapa (padrão 30 s, em segundos,
     minutos ou sem limite).
+  - O mapa principal é o desenho da tela, no painel, sem nada da conta de ninguém; ver por cima do app (com a sua conta)
+    fica como link no fim da página.
   - **De quem:** todo mundo, ou só um papel, uma pessoa ou uma conta. O que outras pessoas clicaram e não existe na
     sua tela (outro papel, outra configuração, outro registro) aparece numa lista à parte, em vez de sumir.
   - O que um clique abre (uma janela, um menu) entra no desenho. **Abrir com o calor** e **Abrir com as rotas**
