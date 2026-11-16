@@ -689,6 +689,9 @@ class Server(unittest.TestCase):
         call(self.base, "/api/names?project=shop", {"kind": "account", "key": "4821", "name": "Acme"}, cookie=self.cookie)
         self.assertEqual(self.read("/api/names?project=shop")["accounts"]["4821"], "Acme")
 
+    def test_the_server_queues_a_burst_of_connections_instead_of_resetting_them(self):
+        self.assertGreaterEqual(t.Server.request_queue_size, 128)  # the standard library's 5 reset a dashboard's reads
+
     def test_me_says_which_version_of_the_server_runs(self):
         self.assertEqual(self.read("/api/me")["version"], t.VERSION)
 

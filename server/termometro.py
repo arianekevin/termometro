@@ -2582,6 +2582,12 @@ STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/termometro_mcp.py": ("termometro_mcp.py", "text/x-python; charset=utf-8")}
 
 
+class Server(ThreadingHTTPServer):
+    """The standard library's default backlog is 5 waiting connections: a dashboard opening a dozen reads at once, or a
+    burst of apps sending events, saw the rest reset (ERR_CONNECTION_RESET). The kernel caps it anyway."""
+    request_queue_size = 128
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = f"termometro/{VERSION}"
 
@@ -2917,7 +2923,7 @@ def main(argv: list[str]) -> None:
     threading.Thread(target=daily_retention, daemon=True).start()
     if any(p["webhook"] for p in CONFIG.projects.values()):
         threading.Thread(target=hourly_alerts, daemon=True).start()
-    server = ThreadingHTTPServer((CONFIG.host, CONFIG.port), Handler)
+    server = Server((CONFIG.host, CONFIG.port), Handler)
     names = ", ".join(p["name"] for p in CONFIG.projects.values()) or "none"
     print(f"termometro {VERSION} on http://{CONFIG.host}:{CONFIG.port} — db {CONFIG.db} — projects: {names}", flush=True)
     server.serve_forever()
