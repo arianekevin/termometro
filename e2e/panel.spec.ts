@@ -348,3 +348,67 @@ test('phone: the open tab is in view, the tab bar hints it scrolls, the search h
   const [search, tour] = await Promise.all([page.locator('.search').boundingBox(), page.locator('#tour-open').boundingBox()])
   expect(search!.y).toBeGreaterThan(tour!.y + tour!.height - 1)
 })
+
+// A complaint handed to the devs: a person's or an account's sessions, each one opening whole in place.
+// SHOTS=<folder> also saves a screenshot of each, to look at.
+test.describe('sessions of a person or an account', () => {
+  const noScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  for (const width of WIDTHS) {
+    test(`a person's sessions open whole and close at ${width}px`, async ({ page }) => {
+      const errors = watch(page)
+      await page.setViewportSize({ width, height: 900 })
+      await open(page, 'people', '&user=u1')
+      const card = page.locator('section.sessions')
+      await expect(card.locator('.label').first()).toHaveText(/^Sessões de Person 1/)
+      const buttons = card.locator('button[data-session]')
+      expect(await buttons.count()).toBeGreaterThan(1)
+      await expect(card.locator('.spath').first()).toContainText(/Home|Tickets|Users/)
+      const first = buttons.first()
+      await first.click()
+      const opened = card.locator('tr[data-steps-of]:not([hidden])')
+      await expect(opened.locator('.steps li').first()).toBeVisible()
+      await expect(opened.locator('.meta')).toContainText('Sessão')
+      await expect(first).toHaveText('Fechar sessão')
+      if (process.env.SHOTS) await page.screenshot({ fullPage: true, path: `${process.env.SHOTS}/sessions-person-${width}.png` })
+      expect(await noScroll(page), 'horizontal page scroll').toBeLessThanOrEqual(0)
+      await first.click()
+      await expect(opened).toHaveCount(0)
+      expect(errors).toEqual([])
+    })
+
+    test(`an account's sessions say whose each one was at ${width}px`, async ({ page }) => {
+      const errors = watch(page)
+      await page.setViewportSize({ width, height: 900 })
+      await open(page, 'accounts', '&account=4821')
+      const card = page.locator('section.sessions')
+      await expect(card.locator('.label').first()).toHaveText(/^Sessões da conta 4821/)
+      await expect(card).toContainText(/Person [024]/) // the seed's account 4821 is u0, u2 and u4
+      await expect(card).not.toContainText(/Person [135]/)
+      await card.locator('button[data-session]').first().click()
+      await expect(card.locator('tr[data-steps-of]:not([hidden]) .steps li').first()).toBeVisible()
+      if (process.env.SHOTS) await page.screenshot({ fullPage: true, path: `${process.env.SHOTS}/sessions-account-${width}.png` })
+      expect(await noScroll(page), 'horizontal page scroll').toBeLessThanOrEqual(0)
+      expect(errors).toEqual([])
+    })
+  }
+
+  test('a single session in the period is said in words, and without a person or account there is no card', async ({ page }) => {
+    const errors = watch(page)
+    await page.goto(`${process.env.PANEL_URL}/#people?project=demo&days=1&user=u1`) // the seed gives each person one session a day
+    await expect(page.locator('section.sessions')).toContainText('Só uma sessão no período')
+    await expect(page.locator('section.sessions button[data-session]')).toHaveCount(1)
+    await open(page, 'people')
+    await expect(page.locator('section.sessions')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
+  test('a person found in search lands on their sessions', async ({ page }) => {
+    const errors = watch(page)
+    await open(page, 'overview')
+    await page.locator('#search').fill('Person 2')
+    await page.locator('#results a').first().click()
+    await expect(page.locator('a[data-tab="people"]')).toHaveAttribute('aria-current', 'page')
+    await expect(page.locator('section.sessions .label').first()).toHaveText(/^Sessões de Person 2/)
+    expect(errors).toEqual([])
+  })
+})

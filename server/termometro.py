@@ -15,6 +15,8 @@ and the API:
   GET  /api/failures   every failure, grouped by kind and message, per day │
   GET  /api/failure    one failure in depth (?signal=&detail=): stack, browsers, trails │
   GET  /api/session    everything one session did, in order (?session=) │
+  GET  /api/sessions   the sessions of the cuts (a person, an account…), newest first: when, version, who, screens │
+                       in order, clicks, signals, failures and the worst signal; the latest SESSIONS_LIST │
   GET  /api/journeys   time on screen, screen to screen, how far things are, actions that follow │
   GET  /api/funnel     sessions through ?steps=["page:/a","action:POST /b"] in order │
   GET  /api/report     everything above for the period in one document, with definitions; ?format=md for text │
@@ -1816,7 +1818,7 @@ def search(con, f: Filter) -> dict:
     for column, kind, param in (("user_id", "user", "user"), ("account", "account", "account")):
         for value, n in con.execute(f"""SELECT {column}, SUM(type = 'page') FROM events WHERE {f.sql} AND {column} != ''
                 AND {has.format(column)} GROUP BY {column} ORDER BY 2 DESC LIMIT {SEARCH_LIMIT}""", f.args + [text]):
-            out.append({"kind": kind, "label": value, "n": n, "link": {"tab": "people" if kind == "user" else "overview",
+            out.append({"kind": kind, "label": value, "n": n, "link": {"tab": "people" if kind == "user" else "accounts",
                                                                       "params": {param: value}}})
     # People and accounts by the names this server keeps for them (the app's people names, the dictionary's accounts).
     found = {(r["kind"], r["label"]) for r in out}
@@ -1936,6 +1938,55 @@ def session_trail(con, f: Filter) -> dict:
     return {"session": session, "user": who[0], "account": who[1], "role": who[2], "agent": who[3], "device": who[4],
             "steps": steps(rows), "truncated": len(rows) == SESSION_MAX}
 
+
+
+SESSIONS_LIST, SESSION_SCREENS = 100, 12
+
+
+def sessions(con, f: Filter) -> dict:
+    """The sessions that match the cuts (a person, an account, a version, a screen…), newest first, capped at
+    SESSIONS_LIST: what a complaint about "account 4821" needs before one session is opened whole (/api/session).
+    A session is told whole once picked — its screens, clicks and signals — even where the cut was one screen. Ids and
+    route keys only, never content."""
+    project = f.q.get("project", "")
+    total = con.execute(f"SELECT COUNT(DISTINCT session) FROM events WHERE {f.sql}", f.args).fetchone()[0]
+    picked = [s for (s,) in con.execute(f"""SELECT session FROM events WHERE {f.sql} GROUP BY session
+        ORDER BY MIN(at) DESC, session LIMIT {SESSIONS_LIST}""", f.args)]
+    if not picked:
+        return {"sessions": [], "total": total, "cap": SESSIONS_LIST}
+    marks = ",".join("?" * len(picked))
+    out: dict[str, dict] = {s: {"session": s, "start": None, "end": None, "version": "", "user": "", "name": "", "role": "",
+                                "account": "", "screens": [], "screens_total": 0, "clicks": 0, "signals": 0,
+                                "failures": 0, "kinds": {}, "worst": ""} for s in picked}
+    for session, kind, route, at, version, user, account, role in con.execute(f"""
+            SELECT session, type, route, at, version, user_id, account, role FROM events
+            WHERE project = ? AND at >= ? AND session IN ({marks}) AND type != 'inventory' ORDER BY at, id""",
+            [project, f.mark] + picked):
+        s = out[session]
+        s["start"] = s["start"] or at
+        s["end"] = at
+        s["version"] = version  # the last one seen: an update mid-session is told by its newest version
+        s["user"], s["account"], s["role"] = user or s["user"], account or s["account"], role or s["role"]
+        if kind == "page":
+            if not s["screens_total"] or s["last_route"] != route:  # a reload is not a new screen
+                s["screens_total"] += 1
+                if len(s["screens"]) < SESSION_SCREENS:
+                    s["screens"].append(route)
+            s["last_route"] = route
+        elif kind == "click":
+            s["clicks"] += 1
+        elif kind in WEIGHTS:
+            s["kinds"][kind] = s["kinds"].get(kind, 0) + 1
+            s["failures" if kind in FAILURE_WEIGHT else "signals"] += 1
+    people = dict(con.execute(f"SELECT user_id, name FROM people WHERE project = ? AND user_id IN ({marks})",
+                              [project] + [s["user"] for s in out.values()]))
+    for s in out.values():
+        s.pop("last_route", None)
+        s["name"] = people.get(s["user"], "")
+        # Worst first: the heaviest signal, a tie broken by how many times it came; the first one is the session's worst.
+        s["kinds"] = dict(sorted(s["kinds"].items(), key=lambda kv: (-WEIGHTS[kv[0]], -kv[1], kv[0])))
+        s["worst"] = next(iter(s["kinds"]), "")
+    return {"sessions": [out[s] for s in picked], "total": total, "cap": SESSIONS_LIST}
 
 MAX_JOURNEY_ROWS = 500_000
 SCREEN_CAP_MS = 30 * 60 * 1000  # longer than this on one screen is a tab left open, not reading
@@ -2522,7 +2573,7 @@ def follow(con, f: Filter, item: dict) -> str:
 
 READS = {"/api/ways": ways, "/api/patterns": patterns, "/api/product": product, "/api/features": features_report, "/api/engagement": engagement_read, "/api/summary": summary, "/api/usage": usage, "/api/people": people, "/api/actions": actions,
          "/api/compare": compare, "/api/overview": overview, "/api/search": search, "/api/failures": failures,
-         "/api/failure": failure, "/api/session": session_trail, "/api/journeys": journeys, "/api/funnel": funnel,
+         "/api/failure": failure, "/api/session": session_trail, "/api/sessions": sessions, "/api/journeys": journeys, "/api/funnel": funnel,
          "/api/report": report, "/api/follow": lambda con, f: {"items": follows_of(con, f)}}
 STATIC_FILES = {"/": ("index.html", "text/html; charset=utf-8"),
                 "/map.js": ("map.js", "text/javascript; charset=utf-8"),

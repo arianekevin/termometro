@@ -19,7 +19,8 @@ collects what users type or see, and it runs on your own server.
   (used a lot and far away = it deserves a better place), actions that tend to follow one another (bring them closer
   or merge them), where people come from and go to on each screen, and funnels you build from screens, actions and buttons.
 - **Usage:** most and least used screens, and the elements nobody clicks.
-- **People:** usage by role, account and user — ids only.
+- **People:** usage by role, account and user — ids only. Pick a person or an account to list their sessions, newest
+  first: screens in order, problems and every step of the whole session.
 - **Heat map:** each screen looking like your app (colours, blocks and lines of text, without the words) with three
   lenses: Heat (where people click most, blue to red), Problems (where it irritates most, with why for each element
   and what to do) and Routes (where people go next, with back-and-forth pairs marked). The same map opens over your
@@ -217,9 +218,12 @@ point: what you can do there, a tip and a day-to-day example. The tabs come in g
   frustration and who uses them. Picking a feature in Filters cuts the whole dashboard to it.
 
 **People**
-- **People:** use by role and by user (ids, and the name if you send it).
+- **People:** use by role and by user (ids, and the name if you send it). Click a person (or find them in search) to
+  see their sessions in the period, newest first: when, how long, version, the screens in order and the problems, with
+  "Whole session" for every step — what to hand the dev along with the complaint.
 - **Accounts:** each account with people per day, feature use, frustration and failures, and a warning when an
-  account's use drops (60% or more, out of its normal). "Worst first" sorts by what needs attention most.
+  account's use drops (60% or more, out of its normal). "Worst first" sorts by what needs attention most. An open
+  account lists the sessions of its people, each with its screens, problems and the whole session.
 
 **Settings**
 - **Dictionary:** the name people use for each screen, button, action, account and area. The whole dashboard then

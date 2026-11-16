@@ -19,7 +19,8 @@ não coleta o que o usuário digita ou vê e roda no seu próprio servidor.
   merece um lugar melhor), ações que costumam vir em sequência (aproximar ou juntar), de onde vêm e para onde vão em
   cada tela, e funis montados com telas, ações e botões.
 - **Uso:** telas mais e menos usadas, e os elementos que ninguém clica.
-- **Pessoas:** uso por papel, conta e usuário — só ids.
+- **Pessoas:** uso por papel, conta e usuário — só ids. Escolhida uma pessoa ou uma conta, as sessões dela, da mais
+  nova: telas na ordem, problemas e cada passo da sessão inteira.
 - **Mapa de calor:** cada tela com a cara do seu app (cores, blocos e linhas de texto, sem as palavras) e três
   lentes: Calor (onde mais clicam, do azul ao vermelho), Problemas (onde mais irrita, com o porquê de cada elemento
   e o que fazer) e Rotas (para onde as pessoas vão depois, com o vai e volta marcado). O mesmo mapa abre por cima do
@@ -197,9 +198,12 @@ o que dá para fazer ali, uma dica e um exemplo do dia a dia. As abas vêm em gr
   uso, frustração e quem usa. Escolher uma feature nos Filtros recorta o painel inteiro por ela.
 
 **Gente**
-- **Pessoas:** uso por papel e por usuário (ids, e o nome se você mandar).
+- **Pessoas:** uso por papel e por usuário (ids, e o nome se você mandar). Clique numa pessoa (ou ache pela busca) e
+  aparecem as sessões dela no período, da mais nova: quando, duração, versão, as telas na ordem e os problemas, com
+  "Sessão inteira" para ver cada passo — o que levar ao dev junto com a reclamação.
 - **Contas:** cada conta com pessoas por dia, uso das features, frustração e falhas, e um aviso quando o uso de uma
-  conta cai (60% ou mais, fora do normal dela). "Pior primeiro" ordena pelo que mais precisa de atenção.
+  conta cai (60% ou mais, fora do normal dela). "Pior primeiro" ordena pelo que mais precisa de atenção. Aberta uma
+  conta, as sessões de quem é dela, cada uma com as telas, os problemas e a sessão inteira.
 
 **Ajustes**
 - **Dicionário:** o nome que as pessoas usam para cada tela, botão, ação, conta e área. O painel inteiro passa a

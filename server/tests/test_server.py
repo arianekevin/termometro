@@ -787,7 +787,10 @@ class Server(unittest.TestCase):
         r = self.read("/api/search?project=shop&days=1&q=ORDERS")["results"]
         self.assertEqual(sorted({x["kind"] for x in r}), ["action", "element", "failure", "screen", "user"])
         self.assertEqual(next(x for x in r if x["kind"] == "element")["link"], {"tab": "usage", "params": {"route": "/orders"}})
-        self.assertEqual(self.read("/api/search?project=shop&days=1&q=acc-9")["results"][0]["kind"], "account")
+        # A person or an account lands where their sessions are listed.
+        self.assertEqual(self.read("/api/search?project=shop&days=1&q=acc-9")["results"][0]["link"],
+                         {"tab": "accounts", "params": {"account": "acc-9"}})
+        self.assertEqual(next(x for x in r if x["kind"] == "user")["link"], {"tab": "people", "params": {"user": "u-orders-1"}})
         self.assertEqual(self.read("/api/search?project=shop&days=1&q=o")["results"], [])  # too short to mean anything
 
     def test_events_take_the_browser_time_lined_up_with_the_server_and_keep_browser_and_stack(self):
@@ -847,6 +850,54 @@ class Server(unittest.TestCase):
         whole = self.read("/api/session?project=shop&days=1&session=s1")
         self.assertEqual(([s["type"] for s in whole["steps"]], whole["user"]), (["page", "click", "js_error", "click"], "u-s1"))
         self.assertEqual(self.read("/api/failure?project=shop&days=1&signal=js_error&detail=nope")["n"], 0)
+
+    def test_sessions_of_a_person_or_an_account_newest_first_with_their_screens_and_problems(self):
+        sent = int(time.time() * 1000)
+        page = lambda route, at: {"type": "page", "route": route, "t": sent - at}
+        self.send([page("/users", 90_000), page("/users", 80_000), {"type": "click", "route": "/users", "target": "button#save", "t": sent - 70_000},
+                   {"type": "rage", "route": "/users", "target": "button#save", "t": sent - 60_000},
+                   {"type": "js_error", "route": "/users", "detail": "TypeError: secret", "t": sent - 55_000},
+                   page("/users/:id", 50_000), page("/users", 40_000)],
+                  session="a", user="u1", account="acme", role="Admin", user_name="Ana Lima", version="1.0", sent=sent)
+        self.send([page("/home", 20_000), {"type": "click", "route": "/home", "target": "a#x", "t": sent - 10_000}],
+                  session="b", user="u1", account="acme", role="Admin", version="1.1", sent=sent)
+        self.send([page("/reports", 30_000)], session="c", user="u2", account="beta", sent=sent)
+        mine = self.read("/api/sessions?project=shop&days=1&user=u1")
+        self.assertEqual(([s["session"] for s in mine["sessions"]], mine["total"]), (["b", "a"], 2))
+        b, a = mine["sessions"]
+        self.assertEqual((a["screens"], a["screens_total"], a["clicks"], a["signals"], a["failures"], a["worst"]),
+                         (["/users", "/users/:id", "/users"], 3, 1, 1, 1, "js_error"))
+        self.assertEqual((a["user"], a["name"], a["role"], a["account"], a["version"]), ("u1", "Ana Lima", "Admin", "acme", "1.0"))
+        self.assertEqual((a["end"] - a["start"], list(a["kinds"]), b["worst"], b["kinds"]), (50_000, ["js_error", "rage"], "", {}))
+        self.assertEqual([s["session"] for s in self.read("/api/sessions?project=shop&days=1&account=beta")["sessions"]], ["c"])
+        # Every cut applies: a screen picks the sessions that went through it, each still told whole.
+        [only] = self.read("/api/sessions?project=shop&days=1&route=/users/:id")["sessions"]
+        self.assertEqual((only["session"], only["clicks"]), ("a", 1))
+        # Ids and route keys, never what was clicked or said.
+        status, _, body = call(self.base, "/api/sessions?project=shop&days=1&user=u1", cookie=self.cookie)
+        self.assertNotIn(b"button#save", body)
+        self.assertNotIn(b"secret", body)
+
+    def test_sessions_are_capped_and_a_long_way_is_cut(self):
+        sent = int(time.time() * 1000)
+        for i in range(4):
+            self.send([{"type": "page", "route": f"/s{n}", "t": sent - 100_000 + i * 1000 + n} for n in range(20)],
+                      session=f"s{i}", account="acme", sent=sent)
+        old = t.SESSIONS_LIST
+        t.SESSIONS_LIST = 3
+        try:
+            r = self.read("/api/sessions?project=shop&days=1&account=acme")
+        finally:
+            t.SESSIONS_LIST = old
+        self.assertEqual(([s["session"] for s in r["sessions"]], r["total"], r["cap"]), (["s3", "s2", "s1"], 4, 3))
+        first = r["sessions"][0]
+        self.assertEqual((len(first["screens"]), first["screens_total"], first["screens"][:2]), (t.SESSION_SCREENS, 20, ["/s0", "/s1"]))
+
+    def test_sessions_need_the_dashboard_not_the_map_token(self):
+        self.send([{"type": "page", "route": "/a"}], user="u1")
+        token = json.loads(call(self.base, "/api/map-token?project=shop", {}, method="POST", cookie=self.cookie)[2])["token"]
+        self.assertEqual(call(self.base, "/api/sessions?project=shop&user=u1", origin=ORIGIN, token=token)[0], 401)
+        self.assertEqual(call(self.base, "/api/sessions?project=shop&user=u1")[0], 401)
 
     def test_failures_have_a_count_per_day_and_the_detail_names_its_accounts_people_and_last_version(self):
         self.send([{"type": "js_error", "route": "/a", "detail": "E1"}] * 3, session="s1", user="u1", account="acme")

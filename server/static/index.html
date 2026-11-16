@@ -188,6 +188,10 @@ pre.stack { margin: 8px 0 0; padding: 10px 12px; background: var(--sunken); bord
 .trails { display: grid; gap: 12px; margin-top: 8px; }
 .trail { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .steps { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+/* A person's or an account's sessions: the screens as a short path, the problems as chips. */
+.spath { overflow-wrap: anywhere; } .spath > span { white-space: nowrap; } .spath i { font-style: normal; color: var(--faint); }
+.schips { display: inline-flex; flex-wrap: wrap; gap: 4px; } .swhen { white-space: nowrap; }
+.sessions td > button[data-session] { white-space: nowrap; }
 .steps li { display: flex; gap: 10px; padding: 3px 6px; border-radius: 4px; overflow-wrap: anywhere; }
 .steps .t { flex: 0 0 76px; text-align: right; color: var(--faint); font-size: 12px; }
 .steps li.sig { color: var(--warn); } .steps li.here { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
@@ -644,6 +648,7 @@ const HELP_PT = {
   pairs: ['O que é', 'Ações que costumam vir uma logo depois da outra, e o esforço entre elas.', 'Par marcado como "juntas" e com muitos cliques no meio sugere juntar as duas numa tela ou num passo só.'],
   flow: ['O que é', 'Para a tela escolhida: de quais telas as pessoas chegam e para quais vão em seguida, em porcentagem das passagens. "Saíram do app" é onde a sessão terminou.', 'Saída alta numa tela do meio de um fluxo indica abandono. Ida e volta frequente entre duas telas sugere que falta informação numa delas.'],
   funnel: ['O que é', 'Uma sequência de telas e ações, e quantas sessões chegam a cada passo, na ordem.', 'O passo com a maior perda é onde o fluxo trava. Veja a frustração e as falhas daquela tela.'],
+  sessions: ['O que é', 'As sessões da pessoa ou da conta escolhida no período, da mais nova para a mais antiga: quando, quanto durou, a versão, as telas na ordem (uma recarga não conta como tela nova) e os sinais e falhas, o pior primeiro. "Sessão inteira" abre cada passo. Nada do que foi digitado aparece, só telas, botões e ações.', 'Para levar uma reclamação ao time: ache a sessão do dia em que o cliente reclamou, abra a sessão inteira e copie o link da página, que já vem filtrada.'],
   byUser: ['O que é', 'Uso e frustração por pessoa, só pelo id. Clique numa pessoa para filtrar o painel por ela.', 'Frustração alta em poucas pessoas costuma ser treinamento; espalhada por todos, é a tela.'],
   effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo. "Até a tela" são os cliques no caminho até a tela da ação; "na tela", os cliques nela.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
@@ -685,6 +690,7 @@ const HELP_EN = {
   pairs: ['What it is', 'Actions that usually come one right after the other, and the effort between them.', 'A pair marked "together" with many clicks in between suggests merging them into one screen or step.'],
   flow: ['What it is', 'For the chosen screen: which screens people come from and which they go to next, as a share of the passages. "Left the app" is where the session ended.', 'A high exit in the middle of a flow points to abandonment. Frequent back and forth between two screens suggests one of them lacks information.'],
   funnel: ['What it is', 'A sequence of screens and actions, and how many sessions reach each step, in order.', 'The step with the biggest loss is where the flow gets stuck. See that screen\'s frustration and failures.'],
+  sessions: ['What it is', 'The sessions of the chosen person or account in the period, newest first: when, how long, the version, the screens in order (a reload is not a new screen) and the signals and failures, the worst first. "Whole session" opens every step. Nothing typed shows, only screens, buttons and actions.', 'To hand a complaint to the team: find the session of the day the customer complained, open the whole session and copy the page link, already filtered.'],
   byUser: ['What it is', 'Use and frustration per person, by id only. Click a person to narrow the dashboard to them.', 'High frustration in a few people is usually training; spread over everyone, it is the screen.'],
   effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done. "On the way" are the clicks to reach the action\'s screen; "on the screen", the clicks on it.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
@@ -2612,6 +2618,19 @@ document.addEventListener('click', (e) => {
 }, true)
 
 async function showSession(button) {
+  // In a list of sessions the steps open in the row under the session and the button closes them again; in a failure's
+  // trail the whole session takes the place of the steps around the failure.
+  const under = button.closest('tbody')?.querySelector(`tr[data-steps-of="${CSS.escape(button.dataset.session)}"]`)
+  if (under) {
+    const open = under.hidden
+    under.hidden = !open; button.setAttribute('aria-expanded', String(open)); button.textContent = open ? SS().close : F().fullSession
+    if (!open || under.dataset.read) return
+    const s = await read('/api/session', { session: button.dataset.session })
+    under.dataset.read = '1'
+    under.querySelector('.meta').innerHTML = [`<b>${F().session} ${esc(short(s.session))}</b>`, ...whoHtml(s), s.truncated ? F().truncated : ''].filter(Boolean).join(' · ')
+    under.querySelector('.steps').innerHTML = stepsHtml(s.steps, () => false)
+    return
+  }
   const box = button.closest('.trail'), zero = Number(box.dataset.zero)
   const s = await read('/api/session', { session: button.dataset.session })
   box.querySelector('.steps').innerHTML = stepsHtml(s.steps, (x) => x.at === zero && isFailure(x))
@@ -2754,12 +2773,52 @@ async function openMap(route = '', mode = 'heat') {
   window.open(target.href, '_blank', 'noopener')
 }
 
+// Sessions of a person or an account -------------------------------------------------------------------------
+// What someone went through, for a complaint handed to the devs: the cut's sessions, newest first, each one opening
+// whole in place (showSession). Words kept apart from L, which several hands change.
+const SS_PT = { ofUser: (n) => `Sessões de ${n}`, ofAccount: (n) => `Sessões da conta ${n}`,
+  hint: 'Da mais nova para a mais antiga: quando, quanto durou, a versão, as telas na ordem e o que deu errado. "Sessão inteira" mostra cada passo.',
+  when: 'Quando', screens: 'Telas', problems: 'Problemas', who: 'Quem', ok: 'nenhum', more: (n) => `+${n}`, moreTip: (n) => `mais ${n} telas`,
+  noScreen: 'nenhuma tela aberta', close: 'Fechar sessão', clicks: (n) => plural(n, 'clique', 'cliques'),
+  noneUser: 'Nenhuma sessão desta pessoa no período.', noneAccount: 'Nenhuma sessão desta conta no período.',
+  one: 'Só uma sessão no período: amplie o período no topo para ver mais.', capped: (n, t) => `Mostrando as ${num(n)} mais recentes de ${num(t)}.` }
+const SS_EN = { ofUser: (n) => `Sessions of ${n}`, ofAccount: (n) => `Sessions of account ${n}`,
+  hint: 'Newest first: when, how long, the version, the screens in order and what went wrong. "Whole session" shows every step.',
+  when: 'When', screens: 'Screens', problems: 'Problems', who: 'Who', ok: 'none', more: (n) => `+${n}`, moreTip: (n) => `${n} more screens`,
+  noScreen: 'no screen opened', close: 'Close session', clicks: (n) => plural(n, 'click', 'clicks'),
+  noneUser: 'No sessions of this person in the period.', noneAccount: 'No sessions of this account in the period.',
+  one: 'Only one session in the period: widen the period at the top to see more.', capped: (n, t) => `Showing the latest ${num(n)} of ${num(t)}.` }
+const SS = () => (PT ? SS_PT : SS_EN)
+const lasted = (ms) => offset(ms).replace(/^\+/, '')
+const sessionChips = (x) => Object.keys(x.kinds).length ? `<span class="schips">${Object.entries(x.kinds).map(([k, n]) =>
+  `<span class="pill ${isFailure({ type: k }) ? 'bad' : 'warn'}">${esc(L.names[k] ?? k)}${n > 1 ? ` ${num(n)}` : ''}</span>`).join('')}</span>` : `<span class="meta">${SS().ok}</span>`
+const sessionPath = (x) => x.screens.length ? `<span class="spath">${x.screens.map((r) => `<span title="${esc(r)}">${esc(screenText(r) || r)}</span>`).join('<i aria-hidden="true"> → </i>')}${
+  x.screens_total > x.screens.length ? ` <span class="meta" title="${esc(SS().moreTip(x.screens_total - x.screens.length))}">${SS().more(x.screens_total - x.screens.length)}</span>` : ''}</span>` : `<span class="meta">${SS().noScreen}</span>`
+// On a phone the screens go to the row's second line, full width. Shown when the user or account filter is on (Pessoas, Contas); nothing otherwise. The person wins over the account.
+async function sessionsCard() {
+  const account = $('#account').value, S = SS()
+  if (!state.user && !account) return ''
+  const r = await read('/api/sessions'), list = r.sessions, byWho = !state.user
+  const title = state.user ? S.ofUser(personName(state.user) || `${L.user} ${short(state.user)}`) : S.ofAccount(accountText(account))
+  const person = (x) => x.user ? (x.name || personName(x.user) ? `<span class="nm">${esc(x.name || personName(x.user))}</span>` : `<code title="${esc(x.user)}">${esc(short(x.user))}</code>`) : '—'
+  const note = !list.length ? (state.user ? S.noneUser : S.noneAccount) : r.total === 1 ? S.one : r.total > list.length ? S.capped(list.length, r.total) : ''
+  return `<section class="card sessions"><div class="label">${esc(title)}${help('sessions')}</div><div class="meta">${S.hint}</div>
+    ${note ? `<p class="meta">${note}</p>` : ''}
+    ${list.length ? table(`<th>${S.when}</th>${byWho ? `<th data-lo>${S.who}</th>` : ''}<th data-lo>${L.version}</th><th data-lo>${S.screens}</th><th data-lo>${S.problems}</th><th data-nocsv><span class="sr">${F().fullSession}</span></th>`,
+      list.map((x) => `<tr><td class="swhen"><b>${when(x.start)}</b><div class="meta">${lasted(x.end - x.start)} · ${S.clicks(x.clicks)}</div></td>
+        ${byWho ? `<td data-lo>${person(x)}${x.role ? `<div class="meta">${esc(x.role)}</div>` : ''}</td>` : ''}<td data-lo><code>${esc(x.version)}</code></td>
+        <td data-lo>${sessionPath(x)}</td><td data-lo>${sessionChips(x)}</td>
+        <td data-nocsv><button class="small" data-session="${esc(x.session)}" aria-expanded="false">${F().fullSession}</button></td></tr>
+        ${subRow([[S.screens, sessionPath(x)], byWho && [S.who, person(x)], [L.version, `<code>${esc(x.version)}</code>`], [S.problems, sessionChips(x)]])}
+        <tr class="detail" data-steps-of="${esc(x.session)}" hidden><td colspan="12"><div class="meta"></div><ol class="steps"></ol></td></tr>`).join('')) : ''}</section>`
+}
+
 // People ---------------------------------------------------------------------------------------------------
 // The account's name (the id when it has none), as a link to Contas filtered to it.
 const accLink = (id) => id ? `<a class="acc-link" ${linkAttrs({ tab: 'accounts', params: { account: id } })}>${esc(accountText(id))}</a>` : ''
 async function people() {
-  const p = await read('/api/people')
-  if (!p.roles.length && !p.users.length && !p.accounts.length) return empty(L.noPeople)
+  const [p, sess] = await Promise.all([read('/api/people'), sessionsCard()])
+  if (!p.roles.length && !p.users.length && !p.accounts.length) return sess + empty(L.noPeople)
   const top = (ss) => ss.map((s) => `<span title="${esc(s.route)}">${esc(screenText(s.route) || s.route)}</span> <span class="meta">${num(s.visits)}</span>`).join('<br>')
   const group = (title, hint, list, col, name = (k) => esc(k)) => `<div class="card"><div class="label">${title}</div><div class="meta">${hint}</div>
     ${table(`<th>${col}</th><th class="n" data-lo>${L.users}</th><th class="n">${L.visits}</th><th class="n" data-lo>${L.clicks}</th><th class="n" data-lo>${L.score}</th><th data-lo>${L.topScreens}</th>`,
@@ -2767,7 +2826,7 @@ async function people() {
         <td class="n" data-lo>${num(g.clicks)}</td><td class="n" data-lo>${scoreHtml(g.score)}${scoreDelta(g.score, g.before?.score)}</td><td data-lo>${top(g.screens)}</td></tr>
         ${subRow([[L.users, num(g.users)], [L.clicks, num(g.clicks)], [L.score, scoreHtml(g.score)]])}`).join(''))}</div>`
   // Per account lives on Contas, with trend, frustration and failures: here only the way there.
-  return `
+  return `${sess}
     ${p.roles.length ? group(L.byRole, L.roleHint, p.roles, L.role) : ''}
     ${p.accounts.length ? `<section class="card pointer"><span class="meta">${AC().inAccounts}</span><a class="button" ${linkAttrs({ tab: 'accounts', params: {} })}>${AC().openAccounts}</a></section>` : ''}
     <section class="card" data-scroll><div class="label">${L.byUser}${help('byUser')}</div><div class="meta">${L.userHint}</div>
@@ -3111,13 +3170,14 @@ async function accounts() {
   const e = await read('/api/engagement')
   const id = $('#account').value
   if (id) return accountDetail(e, id)
-  if (!e.accounts.length) return empty(AC().none)
+  const sess = await sessionsCard()
+  if (!e.accounts.length) return sess + empty(AC().none)
   const feats = e.features
   const down = e.accounts.filter((a) => a.trend === 'down').length
   const sort = state.accSort ?? recall('accSort') ?? 'trend'
   const rows = (state.accDown ? e.accounts.filter((a) => a.trend === 'down') : [...e.accounts])
   if (sort === 'worst') rows.sort((a, b) => painOf(b) - painOf(a))
-  return `<section class="card"><div class="label">${AC().title}${help('accounts')}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
+  return `${sess}<section class="card"><div class="label">${AC().title}${help('accounts')}</div><div class="meta">${AC().hint(Math.round(e.covered))} ${e.comparable ? '' : AC().noCompare} ${AC().open}</div>
     ${feats.length ? '' : `<p class="meta">${AC().noFeatures}</p>`}
     <div class="chips">${e.comparable ? `<button data-acc-down aria-pressed="${!!state.accDown}" ${down || state.accDown ? '' : 'disabled'}>${AC().onlyDown(down)}</button>` : ''}
       <span class="sep">${AC().sort}</span>${['trend', 'worst'].map((k) => `<button data-acc-sort="${k}" aria-pressed="${sort === k}">${k === 'trend' ? AC().byTrend : AC().worst}</button>`).join('')}</div>
@@ -3167,6 +3227,7 @@ async function accountDetail(e, id) {
       <div class="card"><div class="label">${AC().people}</div><div class="big">${num(a.now.users)}</div></div>
     </section>
     ${await accountPain()}
+    ${await sessionsCard()}
     ${barsChart(AC().pulse, days, (d) => d.users, (d) => AC().dayTip(d.day, d.users))}
     ${e.features.length ? `<section class="card"><div class="label">${AC().featureUses}</div>
       ${table(`<th>Feature</th><th class="n">${FT().uses}</th><th>${FT().usesByDay}</th>`, e.features.map((f) => { const x = a.features.find((y) => y.id === f.id)
