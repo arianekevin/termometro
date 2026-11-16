@@ -40,6 +40,9 @@ export interface Identity {
   /** Optional: the user's name, shown on the dashboard next to the id. Kept apart from the events, dropped with the
    *  retention, never in what an AI reads; a server whose project has "people_names": false throws it away. */
   name?: string | null
+  /** Optional: the account's name (your customer's company), shown on the dashboard next to the account's id. The
+   *  dashboard's dictionary still wins over it. */
+  accountName?: string | null
 }
 
 export interface Options {
@@ -139,7 +142,7 @@ export interface Look {
   /** Lines of text: `[x, y, width, height, colour]`, the words left out. */
   texts: Array<[number, number, number, number, string]>
 }
-interface Who { account: string; user: string; role: string; user_name?: string }
+interface Who { account: string; user: string; role: string; user_name?: string; account_name?: string }
 interface Queued { event: TrackedEvent; who: Who }
 
 const RAGE_CLICKS = 3
@@ -514,8 +517,9 @@ export function start(options: Options): Termometro {
       if (options.identity) id = options.identity()
     } catch { /* the app's store is not ready: anonymous */ }
     const text = (v: unknown) => (v === null || v === undefined ? '' : String(v))
-    const name = text(id?.name).trim().slice(0, 80)
-    return { account: text(id?.account), user: text(id?.user), role: text(id?.role), ...(name ? { user_name: name } : {}) }
+    const name = text(id?.name).trim().slice(0, 80), accountName = text(id?.accountName).trim().slice(0, 80)
+    return { account: text(id?.account), user: text(id?.user), role: text(id?.role), ...(name ? { user_name: name } : {}),
+      ...(accountName ? { account_name: accountName } : {}) }
   }
 
   const record = (event: TrackedEvent): TrackedEvent | undefined => {

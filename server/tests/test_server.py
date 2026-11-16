@@ -629,6 +629,15 @@ class Server(unittest.TestCase):
         u = self.read("/api/usage?project=shop&days=1&route=/tickets/:id&step=0")  # no limit
         self.assertEqual((u["step"], pairs(u)), (0, [("button#reply", "button#send", 2)]))
 
+    def test_an_account_takes_the_name_the_app_sends_and_the_dictionary_still_wins(self):
+        clk = {"type": "click", "route": "/users", "target": "button#new"}
+        self.send([{"type": "page", "route": "/users"}, clk], session="a", account="4821", account_name="Acme  Comércio Ltda")
+        self.send([{"type": "page", "route": "/users"}, clk], session="b", account="7001")
+        u = self.read("/api/usage?project=shop&days=1&route=/users")
+        self.assertEqual({x["id"]: x["name"] for x in u["who"]["account"]}, {"4821": "Acme Comércio Ltda", "7001": ""})
+        call(self.base, "/api/names?project=shop", {"kind": "account", "key": "4821", "name": "Acme"}, cookie=self.cookie)
+        self.assertEqual(self.read("/api/names?project=shop")["accounts"]["4821"], "Acme")
+
     def test_map_says_whose_clicks_it_shows_and_cuts_by_person_or_role(self):
         clk = {"type": "click", "route": "/users", "target": "button#new"}
         self.send([{"type": "page", "route": "/users"}, clk, clk], session="a", user="u1", role="Admin", user_name="Ana Lima")

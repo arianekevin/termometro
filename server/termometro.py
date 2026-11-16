@@ -215,6 +215,9 @@ def connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS people (
             project TEXT NOT NULL, user_id TEXT NOT NULL, name TEXT NOT NULL, last_seen INTEGER NOT NULL,
             PRIMARY KEY (project, user_id));
+        CREATE TABLE IF NOT EXISTS account_names (
+            project TEXT NOT NULL, account TEXT NOT NULL, name TEXT NOT NULL, last_seen INTEGER NOT NULL,
+            PRIMARY KEY (project, account));
         CREATE TABLE IF NOT EXISTS dictionary (
             project TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, at INTEGER NOT NULL,
             PRIMARY KEY (project, kind, key));
@@ -2154,10 +2157,11 @@ def names(con, project: str) -> dict:
         controls.setdefault(route + "\t" + target, label)
     actions = most_common(con.execute("""SELECT detail, label, COUNT(*) FROM events WHERE project = ? AND type = 'action'
         AND label != '' GROUP BY detail, label""", (project,)))
-    out = {"screens": screens, "controls": controls, "actions": actions, "accounts": {}, "areas": {},
+    accounts = dict(con.execute("SELECT account, name FROM account_names WHERE project = ?", (project,)))
+    out = {"screens": screens, "controls": controls, "actions": actions, "accounts": dict(accounts), "areas": {},
            "people": dict(con.execute("SELECT user_id, name FROM people WHERE project = ?", (project,))),
            "features": [{"id": x["id"], "name": x["name"], "rules": x["rules"]} for x in FEATURES.get(project, {}).values()],
-           "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions)}}
+           "auto": {"screens": dict(screens), "controls": dict(controls), "actions": dict(actions), "accounts": accounts}}
     # What the product team wrote in the dictionary wins over what the collector saw.
     for kind, key, name in con.execute("SELECT kind, key, name FROM dictionary WHERE project = ?", (project,)):
         out[DICTIONARY[kind]][key] = name
@@ -2210,6 +2214,14 @@ def name_of_person(batch: dict, project: dict) -> tuple[str, str] | None:
     return (user, name) if user and name and project["people_names"] else None
 
 
+def name_of_account(batch: dict) -> tuple[str, str] | None:
+    """The account's name as the app knows it (a customer's company), when it sends one: what the dashboard shows by
+    the account's id, unless the dictionary names it."""
+    account = text(batch.get("account"), "account")
+    name = " ".join(str(batch.get("account_name") or "").split())[:MAX_NAME]
+    return (account, name) if account and name else None
+
+
 def filters(con, project: str) -> dict:
     def distinct(column):
         return [v for (v,) in con.execute(
@@ -2228,6 +2240,7 @@ def apply_retention(con, now: float | None = None) -> int:
     removed = con.execute("DELETE FROM events WHERE at < ?", (cutoff,)).rowcount
     con.execute("DELETE FROM elements WHERE last_seen < ?", (cutoff,))
     con.execute("DELETE FROM layouts WHERE at < ?", (cutoff,))
+    con.execute("DELETE FROM account_names WHERE last_seen < ?", (cutoff,))
     con.execute("DELETE FROM people WHERE last_seen < ?", (cutoff,))  # a name leaves with the person's last event
     return removed
 
@@ -2664,7 +2677,11 @@ class Handler(BaseHTTPRequestHandler):
         # A person's name, if the app sends it and the project keeps names: apart from the events, by id, for the
         # dashboard only (never in the report or the MCP server an AI reads).
         person = name_of_person(batch, project)
+        account = name_of_account(batch)
         with connect() as con:
+            if account:
+                con.execute("INSERT INTO account_names (project, account, name, last_seen) VALUES (?, ?, ?, ?) ON CONFLICT (project, account) "
+                            "DO UPDATE SET name = excluded.name, last_seen = excluded.last_seen", (name, *account, int(time.time() * 1000)))
             if person:
                 con.execute("INSERT INTO people (project, user_id, name, last_seen) VALUES (?, ?, ?, ?) ON CONFLICT (project, user_id) "
                             "DO UPDATE SET name = excluded.name, last_seen = excluded.last_seen", (name, *person, int(time.time() * 1000)))
