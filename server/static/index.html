@@ -443,6 +443,11 @@ a.widen { min-height: 36px; padding: 6px 14px; border: 1px solid var(--fill); te
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #marks-open { max-width: 280px; min-width: 0; justify-content: flex-start; }
+#share-open { white-space: nowrap; }
+.share { display: grid; gap: 4px; width: min(260px, calc(100vw - 32px)); padding: 8px; }
+.share button { width: 100%; justify-content: flex-start; text-align: left; }
+.share button.done { border-color: var(--accent); background: var(--accent-soft); }
+.tile .unit { color: var(--fg2); }
 #prefs-open { width: 36px; padding: 0; font-size: 18px; letter-spacing: 1px; }
 .fpanel[hidden] { display: none; }
 .fpanel { width: min(320px, calc(100vw - 32px)); gap: 10px; }
@@ -476,8 +481,9 @@ header.busy .progress { opacity: 1; transition-delay: .12s; }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (max-width: 640px) {
   .top { gap: 8px; padding: 8px 16px; } .top .mark { margin-right: 0; } .mark .brand-name { display: none; }
-  .search { order: 1; flex: 1 1 0; min-width: 0; max-width: none; } .f-more { order: 2; } .who { order: 3; } .who .meta { display: none; }
-  .top::after { content: ""; order: 4; flex-basis: 100%; height: 0; }
+  /* First row: the brand and its buttons; the search gets a row of its own, then the period, filters and marks. */
+  .f-more { order: 1; } .who { order: 2; } .who .meta { display: none; }
+  .search { order: 3; flex: 1 1 100%; min-width: 0; max-width: none; }
   .f-days { order: 5; } .f-days .meta { display: none; } .f-open { order: 6; } .f-marks { order: 7; flex: 1 1 0; min-width: 0; }
   #marks-open { width: 100%; max-width: none; }
   .tg { padding-top: 4px; } .tgroup.tg-config { margin-left: 0; }
@@ -640,7 +646,7 @@ const HELP_PT = {
   byUser: ['O que é', 'Uso e frustração por pessoa, só pelo id. Clique numa pessoa para filtrar o painel por ela.', 'Frustração alta em poucas pessoas costuma ser treinamento; espalhada por todos, é a tela.'],
   effort: ['O que é', 'Cada gravação aceita pelo servidor, com os cliques e o tempo desde a anterior: o esforço para conseguir fazer aquilo. "Até a tela" são os cliques no caminho até a tela da ação; "na tela", os cliques nela.', 'Ação frequente com muitos cliques ou muito tempo é candidata a simplificar.'],
   compare: ['O que é', 'Uma versão contra outra: frustração por tela, esforço por ação e falhas que só a nova tem.', 'Variação positiva grande é regressão do deploy; falha que só a nova tem é bug introduzido por ela.'],
-  release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas a cada 100 sessões. O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
+  release: ['O que é', 'A versão mais nova contra a anterior, por visita e por sessão: a frustração (pontos dos sinais por visita) e as falhas por sessão (o esperado é 0). O volume de visitas fica só como contexto, porque cada versão ficou no ar por um tempo diferente. Variação de até 2 pontos na frustração conta como igual.', 'Piorou logo depois do deploy: abra as telas que mais pioraram. Se a versão anterior já saiu do período, a comparação amplia sozinha até ela.'],
   follow: ['O que é', 'O que você decidiu corrigir. Ao clicar em Acompanhar, o valor de hoje vira a linha de base: a frustração da tela, as falhas a cada 100 sessões, os cliques por vez da ação ou as pessoas por dia da conta. Depois, o mesmo número é medido só com o que veio desde então, com os filtros em uso.', 'Melhorou ou piorou só quando a mudança passa da tolerância (5 pontos de frustração, ou 20% nas outras medidas); dentro dela é Igual. Sem dados ainda: ninguém passou por ali desde que começou.'],
   since: ['O que é', 'A linha sob o veredito: o que mudou desde a versão mais nova, quando ela chegou nos últimos 7 dias, ou senão nas últimas 24 horas, contra o mesmo tempo logo antes. Não depende do período escolhido; segue o marco e os filtros. Uma tela piorou ou melhorou quando a frustração mudou 10 pontos ou mais, com pelo menos 10 visitas nos dois lados; uma falha é nova quando nunca tinha aparecido antes; uma falha parou quando sumiu depois de acontecer além do acaso.', 'De manhã, comece por aqui: cada etiqueta abre a evidência. "Pouco dado" quer dizer que ainda não dá para comparar, não que está tudo bem.'],
   todo: ['O que é', 'Tudo o que fugiu do normal, numa lista só: bugs, irritação, contas esfriando e sugestões. A ordem é a gravidade vezes o alcance: quantas sessões e pessoas foram atingidas.', 'Comece pelo topo. "Ver evidência" leva à aba que prova o problema; "Copiar como demanda" gera o texto para o backlog. Sugestões são hipóteses para o produto validar, não ordens.'],
@@ -681,7 +687,7 @@ const HELP_EN = {
   byUser: ['What it is', 'Use and frustration per person, by id only. Click a person to narrow the dashboard to them.', 'High frustration in a few people is usually training; spread over everyone, it is the screen.'],
   effort: ['What it is', 'Each write the server accepted, with the clicks and time since the previous one: the effort to get it done. "On the way" are the clicks to reach the action\'s screen; "on the screen", the clicks on it.', 'A frequent action with many clicks or much time is a candidate to simplify.'],
   compare: ['What it is', 'One version against another: frustration per screen, effort per action and failures only the newer one has.', 'A big positive change is a deploy regression; a failure only the newer one has is a bug it brought.'],
-  release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per 100 sessions. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
+  release: ['What it is', 'The newest version against the one before, per visit and per session: frustration (signal points per visit) and failures per session. Visit volume is only context, since each version was live for a different time. A change of up to 2 points in frustration counts as the same.', 'Worse right after the deploy: open the screens that got worse the most. If the previous version is already out of the period, the comparison widens to reach it.'],
   follow: ['What it is', 'What you decided to fix. Clicking Follow keeps today\'s value as the baseline: the screen\'s frustration, failures per 100 sessions, the action\'s clicks per use or the account\'s people a day. Afterwards the same number is measured only on what came since, with the filters in use.', 'Improved or worse only when the change goes past the tolerance (5 frustration points, or 20% for the other measures); within it, Same. No data yet: nobody went there since it started.'],
   since: ['What it is', 'The line under the verdict: what changed since the newest version, when it arrived in the last 7 days, or else in the last 24 hours, against the same length of time just before. It does not follow the chosen period; it follows the mark and the filters. A screen got worse or better when its frustration moved 10 points or more, with at least 10 visits on both sides; a failure is new when it had never shown up before; a failure stopped when it vanished after happening beyond chance.', 'In the morning, start here: each chip opens the evidence. "Too little data" means it cannot compare yet, not that all is well.'],
   todo: ['What it is', 'Everything out of the ordinary, in one list: bugs, irritation, accounts cooling down and suggestions. The order is severity times reach: how many sessions and people were affected.', 'Start at the top. "See evidence" goes to the tab that proves it; "Copy as a request" writes the text for the backlog. Suggestions are hypotheses for the product team to check, not orders.'],
@@ -829,7 +835,7 @@ const L = PT ? {
   },
   tabs: { overview: 'Início', product: 'Produto', frustration: 'Frustração', failures: 'Falhas', usage: 'Uso', journeys: 'Jornadas', map: 'Mapa', people: 'Pessoas', actions: 'Ações', versions: 'Versões', features: 'Features', accounts: 'Contas', dictionary: 'Dicionário' },
   nav: { label: 'Seções do painel', groups: { summary: 'Resumo', problems: 'Problemas', usage: 'Uso', people: 'Gente', config: 'Ajustes' } },
-  bar: { filters: 'Filtros', clear: 'Limpar filtros', done: 'Fechar', active: 'Filtros ativos', remove: (f) => `Tirar o filtro ${f}`, more: 'Aparência',
+  bar: { filters: 'Filtros', clear: 'Limpar filtros', clearAll: 'Limpar tudo', done: 'Fechar', active: 'Filtros ativos', remove: (f) => `Tirar o filtro ${f}`, more: 'Aparência',
     loading: 'Carregando…', loaded: (t) => `${t} carregado` },
   prod: { areas: 'Áreas do produto', areasHint: 'Telas agrupadas por área. Clique numa área para ver as telas dela.', area: 'Área', screens: 'Telas', share: 'das visitas',
     adoption: 'Adoção', score: 'Frustração', failures: 'Falhas', trend: 'Visitas por dia', low: 'Visto e pouco usado', lowHint: (p) => `Botões que apareceram em muitas sessões e foram clicados em menos de ${p}% delas.`,
@@ -1023,7 +1029,7 @@ const L = PT ? {
   compareHint: 'Mesmo período e filtros, separados por versão. Frustração maior na versão nova é piora.', change: 'Variação',
   screensCompared: 'Telas, da que mais piorou para a que mais melhorou', actionsCompared: 'Ações: cliques e tempo (medianas)',
   newFailures: 'Falhas que só a versão nova tem', noNewFailures: 'Nenhuma falha nova.', onlyIn: (v) => `só na ${v}`, worse: 'piorou', better: 'melhorou', same: 'igual',
-  rel: { title: (b, a) => `Versão ${b} vs ${a}`, scorePer: 'Frustração por visita', failPer: 'Falhas por 100 sessões', volume: (a, b) => `Volume: ${a} → ${b} visitas (só contexto: cada versão ficou no ar um tempo)`,
+  rel: { title: (b, a) => `Versão ${b} vs ${a}`, scorePer: 'Frustração por visita', failPer: 'Falhas por sessão', failExpect: 'esperado: 0', volume: (a, b) => `Volume: ${a} → ${b} visitas (só contexto: cada versão ficou no ar um tempo)`,
     worst: 'Telas que mais pioraram', worstVs: (a) => `contra a versão ${a}`, noWorse: 'Nenhuma tela piorou.', open: 'Ver em Versões', widened: (n) => `Comparadas em ${n} dias: a versão anterior saiu do período escolhido.`,
     onlyOne: (b) => `Só a versão ${b} neste período.`, prevHint: (a, n) => `A anterior, ${a}, aparece ampliando o período para ${n} dias.`,
     widen: (n) => `Comparar com a versão anterior (amplia para ${n} dias)`, noPrev: 'Não há versão anterior nos dados guardados.', sinceMark: 'Não há versão anterior desde o marco em uso. Escolha "Todo o período" em Marcos para ver as outras.',
@@ -1098,7 +1104,7 @@ const L = PT ? {
   },
   tabs: { overview: 'Overview', product: 'Product', frustration: 'Frustration', failures: 'Failures', usage: 'Usage', journeys: 'Journeys', map: 'Map', people: 'People', actions: 'Actions', versions: 'Versions', features: 'Features', accounts: 'Accounts', dictionary: 'Dictionary' },
   nav: { label: 'Dashboard sections', groups: { summary: 'Summary', problems: 'Problems', usage: 'Usage', people: 'People', config: 'Settings' } },
-  bar: { filters: 'Filters', clear: 'Clear filters', done: 'Close', active: 'Active filters', remove: (f) => `Remove the ${f} filter`, more: 'Appearance',
+  bar: { filters: 'Filters', clear: 'Clear filters', clearAll: 'Clear all', done: 'Close', active: 'Active filters', remove: (f) => `Remove the ${f} filter`, more: 'Appearance',
     loading: 'Loading…', loaded: (t) => `${t} loaded` },
   prod: { areas: 'Product areas', areasHint: 'Screens grouped by area. Click an area to see its screens.', area: 'Area', screens: 'Screens', share: 'of the visits',
     adoption: 'Adoption', score: 'Frustration', failures: 'Failures', trend: 'Visits per day', low: 'Seen and little used', lowHint: (p) => `Buttons that showed up in many sessions and were clicked in fewer than ${p}% of them.`,
@@ -1291,7 +1297,7 @@ const L = PT ? {
   compareHint: 'Same period and filters, split by version. More frustration on the new version is worse.', change: 'Change',
   screensCompared: 'Screens, most worsened first', actionsCompared: 'Actions: clicks and time (medians)',
   newFailures: 'Failures only the new version has', noNewFailures: 'No new failures.', onlyIn: (v) => `only in ${v}`, worse: 'worse', better: 'better', same: 'same',
-  rel: { title: (b, a) => `Version ${b} vs ${a}`, scorePer: 'Frustration per visit', failPer: 'Failures per 100 sessions', volume: (a, b) => `Volume: ${a} → ${b} visits (context only: each version was live for its own time)`,
+  rel: { title: (b, a) => `Version ${b} vs ${a}`, scorePer: 'Frustration per visit', failPer: 'Failures per session', failExpect: 'expected: 0', volume: (a, b) => `Volume: ${a} → ${b} visits (context only: each version was live for its own time)`,
     worst: 'Screens that got worse the most', worstVs: (a) => `against version ${a}`, noWorse: 'No screen got worse.', open: 'See in Versions', widened: (n) => `Compared over ${n} days: the previous version is out of the chosen period.`,
     onlyOne: (b) => `Only version ${b} in this period.`, prevHint: (a, n) => `The previous one, ${a}, shows up widening the period to ${n} days.`,
     widen: (n) => `Compare with the previous version (widens to ${n} days)`, noPrev: 'There is no previous version in the kept data.', sinceMark: 'There is no previous version since the mark in use. Pick "Whole period" in Marks to see the others.',
@@ -1460,6 +1466,7 @@ function shell() {
             <div class="fpanel-foot"><button id="filters-clear" data-clear="*">${L.bar.clear}</button><button class="primary" id="filters-done">${L.bar.done}</button></div>
           </div></span>
         <span class="prefs-wrap f-marks"><button id="marks-open" aria-expanded="false" aria-controls="marks"></button></span>
+        <span class="prefs-wrap f-share"><button id="share-open" aria-haspopup="menu" aria-expanded="false" aria-controls="share" title="${X().shareTip}">${X().share}</button></span>
         <span class="prefs-wrap f-more"><button id="prefs-open" aria-expanded="false" aria-controls="prefs" aria-label="${L.bar.more}" title="${L.bar.more}">⋯</button></span>
         ${state.me.no_auth ? '' : `<span class="who"><span class="meta">${esc(state.me.email)}</span><button id="signout">${L.signout}</button></span>`}
       </div>
@@ -1483,6 +1490,7 @@ function shell() {
   })
   wireBar()
   wireSearch()
+  wireShare()
   $('#signout')?.addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); boot() })
   $('#content').addEventListener('click', onContentClick)
   $('#content').addEventListener('click', (e) => {
@@ -1602,19 +1610,27 @@ const BAR = () => L.bar
 // On a narrow screen the account goes inside the panel too; the select is moved, never copied, so its value and listeners stay.
 const placeAccount = () => { const f = $('#f-account'); if (f) $(NARROW.matches ? '.f-account-panel' : '.f-account-top').append(f) }
 const optText = (id) => { const s = $('#' + id); return s?.selectedOptions[0]?.textContent ?? s?.value }
+// Everything that cuts the numbers, in one list: the chips under the tabs and the shared summary both read it, so a tab
+// never looks unfiltered while it is filtered.
+function activeFilters() {
+  const label = { version: L.version, account: L.account, role: L.role, feature: L.feature }, p = projectNow(), out = []
+  for (const id of ['account', 'version', 'role', 'feature']) if ($('#' + id)?.value) out.push({ id, text: `${label[id]}: ${optText(id)}`, aria: BAR().remove(label[id]) })
+  if (state.all && p?.mark) out.push({ id: 'all', text: L.nodata.allChip, aria: L.nodata.allOff })
+  else if (p?.mark) { const m = (p.marks ?? []).find((x) => x.at === p.mark)
+    out.push({ id: 'mark', text: L.mark.since(`${dateOf(p.mark)}${m?.name ? ' · ' + m.name : ''}`), aria: X().removeMark }) }
+  if (state.user) out.push({ id: 'user', text: personName(state.user) || `${L.user} ${short(state.user)}`, aria: L.removeUser,
+    html: personName(state.user) ? '' : `${L.user} <code>${esc(short(state.user))}</code>` })
+  return out
+}
 function filterBar() {
   const inPanel = ['version', 'role', 'feature', ...(NARROW.matches ? ['account'] : [])]
   const n = inPanel.filter((id) => $('#' + id)?.value).length
   const open = $('#filters-open'); if (open) open.textContent = n ? `${BAR().filters} · ${n}` : BAR().filters
   if ($('#account')) $('#account').title = $('#account').value ? optText('account') : ''
-  const label = { version: L.version, account: L.account, role: L.role, feature: L.feature }
-  const chips = ['account', 'version', 'role', 'feature'].filter((id) => $('#' + id)?.value).map((id) => {
-    const t = `${label[id]}: ${optText(id)}`
-    return `<span class="chip" title="${esc(t)}"><span class="ell">${esc(t)}</span><button data-clear="${id}" aria-label="${esc(BAR().remove(label[id]))}">×</button></span>` })
-  if (state.all && projectNow()?.mark) chips.push(`<span class="chip"><span class="ell">${esc(L.nodata.allChip)}</span><button data-clear="all" aria-label="${esc(L.nodata.allOff)}" title="${esc(L.nodata.allOff)}">×</button></span>`)
-  if (state.user) chips.push(`<span class="chip">${personName(state.user) ? esc(personName(state.user)) : `${L.user} <code>${esc(short(state.user))}</code>`}<button id="remove-user" data-clear="user" aria-label="${L.removeUser}">×</button></span>`)
+  const list = activeFilters()
+  const chips = list.map((c) => `<span class="chip" title="${esc(c.text)}"><span class="ell">${c.html || esc(c.text)}</span><button ${c.id === 'user' ? 'id="remove-user" ' : ''}data-clear="${c.id}" aria-label="${esc(c.aria)}">×</button></span>`)
   const box = $('#active-filters'); if (!box) return
-  box.innerHTML = chips.join('') + (chips.length > 1 ? `<button class="link" data-clear="*">${BAR().clear}</button>` : '')
+  box.innerHTML = chips.join('') + (chips.length > 1 ? `<button class="link" data-clear="**">${BAR().clearAll}</button>` : '')
   box.hidden = !chips.length
 }
 // Tabs on a narrow screen scroll sideways: a fade on the side that has more, and the open tab brought into view.
@@ -1643,12 +1659,14 @@ function closeFilters(focus) {
 function wireBar() {
   placeAccount(); NARROW.addEventListener('change', () => { placeAccount(); filterBar() })
   const nav = $('nav.tabs'); nav.addEventListener('scroll', navEdges, { passive: true }); addEventListener('resize', navEdges)
-  markTab()
+  markTab(); document.fonts?.ready.then(markTab) // tab widths change once the font is in: bring the open tab back into view
   $('header').addEventListener('click', (e) => {
     const c = e.target.closest('[data-clear]')
     if (c) {
-      const ids = c.dataset.clear === '*' ? ['version', 'account', 'role', 'feature', 'user'] : [c.dataset.clear]
-      for (const id of ids) if (id === 'user' || id === 'all') state[id] = ''; else { $('#' + id).value = ''; keep(id, '') }
+      const every = c.dataset.clear === '**' // "Clear all" also drops the mark (saved on the server, so it goes through its own call)
+      const ids = c.dataset.clear === '*' || every ? ['version', 'account', 'role', 'feature', 'user'] : [c.dataset.clear]
+      for (const id of ids) if (id === 'user' || id === 'all') state[id] = ''; else if (id !== 'mark') { $('#' + id).value = ''; keep(id, '') }
+      if ((every || c.dataset.clear === 'mark') && projectNow()?.mark) { state.all = ''; return markAction({ action: 'none' }) }
       return render()
     }
     if (e.target.closest('#filters-done')) return closeFilters(true)
@@ -1664,6 +1682,112 @@ function wireBar() {
   document.addEventListener('click', (e) => { if (!e.target.closest('#filters, #filters-open')) closeFilters() })
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#filters')?.hidden) closeFilters(true) })
 }
+// Share this view ------------------------------------------------------------------------------------------
+// Its own words (kept apart from L, which several hands change). The link reuses the address format: hashFor writes tab, period and filters.
+const X_PT = { share: 'Compartilhar', shareTip: 'Compartilhar esta visão', menu: 'Compartilhar esta visão', link: 'Copiar link desta visão', text: 'Copiar resumo em texto', working: 'Gerando…',
+  removeMark: 'Tirar o marco (contar o período inteiro)', period: 'Período', filters: 'Filtros', none: 'nenhum', link2: 'Link',
+  unitVisits: 'telas abertas', unitPeople: 'pessoas diferentes', unitFailures: 'erros, lentidões e pedidos recusados',
+  ovScore: (s, v, ses) => `Frustração ${s} de 100 (quanto maior, pior) em ${plural(v, 'visita', 'visitas')} e ${plural(ses, 'sessão', 'sessões')}`,
+  ovTotals: (p, f) => `${plural(p, 'pessoa', 'pessoas')} · ${plural(f, 'falha', 'falhas')}`, topTodo: 'O que pede atenção',
+  frScore: (s, v) => `Frustração geral ${s} de 100 em ${plural(v, 'visita', 'visitas')}`, frRow: (n, s, v) => `${n}: frustração ${s} em ${plural(v, 'visita', 'visitas')}`,
+  faTotal: (n) => `${plural(n, 'falha diferente', 'falhas diferentes')}`, faRow: (n, t, s, u) => `${t}: ${n} — ${num(s)}× em ${plural(u.sessions, 'sessão', 'sessões')} · ${plural(u.users, 'usuário', 'usuários')}`,
+  veOne: 'Só uma versão no período: nada para comparar.', veHead: (b, a) => `Versão ${b} contra ${a}`, veScore: (a, b) => `Frustração por visita: ${a} → ${b}`,
+  veFail: (a, b) => `Falhas por sessão: ${a} → ${b} (esperado: 0)`, veNew: (n) => `${plural(n, 'falha só na versão nova', 'falhas só na versão nova')}`,
+  usRow: (n, v, u) => `${n}: ${plural(v, 'visita', 'visitas')} · ${plural(u, 'pessoa', 'pessoas')}`,
+  peRow: (n, u, v, s) => `${n}: ${plural(u, 'pessoa', 'pessoas')} · ${plural(v, 'visita', 'visitas')} · frustração ${s}` }
+const X_EN = { share: 'Share', shareTip: 'Share this view', menu: 'Share this view', link: 'Copy link to this view', text: 'Copy summary as text', working: 'Generating…',
+  removeMark: 'Remove the mark (count the whole period)', period: 'Period', filters: 'Filters', none: 'none', link2: 'Link',
+  unitVisits: 'screens opened', unitPeople: 'different people', unitFailures: 'errors, slowdowns and refused requests',
+  ovScore: (s, v, ses) => `Frustration ${s} of 100 (higher is worse) over ${plural(v, 'visit', 'visits')} and ${plural(ses, 'session', 'sessions')}`,
+  ovTotals: (p, f) => `${plural(p, 'person', 'people')} · ${plural(f, 'failure', 'failures')}`, topTodo: 'What needs attention',
+  frScore: (s, v) => `Overall frustration ${s} of 100 over ${plural(v, 'visit', 'visits')}`, frRow: (n, s, v) => `${n}: frustration ${s} over ${plural(v, 'visit', 'visits')}`,
+  faTotal: (n) => `${plural(n, 'different failure', 'different failures')}`, faRow: (n, t, s, u) => `${t}: ${n} — ${num(s)}× in ${plural(u.sessions, 'session', 'sessions')} · ${plural(u.users, 'user', 'users')}`,
+  veOne: 'Only one version in the period: nothing to compare.', veHead: (b, a) => `Version ${b} against ${a}`, veScore: (a, b) => `Frustration per visit: ${a} → ${b}`,
+  veFail: (a, b) => `Failures per session: ${a} → ${b} (expected: 0)`, veNew: (n) => `${plural(n, 'failure only in the new version', 'failures only in the new version')}`,
+  usRow: (n, v, u) => `${n}: ${plural(v, 'visit', 'visits')} · ${plural(u, 'person', 'people')}`,
+  peRow: (n, u, v, s) => `${n}: ${plural(u, 'person', 'people')} · ${plural(v, 'visit', 'visits')} · frustration ${s}` }
+const X = () => (PT ? X_PT : X_EN)
+const strip = (html) => Object.assign(document.createElement('div'), { innerHTML: html }).textContent.replace(/\s+/g, ' ').trim()
+const viewLink = () => location.origin + location.pathname + hashFor(state.tab, tabParams(state.tab))
+// A few plain lines of what the open tab says now: counts and names only, never typed content. Tabs without one share the link alone.
+const SUMMARY = {
+  async overview() {
+    const o = await read('/api/overview'), n = o.now, T = X()
+    const todo = o.insights.filter((i) => groupOf(i.kind) !== 'better').slice(0, 3).map((i) => `- ${strip(L.insight[i.kind](nameFields(i), esc(L.names[i.type ?? i.top_signal] ?? i.type ?? i.top_signal ?? '')))}`)
+    return [T.ovScore(n.score, n.visits, n.sessions), T.ovTotals(n.users, n.failures), ...(todo.length ? ['', T.topTodo + ':', ...todo] : [])]
+  },
+  async frustration() {
+    const r = await read('/api/summary'), T = X()
+    return [T.frScore(r.overall.score, r.overall.visits), ...r.routes.filter((x) => x.visits).slice(0, 5).map((x) => `- ${T.frRow(screenText(x.key) || x.key, x.score, x.visits)}`)]
+  },
+  async failures() {
+    const { failures: list } = await read('/api/failures'), T = X()
+    return [T.faTotal(list.length), ...list.slice(0, 5).map((f) => `- ${T.faRow(f.detail, L.names[f.type] ?? f.type, f.n, f)}`)]
+  },
+  async versions() {
+    const c = await read('/api/compare', { a: state.a, b: state.b }), T = X()
+    if (c.versions.length < 2) return [T.veOne]
+    const o = c.overall, worse = c.routes.filter((r) => r.delta > 0).slice(0, 3)
+    return [T.veHead(c.b, c.a), T.veScore(o.a.score, o.b.score), T.veFail(perSession(o.a), perSession(o.b)), T.veNew(c.new_failures.length),
+      ...worse.map((r) => `- ${screenText(r.route) || r.route}: +${r.delta}`)]
+  },
+  async usage() {
+    const { screens } = await read('/api/usage'), T = X()
+    return screens.slice(0, 5).map((s) => `- ${T.usRow(screenText(s.route) || s.route, s.visits, s.users)}`)
+  },
+  async people() {
+    const p = await read('/api/people'), T = X()
+    return p.roles.slice(0, 5).map((g) => `- ${T.peRow(g.key, g.users, g.visits, g.score)}`)
+  },
+}
+async function summaryText() {
+  const T = X(), fs = activeFilters().map((x) => x.text)
+  const lines = await (SUMMARY[state.tab]?.() ?? [])
+  return [`${L.tabs[state.tab]} · ${$('#project').value}`, `${T.period}: ${inPeriod()}`, `${T.filters}: ${fs.length ? fs.join('; ') : T.none}`,
+    ...(lines.length ? ['', ...lines] : []), '', `${T.link2}: ${viewLink()}`].join('\n')
+}
+// Safari wants the copy inside the click, so the text goes in as a promise; elsewhere writeText does the same.
+const copyText = (text) => (window.ClipboardItem && navigator.clipboard?.write
+  ? navigator.clipboard.write([new ClipboardItem({ 'text/plain': Promise.resolve(text).then((t) => new Blob([t], { type: 'text/plain' })) })])
+  : Promise.resolve(text).then((t) => navigator.clipboard.writeText(t)))
+function closeShare(focus) {
+  const m = $('#share'); if (!m) return
+  m.remove(); $('#share-open')?.setAttribute('aria-expanded', 'false'); if (focus) $('#share-open')?.focus()
+}
+let shareWired = false // shell() can run again after a sign-out; the document listeners must not double up
+function wireShare() {
+  if (shareWired) return; shareWired = true
+  const show = () => {
+    const open = $('#share-open')
+    open.insertAdjacentHTML('afterend', `<div class="prefs share" id="share" role="menu" aria-label="${esc(X().menu)}">
+      <button role="menuitem" data-share="link">${X().link}</button><button role="menuitem" data-share="text">${X().text}</button></div>`)
+    const box = $('#share'), r = open.getBoundingClientRect()
+    box.style.top = r.bottom + 6 + 'px'; box.style.left = Math.max(16, Math.min(r.right - box.offsetWidth, innerWidth - box.offsetWidth - 16)) + 'px'
+    open.setAttribute('aria-expanded', 'true'); box.querySelector('button').focus()
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('#share-open')) return $('#share') ? closeShare() : show()
+    const b = e.target.closest('#share [data-share]')
+    if (!b) { if ($('#share') && !e.target.closest('#share')) closeShare(); return }
+    const was = b.textContent
+    b.textContent = X().working; b.disabled = true
+    try {
+      await copyText(b.dataset.share === 'link' ? viewLink() : summaryText())
+      b.textContent = L.copied; b.classList.add('done'); toast(L.copied)
+    } catch { b.textContent = was }
+    b.disabled = false; if (document.activeElement === document.body) b.focus()
+    setTimeout(() => { if (b.isConnected) { b.textContent = was; b.classList.remove('done') } }, 1500)
+  })
+  document.addEventListener('keydown', (e) => {
+    const m = $('#share'); if (!m) return
+    const items = [...m.querySelectorAll('button')], at = items.indexOf(document.activeElement)
+    if (e.key === 'Escape') { e.preventDefault(); closeShare(true) }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus() }
+    else if (e.key === 'Tab') closeShare() // focus moves on naturally; the menu does not stay open behind it
+  })
+  addEventListener('scroll', () => closeShare(), { passive: true })
+}
+
 // Loading: a thin bar on top and the previous content dimmed while the next one comes; the very first time, a skeleton.
 let renderSeq = 0
 // Chart columns and heat cells take focus to show their tooltip; a screen reader gets the same text as their name.
@@ -1739,7 +1863,8 @@ function wireSearch() {
       items.forEach((a, i) => a.classList.toggle('on', i === next)); items[next].scrollIntoView({ block: 'nearest' })
     } else if (e.key === 'Enter' && items.length) { e.preventDefault(); (items[at] ?? items[0]).click() }
   })
-  box.addEventListener('click', (e) => { if (e.target.closest('a')) { close(); input.blur() } })
+  // A picked result goes to its own link; the field and the list are emptied so the next look starts clean.
+  box.addEventListener('click', (e) => { if (e.target.closest('a')) { close(); input.value = ''; box.innerHTML = ''; seq++; input.blur() } })
   document.addEventListener('click', (e) => { if (!e.target.closest('.search')) close() })
   document.addEventListener('keydown', (e) => {
     if (e.key === '/' && !e.target.matches('input, select, textarea')) { e.preventDefault(); input.focus(); input.select() }
@@ -2082,6 +2207,9 @@ document.addEventListener('click', async (e) => {
   // Saved for later: the period keeps counting from where it was.
   if (!was) markAction({ action: 'none' }); else if (from?.id) markAction({ action: 'use', id: from.id })
 })
+// Failures per session, from the server's per-100 figure (the math stays there): 133,3 per 100 reads as "1,33", with the counts that make it.
+const perSession = (x) => (x.failures_per_100 / 100).toLocaleString(PT ? 'pt-BR' : 'en', { maximumFractionDigits: 2 })
+const failCounts = (a, b) => `${num(a.failures)} → ${num(b.failures)} ${L.failures.toLowerCase()} · ${num(a.sessions)} → ${num(b.sessions)} ${PT ? 'sessões' : 'sessions'}`
 function releaseCard(rel) {
   if (!rel) return ''
   const { c, widened } = rel, a = c.overall.a, b = c.overall.b, R = L.rel, v = verdictOf(b.score - a.score)
@@ -2089,7 +2217,7 @@ function releaseCard(rel) {
   return `<section class="card release"><div class="head"><div><div class="label">${esc(R.title(c.b, c.a))}${help('release')}</div>
       ${widened ? `<div class="meta">${R.widened(widened)}</div>` : ''}</div><span class="pill ${VERDICT_CLS[v]}">${L[v]}</span></div>
     <div class="rel-nums"><div><div class="meta">${R.scorePer}</div><div class="big">${scoreHtml(a.score)} → ${scoreHtml(b.score)}</div></div>
-      <div><div class="meta">${R.failPer}</div><div class="big">${num(a.failures_per_100)} → ${num(b.failures_per_100)}</div></div></div>
+      <div><div class="meta">${R.failPer}</div><div class="big">${perSession(a)} → ${perSession(b)}</div><div class="meta">${failCounts(a, b)}</div></div></div>
     <div class="meta">${R.volume(num(a.visits), num(b.visits))}</div>
     <div class="psec"><div class="meta">${R.worst} <span class="vs">${R.worstVs(c.a)}</span></div>${worst.length ? `<ul class="counts">${worst.map((r) => `<li>
         <a ${linkAttrs({ tab: 'frustration', params: { route: r.route } })} title="${esc(r.route)}">${esc(screenText(r.route) || r.route)}</a>
@@ -2119,6 +2247,7 @@ async function overview() {
   const points = n.score - b.score
   const vs = !comparable ? L.noCompare : o.days === 1 ? L.vsDay : L.vsBefore(o.days)
   const series = (k) => o.daily.map((d) => d[k])
+  const unit = (t) => `<span class="unit">${esc(t)}</span> · ` // what the number counts, before the comparison
   const tile = (label, value, cls, delta, key, foot) => `<div class="card tile"><div class="label">${label}${key === 'score' ? help('overall') : ''}</div>
     <div class="row"><div class="big ${cls}">${value}${delta}</div>${spark(series(key), `${label} ${L.perDay}: ${Math.min(...series(key))}–${Math.max(...series(key))}`)}</div>
     <div class="meta">${foot}</div></div>`
@@ -2163,9 +2292,9 @@ async function overview() {
     <section class="numbers">
       ${tile(L.overall, n.score, band(n.score), comparable && b.visits ? deltaChip(n.score, b.score, { kind: 'pts', worseUp: true }) : '', 'score',
         `<span class="pill ${band(n.score)}">${say(n.score)}</span> ${L.allScreens}`)}
-      ${tile(L.visits, num(n.visits), '', diff(n.visits, b.visits), 'visits', L.sessions(n.sessions))}
-      ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', vs)}
-      ${tile(L.failures, num(n.failures), n.failures ? 'bad' : 'ok', diff(n.failures, b.failures, true), 'failures', vs)}
+      ${tile(L.visits, num(n.visits), '', diff(n.visits, b.visits), 'visits', `${unit(X().unitVisits)}${L.sessions(n.sessions)}`)}
+      ${tile(L.people, num(n.users), '', diff(n.users, b.users), 'users', `${unit(X().unitPeople)}${vs}`)}
+      ${tile(L.failures, num(n.failures), n.failures ? 'bad' : 'ok', diff(n.failures, b.failures, true), 'failures', `${unit(X().unitFailures)}${vs}`)}
     </section>
     ${insights}
     ${kindsCard(o)}
@@ -2254,10 +2383,10 @@ async function frustration() {
 const F = () => L.failureTab
 // The failure detail's and the screen detail's own words (kept apart from L, which several hands change).
 const FD_PT = { perDay: 'Por dia', byDay: 'Vezes por dia', peak: (n, d) => `pico de ${n}× em ${d}`, firstSeen: 'Primeira vez', lastSeen: 'Última vez', inVersion: (v) => `na versão ${v}`,
-  started: 'apareceu', accounts: 'Contas atingidas', people: 'Pessoas atingidas', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copiar como demanda',
+  started: 'apareceu', timesEach: 'vezes em cada uma', accounts: 'Contas atingidas', people: 'Pessoas atingidas', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copiar como demanda',
   unnamed: { icon: 'Ícone sem nome', button: 'Botão sem nome', link: 'Link sem nome', field: 'Campo sem nome', form: 'Formulário sem nome', other: 'Elemento sem nome' }, accountsMd: 'Contas' }
 const FD_EN = { perDay: 'Per day', byDay: 'Times per day', peak: (n, d) => `peak of ${n}× on ${d}`, firstSeen: 'First seen', lastSeen: 'Last seen', inVersion: (v) => `in version ${v}`,
-  started: 'appeared', accounts: 'Accounts hit', people: 'People hit', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copy as a request',
+  started: 'appeared', timesEach: 'times on each one', accounts: 'Accounts hit', people: 'People hit', dayTip: (d, n) => `${d}: ${n}×`, copyRow: 'Copy as a request',
   unnamed: { icon: 'Unnamed icon', button: 'Unnamed button', link: 'Unnamed link', field: 'Unnamed field', form: 'Unnamed form', other: 'Unnamed element' }, accountsMd: 'Accounts' }
 const FD = () => (PT ? FD_PT : FD_EN)
 const when = (at) => (at ? new Date(at).toLocaleString(PT ? 'pt-BR' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—')
@@ -2323,8 +2452,9 @@ function failureChart(d) {
     </div>${dayAxis(days, 'sm')}</div>`
 }
 // Accounts or people a failure hit, each a link that opens it with that filter on.
-const hitList = (title, list, name, link) => `<div><div class="label">${title}</div>${list?.length
-  ? `<ul class="counts">${list.map((x) => `<li><a ${linkAttrs(link(x.key))} title="${esc(x.key)}">${esc(name(x.key))}</a><b>${num(x.n)}</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
+// The title counts who was hit (distinct accounts or people, as the server counts them); the number on each row is how many times it happened there.
+const hitList = (title, total, list, name, link) => `<div><div class="label">${title}${total ? ` (${num(total)})` : ''}</div><div class="meta">${FD().timesEach}</div>${list?.length
+  ? `<ul class="counts">${list.map((x) => `<li><a ${linkAttrs(link(x.key))} title="${esc(x.key)}">${esc(name(x.key))}</a><b>${num(x.n)}×</b></li>`).join('')}</ul>` : '<p class="meta">—</p>'}</div>`
 
 // A failure is followed by its type and detail; the copy buttons carry what the toast needs unless it already is.
 const failFollowButton = (d, follows) => follows.some((x) => x.kind === 'failure' && x.key === failKey(d.type, d.detail))
@@ -2360,8 +2490,8 @@ async function failures() {
       </div>
       ${failureChart(d)}
       <div class="facts">${counts(F().where, d.routes, (k) => screenText(k) || k)}${counts(F().versions, d.versions)}
-        ${hitList(FD().accounts, d.account_list, accountText, (k) => ({ tab: 'accounts', params: { account: k } }))}
-        ${hitList(FD().people, d.people, (k) => personName(k) || `${L.user} ${short(k)}`, (k) => ({ tab: 'people', params: { user: k } }))}
+        ${hitList(FD().accounts, d.accounts, d.account_list, accountText, (k) => ({ tab: 'accounts', params: { account: k } }))}
+        ${hitList(FD().people, d.users, d.people, (k) => personName(k) || `${L.user} ${short(k)}`, (k) => ({ tab: 'people', params: { user: k } }))}
         ${counts(F().agents, d.agents)}${counts(F().devices, d.devices, (k) => F().devicesNames[k] ?? k)}${d.after_clicking.length ? counts(F().afterClicking, d.after_clicking, (k) => controlLabel(d.routes[0]?.key, k) || k) : ''}</div>
       <div class="label" style="margin-top:16px">${F().stack}</div>
       ${d.stacks.length ? d.stacks.map((x) => `<pre class="stack">${esc(x.key)}</pre>${d.stacks.length > 1 ? `<div class="meta">${num(x.n)}×</div>` : ''}`).join('') : `<p class="meta">${F().noStack}</p>`}
@@ -2689,8 +2819,8 @@ async function versions() {
     <section class="numbers">
       <div class="card"><div class="label">${R.scorePer}${help('release')}</div><div class="big">${scoreHtml(o.a.score)} → ${scoreHtml(o.b.score)}</div>
         <span class="pill ${VERDICT_CLS[v]}">${L[v]}</span> <span class="meta">${esc(R.volume(num(o.a.visits), num(o.b.visits)))}</span></div>
-      <div class="card"><div class="label">${R.failPer}</div><div class="big ${o.b.failures_per_100 > o.a.failures_per_100 ? 'bad' : ''}">${num(o.a.failures_per_100)} → ${num(o.b.failures_per_100)}</div>
-        <span class="meta">${num(o.a.failures)} → ${num(o.b.failures)} ${L.failures.toLowerCase()} · ${L.todo.sessions(o.b.sessions)}</span></div>
+      <div class="card"><div class="label">${R.failPer}</div><div class="big ${o.b.failures_per_100 > o.a.failures_per_100 ? 'bad' : ''}">${perSession(o.a)} → ${perSession(o.b)}</div>
+        <span class="meta">${failCounts(o.a, o.b)} · ${R.failExpect}</span></div>
       <div class="card"><div class="label">${L.newFailures}</div><div class="big ${c.new_failures.length ? 'bad' : 'ok'}">${c.new_failures.length}</div></div>
     </section>
     <section class="card"><div class="label">${L.screensCompared}${help('compare')}</div>

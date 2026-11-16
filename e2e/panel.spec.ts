@@ -221,3 +221,125 @@ test.describe('map over the app', () => {
     expect(errors).toEqual([])
   })
 })
+
+// Finding, sharing and reading numbers ---------------------------------------------------------------------------
+test.describe('share this view', () => {
+  test.use({ permissions: ['clipboard-read', 'clipboard-write'] })
+  const clip = (page: Page) => page.evaluate(() => navigator.clipboard.readText())
+  const share = async (page: Page, what: 'link' | 'text') => {
+    await page.locator('#share-open').click()
+    await page.locator(`#share [data-share="${what}"]`).click()
+    await expect(page.locator(`#share [data-share="${what}"]`)).toHaveText('Copiado')
+  }
+
+  test('copies the link with the tab, period and filters', async ({ page }) => {
+    const errors = watch(page)
+    await open(page, 'versions', '&account=4821&role=agent')
+    await share(page, 'link')
+    const link = await clip(page)
+    expect(link).toContain('#versions?')
+    for (const part of ['project=demo', 'days=30', 'account=4821', 'role=agent']) expect(link).toContain(part)
+    expect(errors).toEqual([])
+  })
+
+  for (const [tab, title] of [['overview', 'Início'], ['frustration', 'Frustração'], ['failures', 'Falhas'], ['versions', 'Versões'], ['usage', 'Uso'], ['people', 'Pessoas']]) {
+    test(`the text summary of ${tab} has title, period, filters, numbers and the link`, async ({ page }) => {
+      const errors = watch(page)
+      await open(page, tab, '&account=4821')
+      await share(page, 'text')
+      const text = await clip(page)
+      const lines = text.split('\n')
+      expect(lines[0]).toContain(title)
+      expect(text).toContain('Período: nos últimos 30 dias')
+      expect(text).toContain('Filtros: Conta: 4821')
+      expect(lines.filter((l) => /\d/.test(l) && !l.startsWith('Link:')).length).toBeGreaterThan(2) // the numbers, not only the frame
+      expect(lines.at(-1)).toContain(`#${tab}?`)
+      expect(errors).toEqual([])
+    })
+  }
+
+  test('keyboard: opens on the first item, arrows move, Escape closes and gives the focus back', async ({ page }) => {
+    await open(page, 'overview')
+    await page.locator('#share-open').focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#share [data-share="link"]')).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(page.locator('#share [data-share="text"]')).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#share')).toHaveCount(0)
+    await expect(page.locator('#share-open')).toBeFocused()
+  })
+
+  test('tabs without a summary still share the link', async ({ page }) => {
+    await open(page, 'dictionary')
+    await share(page, 'text')
+    const text = await clip(page)
+    expect(text).toContain('Dicionário')
+    expect(text).toContain('#dictionary?')
+  })
+})
+
+test('choosing a search result empties the search field', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'overview')
+  const input = page.locator('#search')
+  await input.fill('users')
+  const first = page.locator('#results a').first()
+  await expect(first).toBeVisible()
+  await first.click()
+  await expect(input).toHaveValue('')
+  await expect(page.locator('#results')).toBeHidden()
+  expect(errors).toEqual([])
+})
+
+test.describe('active filters show on every tab', () => {
+  for (const tab of TABS.filter((t) => t !== 'map')) {
+    test(`${tab}: chips and "Limpar tudo"`, async ({ page }) => {
+      await open(page, tab, '&account=4821&role=agent')
+      const chips = page.locator('#active-filters .chip')
+      await expect(chips).toHaveCount(2)
+      await expect(chips.nth(0)).toContainText('Conta: 4821')
+      await expect(chips.nth(1)).toContainText('Papel: agent')
+      await page.locator('#active-filters [data-clear="**"]').click()
+      await expect(page.locator('#active-filters')).toBeHidden()
+      await expect(page.locator('#account')).toHaveValue('')
+      await expect(page.locator('#role')).toHaveValue('')
+    })
+  }
+})
+
+test('numbers say what they count', async ({ page }) => {
+  const errors = watch(page)
+  await open(page, 'versions')
+  const tile = page.locator('.numbers .card', { hasText: 'Falhas por sessão' })
+  await expect(tile).toContainText(/\d+(,\d+)? → \d+(,\d+)?/)
+  await expect(tile).toContainText(/falhas · .* sessões · esperado: 0/)
+  await expect(page.locator('#content')).not.toContainText('por 100 sessões')
+  await open(page, 'overview')
+  await expect(page.locator('.tile', { hasText: 'Pessoas' })).toContainText('pessoas diferentes')
+  await expect(page.locator('.tile', { hasText: 'Visitas' })).toContainText('telas abertas')
+  await expect(page.locator('.tile', { hasText: 'Falhas' })).toContainText('erros, lentidões e pedidos recusados')
+  // The lists beside "who was hit" count times (the server counts events per account), and the title counts who.
+  await open(page, 'failures', `&signal=http_5xx&detail=${encodeURIComponent('POST /api/invites 500')}`)
+  const hit = page.locator('.facts > div', { hasText: 'Contas atingidas' })
+  await expect(hit).toContainText(/Contas atingidas \(\d+\)/)
+  await expect(hit).toContainText('vezes em cada uma')
+  await expect(hit.locator('li b').first()).toHaveText(/^\d+×$/)
+  expect(errors).toEqual([])
+})
+
+test('phone: the open tab is in view, the tab bar hints it scrolls, the search has its own row', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 })
+  await open(page, 'accounts')
+  const nav = page.locator('nav.tabs')
+  await expect(nav).toHaveClass(/fade-l/) // more tabs to the left: the fade says so
+  const inView = await page.evaluate(() => {
+    const a = document.querySelector('nav.tabs a.on')!.getBoundingClientRect(), n = document.querySelector('nav.tabs')!.getBoundingClientRect()
+    return a.left >= n.left && a.right <= n.right
+  })
+  expect(inView).toBe(true)
+  await open(page, 'overview')
+  await expect(nav).toHaveClass(/fade-r/) // more tabs to the right
+  const [search, tour] = await Promise.all([page.locator('.search').boundingBox(), page.locator('#tour-open').boundingBox()])
+  expect(search!.y).toBeGreaterThan(tour!.y + tour!.height - 1)
+})
